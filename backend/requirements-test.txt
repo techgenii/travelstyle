@@ -1,9 +1,9 @@
-pytest>=7.0.0
-pytest-asyncio>=0.21.0
-pytest-cov>=4.0.0
-pytest-mock>=3.10.0
-pytest-xdist>=3.0.0
+pytest
+pytest-asyncio
+pytest-cov
+pytest-mock
+pytest-xdist
 
-pylint>=3.0.0
-pylint-json2html>=0.6.0
-bandit>=1.7.0
+pylint
+pylint-json2html
+bandit
