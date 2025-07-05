@@ -3,14 +3,13 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![Python Version](https://img.shields.io/badge/python-3.13-blue)
 [![TypeScript](https://img.shields.io/badge/typescript-4.0+-blue.svg)](https://www.typescriptlang.org/)
-![Tests](https://img.shields.io/badge/tests-pytest-blue?logo=pytest)
-![Security](https://img.shields.io/badge/security-bandit-red?logo=python)
-![Code%20Quality](https://img.shields.io/badge/code%20quality-pylint-green?logo=python)
 
-[![Tests](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg)](https://github.com/techgenii/travelstyle/actions)
-[![Coverage](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg?job=coverage)](https://github.com/techgenii/travelstyle/actions)
-[![Security](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg?job=security)](https://github.com/techgenii/travelstyle/actions)
-[![Lint](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg?job=lint)](https://github.com/techgenii/travelstyle/actions)
+## 🚀 Quality & Status
+
+[![CI/CD](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg)](https://github.com/techgenii/travelstyle/actions)
+[![Codecov](https://codecov.io/gh/techgenii/travelstyle/branch/main/graph/badge.svg)](https://codecov.io/gh/techgenii/travelstyle)
+[![Pylint](https://img.shields.io/badge/pylint-8.5%2F10-brightgreen)](https://github.com/techgenii/travelstyle/actions)
+[![Bandit](https://img.shields.io/badge/bandit-0%20issues-brightgreen)](https://github.com/techgenii/travelstyle/actions)
 
 ## Product Vision
 TravelStyle AI is an intelligent travel companion chat application that provides personalized wardrobe recommendations, cultural style guidance, and currency conversion tools to help travelers dress appropriately and confidently for any destination.

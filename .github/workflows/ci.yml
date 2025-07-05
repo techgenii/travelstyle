@@ -12,6 +12,10 @@ on:
       - 'backend/**'
       - '.github/workflows/ci.yml'
 
+permissions:
+  contents: write
+  pull-requests: read
+
 env:
   PYTHON_VERSION: '3.13'
   WORKING_DIR: backend
@@ -54,8 +58,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
-
         
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -139,6 +141,11 @@ jobs:
           
       - name: Create comprehensive quality report
         run: |
+          # Debug: List all artifacts
+          echo "📁 Available artifacts:"
+          find artifacts/ -type f -name "*.txt" 2>/dev/null || echo "No .txt files found"
+          echo ""
+          
           # Create report header
           cat > comprehensive_report.md << 'EOF'
           # TravelStyle AI Backend - Code Quality Report
@@ -158,8 +165,9 @@ jobs:
           
           # Add coverage info
           echo "## 📊 Coverage Report" >> comprehensive_report.md
-          if [ -f "artifacts/coverage-summary/coverage_summary.txt" ]; then
-            cat artifacts/coverage-summary/coverage_summary.txt >> comprehensive_report.md
+          COVERAGE_FILE=$(find artifacts/ -name "coverage_summary.txt" 2>/dev/null | head -1)
+          if [ -n "$COVERAGE_FILE" ] && [ -f "$COVERAGE_FILE" ]; then
+            cat "$COVERAGE_FILE" >> comprehensive_report.md
           else
             echo "❌ Coverage report not available" >> comprehensive_report.md
           fi
@@ -167,8 +175,9 @@ jobs:
           
           # Add security info
           echo "## 🔒 Security Scan" >> comprehensive_report.md
-          if [ -f "artifacts/security-summary/security_summary.txt" ]; then
-            cat artifacts/security-summary/security_summary.txt >> comprehensive_report.md
+          SECURITY_FILE=$(find artifacts/ -name "security_summary.txt" 2>/dev/null | head -1)
+          if [ -n "$SECURITY_FILE" ] && [ -f "$SECURITY_FILE" ]; then
+            cat "$SECURITY_FILE" >> comprehensive_report.md
           else
             echo "❌ Security scan not available" >> comprehensive_report.md
           fi
@@ -176,8 +185,9 @@ jobs:
           
           # Add lint info
           echo "## 🔍 Code Quality (Pylint)" >> comprehensive_report.md
-          if [ -f "artifacts/lint-summary/lint_summary.txt" ]; then
-            cat artifacts/lint-summary/lint_summary.txt >> comprehensive_report.md
+          LINT_FILE=$(find artifacts/ -name "lint_summary.txt" 2>/dev/null | head -1)
+          if [ -n "$LINT_FILE" ] && [ -f "$LINT_FILE" ]; then
+            cat "$LINT_FILE" >> comprehensive_report.md
           else
             echo "❌ Lint report not available" >> comprehensive_report.md
           fi
@@ -210,3 +220,55 @@ jobs:
           name: quality-summary
           path: comprehensive_report.md
           retention-days: 30
+          
+      - name: Generate and update badges
+        if: always()
+        run: |
+          # Generate Pylint Badge
+          LINT_FILE=$(find artifacts/ -name "lint_summary.txt" 2>/dev/null | head -1)
+          if [ -n "$LINT_FILE" ] && [ -f "$LINT_FILE" ]; then
+            LINT_SCORE=$(cat "$LINT_FILE" | grep -o '[0-9]\+\.[0-9]\+' | head -1 || echo "0.0")
+            COLOR="brightgreen"
+            if (( $(echo "$LINT_SCORE < 7.0" | bc -l) )); then
+              COLOR="red"
+            elif (( $(echo "$LINT_SCORE < 8.0" | bc -l) )); then
+              COLOR="orange"
+            fi
+            echo "Pylint Score: $LINT_SCORE/10"
+          else
+            LINT_SCORE="0.0"
+            COLOR="lightgrey"
+          fi
+          
+          # Generate Bandit Badge
+          SECURITY_FILE=$(find artifacts/ -name "security_summary.txt" 2>/dev/null | head -1)
+          if [ -n "$SECURITY_FILE" ] && [ -f "$SECURITY_FILE" ]; then
+            ISSUES=$(cat "$SECURITY_FILE" | grep -o '[0-9]\+' | head -1 || echo "0")
+            SEC_COLOR="brightgreen"
+            if [ "$ISSUES" -gt 5 ]; then
+              SEC_COLOR="red"
+            elif [ "$ISSUES" -gt 0 ]; then
+              SEC_COLOR="orange"
+            fi
+            echo "Security Issues: $ISSUES"
+          else
+            ISSUES="0"
+            SEC_COLOR="lightgrey"
+          fi
+          
+          # Update README with new badges
+          sed -i "s|https://img.shields.io/badge/pylint-[^)]*|https://img.shields.io/badge/pylint-${LINT_SCORE}%2F10-${COLOR}|g" README.md
+          sed -i "s|https://img.shields.io/badge/bandit-[^)]*|https://img.shields.io/badge/bandit-${ISSUES}%20issues-${SEC_COLOR}|g" README.md
+          
+          echo "Badges updated in README.md"
+          
+      - name: Commit badge updates
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update dynamic badges [skip ci]"
+          git push
