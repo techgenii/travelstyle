@@ -3,15 +3,17 @@
 
 import json
 import sys
-import os
 
-filepath = sys.argv[1] if len(sys.argv) > 1 else "coverage.json"
+def extract_coverage(filepath):
+    """Extract coverage percentage from coverage.json"""
+    try:
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+            coverage = data.get("totals", {}).get("percent_covered", 0.0)
+            return f"{coverage:.1f}"
+    except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError):
+        return "0.0"
 
-try:
-    with open(filepath, 'r') as f:
-        data = json.load(f)
-        coverage = data.get("totals", {}).get("percent_covered", 0.0)
-        print(f"{coverage:.1f}")
-except Exception:
-    print("0.0")
-    sys.exit(0)
+if __name__ == "__main__":
+    filepath = sys.argv[1] if len(sys.argv) > 1 else "reports/coverage.json"
+    print(extract_coverage(filepath))
