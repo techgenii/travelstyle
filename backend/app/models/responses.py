@@ -1,12 +1,21 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+"""
+Response models for TravelStyle AI application.
+Defines Pydantic models for API requests and responses.
+"""
 from datetime import datetime
+from typing import List, Optional, Dict, Any
+
+from pydantic import BaseModel, Field
 
 class QuickReply(BaseModel):
+    """Quick reply option for chat responses."""
+
     text: str
     action: Optional[str] = None
 
 class ChatResponse(BaseModel):
+    """Response model for chat interactions."""
+
     message: str
     quick_replies: List[QuickReply] = []
     suggestions: List[str] = []
@@ -14,6 +23,8 @@ class ChatResponse(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 class ConversationContext(BaseModel):
+    """Context information for conversation state."""
+
     user_id: str
     destination: Optional[str] = None
     travel_dates: Optional[List[str]] = None
@@ -22,6 +33,8 @@ class ConversationContext(BaseModel):
     budget_range: Optional[str] = None
 
 class ChatRequest(BaseModel):
+    """Request model for chat interactions."""
+
     message: str
     context: Optional[ConversationContext] = None
-    conversation_id: Optional[str] = None 
+    conversation_id: Optional[str] = None

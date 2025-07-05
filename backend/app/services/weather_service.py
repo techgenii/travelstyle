@@ -3,7 +3,7 @@ import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from app.core.config import settings
-from app.core.cache import redis_client
+from app.services.supabase_cache import supabase_cache
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,8 @@ class WeatherService:
     ) -> Optional[Dict[str, Any]]:
         """Get comprehensive weather data for destination"""
         
-        cache_key = f"weather:{destination}:{dates}"
-        cached_data = await redis_client.get(cache_key)
+        # Check cache first
+        cached_data = await supabase_cache.get_weather_cache(destination)
         if cached_data:
             return cached_data
         
@@ -43,8 +43,8 @@ class WeatherService:
                 "retrieved_at": datetime.utcnow().isoformat()
             }
             
-            # Cache for 30 minutes
-            await redis_client.setex(cache_key, 1800, weather_data)
+            # Cache for 1 hour
+            await supabase_cache.set_weather_cache(destination, weather_data, 1)
             
             return weather_data
             

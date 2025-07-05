@@ -2,7 +2,7 @@ import httpx
 import logging
 from typing import Dict, Any, Optional, List
 from app.core.config import settings
-from app.core.cache import redis_client
+from app.services.supabase_cache import supabase_cache
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +24,7 @@ class QlooService:
             categories = ['fashion', 'etiquette', 'social_norms']
         
         # Check cache first
-        cache_key = f"cultural_insights:{destination}:{context}"
-        cached_data = await redis_client.get(cache_key)
+        cached_data = await supabase_cache.get_cultural_cache(destination, context)
         if cached_data:
             return cached_data
         
@@ -49,7 +48,7 @@ class QlooService:
                 processed_data = self._process_cultural_data(data, destination)
                 
                 # Cache for 24 hours
-                await redis_client.setex(cache_key, 86400, processed_data)
+                await supabase_cache.set_cultural_cache(destination, context, processed_data, 24)
                 
                 return processed_data
                 
@@ -72,10 +71,8 @@ class QlooService:
     ) -> Optional[Dict[str, Any]]:
         """Get style recommendations based on location and preferences"""
         
-        cache_key = f"style_recs:{destination}:{occasion}:{hash(str(user_preferences))}"
-        cached_data = await redis_client.get(cache_key)
-        if cached_data:
-            return cached_data
+        # Note: Style recommendations not cached in MVP - could add to schema later
+        # For now, always fetch fresh data
         
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -105,8 +102,7 @@ class QlooService:
                 data = response.json()
                 processed_data = self._process_style_data(data)
                 
-                # Cache for 6 hours
-                await redis_client.setex(cache_key, 21600, processed_data)
+                # Note: Style recommendations not cached in MVP
                 
                 return processed_data
                 

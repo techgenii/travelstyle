@@ -2,7 +2,7 @@ import httpx
 import logging
 from typing import Dict, Any, Optional
 from app.core.config import settings
-from app.core.cache import redis_client
+from app.services.supabase_cache import supabase_cache
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +15,8 @@ class CurrencyService:
     async def get_exchange_rates(self, base_currency: str = "USD") -> Optional[Dict[str, Any]]:
         """Get current exchange rates"""
         
-        cache_key = f"exchange_rates:{base_currency}"
-        cached_data = await redis_client.get(cache_key)
+        # Check cache first
+        cached_data = await supabase_cache.get_currency_cache(base_currency)
         if cached_data:
             return cached_data
         
@@ -33,7 +33,7 @@ class CurrencyService:
                 }
                 
                 # Cache for 1 hour
-                await redis_client.setex(cache_key, 3600, rates_data)
+                await supabase_cache.set_currency_cache(base_currency, rates_data, 1)
                 
                 return rates_data
                 
