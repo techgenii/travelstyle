@@ -18,6 +18,7 @@ runs:
     - name: Install dependencies
       shell: bash
       run: |
+        cd backend
         python -m pip install --upgrade pip
         make install
         make install-test
