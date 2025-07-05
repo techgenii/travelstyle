@@ -1,0 +1,367 @@
+name: Backend Quality Check
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('backend/**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      working-directory: backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+        
+    - name: Run tests
+      working-directory: backend
+      run: make test-github
+      
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: pytest-report
+        path: |
+          backend/.pytest_cache/
+          backend/test-results.xml
+          backend/pytest.log
+        retention-days: 30
+
+  coverage:
+    runs-on: ubuntu-latest
+    name: Coverage
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('backend/**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      working-directory: backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+        
+    - name: Generate coverage report
+      working-directory: backend
+      run: make test-cov-json
+      
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./backend/coverage.json
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: coverage-report
+        path: |
+          backend/coverage.json
+          backend/htmlcov/
+        retention-days: 30
+        
+    - name: Generate coverage summary
+      working-directory: backend
+      run: |
+        if [ -f coverage.json ]; then
+          COVERAGE=$(python -c "import json; data=json.load(open('coverage.json')); print(f'{data[\"totals\"][\"percent_covered\"]:.1f}')")
+          echo "Coverage: $COVERAGE%"
+          echo "Coverage: $COVERAGE%" > coverage_summary.txt
+        else
+          echo "Coverage: 0.0% (no report generated)"
+          echo "Coverage: 0.0%" > coverage_summary.txt
+        fi
+        
+    - name: Upload coverage summary
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: coverage-summary
+        path: backend/coverage_summary.txt
+        retention-days: 7
+
+  security:
+    runs-on: ubuntu-latest
+    name: Security
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('backend/**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      working-directory: backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+        
+    - name: Run security scan with GitHub annotations
+      working-directory: backend
+      run: make security-github
+      continue-on-error: true
+      
+    - name: Run security scan (JSON)
+      working-directory: backend
+      run: make security-json
+      continue-on-error: true
+      
+    - name: Run security scan (HTML)
+      working-directory: backend
+      run: make security-html
+      continue-on-error: true
+      
+    - name: Upload security artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: bandit-report
+        path: |
+          backend/bandit_report.json
+          backend/bandit_report.html
+        retention-days: 30
+        
+    - name: Generate security summary
+      working-directory: backend
+      run: |
+        if [ -f bandit_report.json ]; then
+          ISSUES=$(python -c "import json; data=json.load(open('bandit_report.json')); print(len(data.get('results', [])))")
+          echo "Security Issues Found: $ISSUES"
+          echo "Security Issues Found: $ISSUES" > security_summary.txt
+        else
+          echo "Security Issues Found: 0 (no report generated)"
+          echo "Security Issues Found: 0" > security_summary.txt
+        fi
+        
+    - name: Upload security summary
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-summary
+        path: backend/security_summary.txt
+        retention-days: 7
+
+  lint:
+    runs-on: ubuntu-latest
+    name: Lint
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('backend/**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      working-directory: backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+        
+    - name: Run linting with GitHub annotations
+      working-directory: backend
+      run: make lint-github
+      continue-on-error: true
+      
+    - name: Run linting (JSON)
+      working-directory: backend
+      run: make lint-json
+      continue-on-error: true
+      
+    - name: Run linting (HTML if available)
+      working-directory: backend
+      run: |
+        if command -v pylint &> /dev/null; then
+          pylint app/ --output-format=html > pylint_report.html || true
+        fi
+      continue-on-error: true
+      
+    - name: Upload linting artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: pylint-report
+        path: |
+          backend/pylint_report.json
+          backend/pylint_report.html
+        retention-days: 30
+        
+    - name: Generate lint summary
+      working-directory: backend
+      run: |
+        if [ -f pylint_report.json ]; then
+          LINT_SCORE=$(python -c "
+          import json
+          try:
+              with open('pylint_report.json', 'r') as f:
+                  data = json.load(f)
+                  if isinstance(data, list) and len(data) > 0:
+                      score = data[0].get('score', 0.0) if 'score' in data[0] else 0.0
+                  else:
+                      score = data.get('score', 0.0)
+                  print(f'{score:.1f}')
+          except:
+              print('0.0')
+          ")
+          echo "Lint Score: $LINT_SCORE/10"
+          echo "Lint Score: $LINT_SCORE/10" > lint_summary.txt
+        else
+          echo "Lint Score: 0.0/10 (no report generated)"
+          echo "Lint Score: 0.0/10" > lint_summary.txt
+        fi
+        
+    - name: Upload lint summary
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: lint-summary
+        path: backend/lint_summary.txt
+        retention-days: 7
+
+  quality-summary:
+    runs-on: ubuntu-latest
+    name: Quality Summary
+    needs: [test, coverage, security, lint]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: artifacts/
+        
+    - name: Create comprehensive quality report
+      run: |
+        echo "# TravelStyle AI Backend - Code Quality Report" > comprehensive_report.md
+        echo "Generated on: $(date)" >> comprehensive_report.md
+        echo "" >> comprehensive_report.md
+        
+        echo "## 🧪 Test Results" >> comprehensive_report.md
+        if [ -d "artifacts/pytest-report" ]; then
+          echo "✅ Tests completed - see pytest artifacts for details" >> comprehensive_report.md
+        else
+          echo "❌ Tests failed or not found" >> comprehensive_report.md
+        fi
+        echo "" >> comprehensive_report.md
+        
+        echo "## 📊 Coverage Report" >> comprehensive_report.md
+        if [ -f "artifacts/coverage-summary/coverage_summary.txt" ]; then
+          cat artifacts/coverage-summary/coverage_summary.txt >> comprehensive_report.md
+        else
+          echo "❌ Coverage report not available" >> comprehensive_report.md
+        fi
+        echo "" >> comprehensive_report.md
+        
+        echo "## 🔒 Security Scan" >> comprehensive_report.md
+        if [ -f "artifacts/security-summary/security_summary.txt" ]; then
+          cat artifacts/security-summary/security_summary.txt >> comprehensive_report.md
+        else
+          echo "❌ Security scan not available" >> comprehensive_report.md
+        fi
+        echo "" >> comprehensive_report.md
+        
+        echo "## 🔍 Code Quality (Pylint)" >> comprehensive_report.md
+        if [ -f "artifacts/lint-summary/lint_summary.txt" ]; then
+          cat artifacts/lint-summary/lint_summary.txt >> comprehensive_report.md
+        else
+          echo "❌ Lint report not available" >> comprehensive_report.md
+        fi
+        echo "" >> comprehensive_report.md
+        
+        echo "## 📁 Available Artifacts" >> comprehensive_report.md
+        echo "- **pytest-report**: Test execution logs and cache" >> comprehensive_report.md
+        echo "- **coverage-report**: HTML coverage report and JSON data" >> comprehensive_report.md
+        echo "- **bandit-report**: Security scan results (JSON + HTML)" >> comprehensive_report.md
+        echo "- **pylint-report**: Code quality reports (JSON + HTML)" >> comprehensive_report.md
+        echo "- **quality-summary**: This comprehensive report" >> comprehensive_report.md
+        echo "" >> comprehensive_report.md
+        
+        echo "## 🎯 Quick Links" >> comprehensive_report.md
+        echo "- [View Coverage Report](../artifacts/coverage-report/htmlcov/index.html)" >> comprehensive_report.md
+        echo "- [View Security Report](../artifacts/bandit-report/bandit_report.html)" >> comprehensive_report.md
+        echo "- [View Pylint Report](../artifacts/pylint-report/pylint_report.html)" >> comprehensive_report.md
+        
+        echo "" >> comprehensive_report.md
+        echo "---" >> comprehensive_report.md
+        echo "*Report generated by TravelStyle AI Backend CI/CD Pipeline*" >> comprehensive_report.md
+        
+        # Display the report in the GitHub Actions log
+        echo "📋 Generated Quality Report:"
+        cat comprehensive_report.md
+        
+    - name: Upload comprehensive report
+      uses: actions/upload-artifact@v3
+      with:
+        name: quality-summary
+        path: comprehensive_report.md
+        retention-days: 30

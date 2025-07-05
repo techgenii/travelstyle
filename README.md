@@ -3,7 +3,14 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![Python Version](https://img.shields.io/badge/python-3.13-blue)
 [![TypeScript](https://img.shields.io/badge/typescript-4.0+-blue.svg)](https://www.typescriptlang.org/)
+![Tests](https://img.shields.io/badge/tests-pytest-blue?logo=pytest)
+![Security](https://img.shields.io/badge/security-bandit-red?logo=python)
+![Code%20Quality](https://img.shields.io/badge/code%20quality-pylint-green?logo=python)
 
+[![Tests](https://github.com/yourusername/your-repo-name/workflows/CI/badge.svg)](https://github.com/yourusername/your-repo-name/actions)
+[![Coverage](https://github.com/yourusername/your-repo-name/workflows/CI/badge.svg?job=coverage)](https://github.com/yourusername/your-repo-name/actions)
+[![Security](https://github.com/yourusername/your-repo-name/workflows/CI/badge.svg?job=security)](https://github.com/yourusername/your-repo-name/actions)
+[![Lint](https://github.com/yourusername/your-repo-name/workflows/CI/badge.svg?job=lint)](https://github.com/yourusername/your-repo-name/actions)
 
 ## Product Vision
 TravelStyle AI is an intelligent travel companion chat application that provides personalized wardrobe recommendations, cultural style guidance, and currency conversion tools to help travelers dress appropriately and confidently for any destination.
@@ -48,7 +55,14 @@ Database Layer (Supabase/PostgreSQL)
 
 ### Prerequisites
 - Python 3.13+
-- PostgreSQL & Redis (can use Docker)
+- PostgreSQL (via Supabase)
+
+### Where to get API Keys
+OpenAI: https://platform.openai.com/api-keys
+Qloo: https://www.qloo.com/api
+OpenWeather: https://openweathermap.org/api
+Exchange Rate API: https://www.exchangerate-api.com/
+Supabase: https://supabase.com/dashboard
 
 ### Setup
 1. **Clone the repository:**
@@ -58,22 +72,19 @@ Database Layer (Supabase/PostgreSQL)
    ```
 2. **Install dependencies:**
    ```bash
-   pip install -r requirements.txt
+   make install
    ```
 3. **Configure environment variables:**
-   - Copy `.env.example` to `.env` and fill in your API keys and secrets.
-4. **Run with Docker Compose:**
+   - Copy `env.example` to `.env` and fill in your API keys and secrets.
+4. **Run locally:**
    ```bash
-   docker-compose up --build
-   ```
-   Or run locally:
-   ```bash
-   uvicorn app.main:app --reload
+   make run
    ```
 
 ### Running Tests
 ```bash
-pytest
+cd backend
+make test
 ```
 
 ## 📝 License
