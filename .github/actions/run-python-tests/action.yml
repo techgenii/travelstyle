@@ -21,13 +21,14 @@ runs:
     - name: Parse env JSON and export variables
       shell: bash
       run: |
+        echo "::add-mask::${{ inputs.env-json }}"
         echo '${{ inputs.env-json }}' | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
 
     - name: Run tests
       shell: bash
       run: |
         cd backend
-        pytest --tb=short -v || true
+        make test || true
 
     - name: Upload test artifacts
       uses: actions/upload-artifact@v4
@@ -37,4 +38,3 @@ runs:
           backend/.pytest_cache/
           backend/test-results.xml
           backend/pytest.log
-

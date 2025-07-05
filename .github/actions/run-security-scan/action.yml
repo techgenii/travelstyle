@@ -19,13 +19,13 @@ runs:
       shell: bash
       run: |
         cd backend
-        bandit -r app/ -f json -o bandit_report.json || true
+        make security-github || true
 
     - name: Run Bandit HTML report
       shell: bash
       run: |
         cd backend
-        bandit -r app/ -f html -o bandit_report.html || true
+        make security-html || true
 
     - name: Upload bandit reports
       uses: actions/upload-artifact@v4

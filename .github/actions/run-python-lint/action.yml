@@ -19,7 +19,7 @@ runs:
       shell: bash
       run: |
         cd backend
-        pylint app/ --output-format=json > pylint_report.json || true
+        make lint-json || true
 
     - name: Generate pylint HTML report
       shell: bash

@@ -19,7 +19,7 @@ runs:
       shell: bash
       run: |
         cd backend
-        pytest --cov=app --cov-report=json --cov-report=html --cov-report=term || true
+        make test-cov || true
 
     - name: Upload coverage artifacts
       uses: actions/upload-artifact@v4

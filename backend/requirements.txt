@@ -23,13 +23,5 @@ passlib[bcrypt]
 # Environment variables
 python-dotenv
 
-# Testing
-pytest
-pytest-asyncio
-
 # AI integration
 openai==1.55.3
-
-# Development tools
-pylint
-bandit

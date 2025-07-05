@@ -7,10 +7,10 @@
 ![Security](https://img.shields.io/badge/security-bandit-red?logo=python)
 ![Code%20Quality](https://img.shields.io/badge/code%20quality-pylint-green?logo=python)
 
-[![Tests](https://github.com/techgenii/travelstyle/workflows/CI/badge.svg)](https://github.com/techgenii/travelstyle/actions)
-[![Coverage](https://github.com/techgenii/travelstyle/workflows/CI/badge.svg?job=coverage)](https://github.com/techgenii/travelstyle/actions)
-[![Security](https://github.com/techgenii/travelstyle/workflows/CI/badge.svg?job=security)](https://github.com/techgenii/travelstyle/actions)
-[![Lint](https://github.com/techgenii/travelstyle/workflows/CI/badge.svg?job=lint)](https://github.com/techgenii/travelstyle/actions)
+[![Tests](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg)](https://github.com/techgenii/travelstyle/actions)
+[![Coverage](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg?job=coverage)](https://github.com/techgenii/travelstyle/actions)
+[![Security](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg?job=security)](https://github.com/techgenii/travelstyle/actions)
+[![Lint](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg?job=lint)](https://github.com/techgenii/travelstyle/actions)
 
 ## Product Vision
 TravelStyle AI is an intelligent travel companion chat application that provides personalized wardrobe recommendations, cultural style guidance, and currency conversion tools to help travelers dress appropriately and confidently for any destination.
