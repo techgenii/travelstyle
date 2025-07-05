@@ -97,11 +97,17 @@ jobs:
         run: |
           if [ -f "reports/${matrix.job}_report.json" ]; then
             SCORE=$(python ${{ matrix.summary_script }} reports/${matrix.job}_report.json)
-            echo "${{ matrix.summary_format }}".format(score="$SCORE")
-            echo "${{ matrix.summary_format }}".format(score="$SCORE") > ${{ matrix.summary_file }}
+            SUMMARY="${{ matrix.summary_format }}"
+            SUMMARY="${SUMMARY//{score}/$SCORE}"
+            echo "$SUMMARY"
+            echo "$SUMMARY" > ${{ matrix.summary_file }}
           else
-            echo "${{ matrix.summary_format }}".format(score="0 (no report generated)")
-            echo "${{ matrix.summary_format }}".format(score="0") > ${{ matrix.summary_file }}
+            SUMMARY="${{ matrix.summary_format }}"
+            SUMMARY="${SUMMARY//{score}/0 (no report generated)}"
+            echo "$SUMMARY"
+            SUMMARY="${{ matrix.summary_format }}"
+            SUMMARY="${SUMMARY//{score}/0}"
+            echo "$SUMMARY" > ${{ matrix.summary_file }}
           fi
           
       - name: Upload artifacts
