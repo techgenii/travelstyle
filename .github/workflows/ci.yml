@@ -1,14 +1,16 @@
-name: Backend Quality Check
+name: Backend Quality CI/CD
 
 on:
   push:
     branches: [ main, develop ]
     paths:
       - 'backend/**'
+      - '.github/workflows/ci.yml'  # Trigger on workflow changes
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'backend/**'
+      - '.github/workflows/ci.yml'
 
 jobs:
   test:
