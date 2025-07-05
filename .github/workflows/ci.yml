@@ -2,91 +2,242 @@ name: Backend Quality CI/CD
 
 on:
   push:
-    branches: [main, develop]
+    branches: [ main, develop ]
     paths:
       - 'backend/**'
       - '.github/workflows/ci.yml'
-      - '.github/actions/**'
   pull_request:
-    branches: [main, develop]
+    branches: [ main, develop ]
     paths:
       - 'backend/**'
       - '.github/workflows/ci.yml'
-      - '.github/actions/**'
+
+env:
+  PYTHON_VERSION: '3.13'
+  WORKING_DIR: backend
+  CACHE_KEY_PREFIX: ${{ runner.os }}-pip
 
 jobs:
-  install-deps:
+  setup:
     runs-on: ubuntu-latest
     outputs:
-      cache-hit: ${{ steps.cache-pip.outputs.cache-hit }}
+      cache-key: ${{ steps.cache-key.outputs.key }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          echo "key=${{ env.CACHE_KEY_PREFIX }}-${{ hashFiles('backend/**/requirements*.txt') }}" >> $GITHUB_OUTPUT
 
+  quality-checks:
+    runs-on: ubuntu-latest
+    needs: setup
+    strategy:
+      matrix:
+        job: [test, coverage, security, lint]
+      fail-fast: false
+    
+    name: ${{ matrix.job }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Configure environment
+        env:
+          SECRET_VARS: ${{ secrets.ENV_VARS }}
+        run: |
+          echo "$SECRET_VARS" | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
       - name: Cache pip dependencies
-        id: cache-pip
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('backend/**/requirements*.txt') }}
+          key: ${{ needs.setup.outputs.cache-key }}
           restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install Python dependencies
-        uses: ./.github/actions/install-python-deps
+            ${{ env.CACHE_KEY_PREFIX }}-
+            
+      - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR }}
+        run: make install-all
+          
+      - name: Run quality checks
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          case "${{ matrix.job }}" in
+            test)
+              make ci-test
+              ;;
+            coverage)
+              make ci-test
+              ;;
+            security)
+              make ci-security
+              ;;
+            lint)
+              make ci-lint
+              ;;
+          esac
+          
+      - name: Upload to Codecov
+        if: matrix.job == 'coverage' || matrix.job == 'test'
+        uses: codecov/codecov-action@v3
         with:
-          working-directory: backend
-
-  lint:
-    runs-on: ubuntu-latest
-    needs: install-deps
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Python linting (composite action)
-        uses: ./.github/actions/run-python-lint
+          file: ./backend/reports/coverage.json
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          
+      - name: Generate summary
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          case "${{ matrix.job }}" in
+            coverage|test)
+              if [ -f reports/coverage.json ]; then
+                COVERAGE=$(python extract_coverage_score.py reports/coverage.json)
+                echo "Coverage: $COVERAGE%"
+                echo "Coverage: $COVERAGE%" > coverage_summary.txt
+              else
+                echo "Coverage: 0.0% (no report generated)"
+                echo "Coverage: 0.0%" > coverage_summary.txt
+              fi
+              ;;
+            security)
+              if [ -f reports/bandit_report.json ]; then
+                ISSUES=$(python extract_security_score.py reports/bandit_report.json)
+                echo "Security Issues Found: $ISSUES"
+                echo "Security Issues Found: $ISSUES" > security_summary.txt
+              else
+                echo "Security Issues Found: 0 (no report generated)"
+                echo "Security Issues Found: 0" > security_summary.txt
+              fi
+              ;;
+            lint)
+              if [ -f reports/pylint_report.json ]; then
+                LINT_SCORE=$(python extract_lint_score.py reports/pylint_report.json)
+                echo "Lint Score: $LINT_SCORE/10"
+                echo "Lint Score: $LINT_SCORE/10" > lint_summary.txt
+              else
+                echo "Lint Score: 0.0/10 (no report generated)"
+                echo "Lint Score: 0.0/10" > lint_summary.txt
+              fi
+              ;;
+          esac
+          
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
-          python-version: '3.13'
-
-  security:
-    runs-on: ubuntu-latest
-    needs: install-deps
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run security scan
-        uses: ./.github/actions/run-security-scan
+          name: ${{ matrix.job }}-report
+          path: |
+            ${{ env.WORKING_DIR }}/reports/
+            ${{ env.WORKING_DIR }}/.pytest_cache/
+            ${{ env.WORKING_DIR }}/pytest.log
+            ${{ env.WORKING_DIR }}/coverage_summary.txt
+            ${{ env.WORKING_DIR }}/security_summary.txt
+            ${{ env.WORKING_DIR }}/lint_summary.txt
+          retention-days: 30
+          
+      - name: Upload summary
+        uses: actions/upload-artifact@v4
+        if: always() && matrix.job != 'test'
         with:
-          python-version: '3.13'
-
-  coverage:
-    runs-on: ubuntu-latest
-    needs: install-deps
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run coverage report
-        uses: ./.github/actions/run-python-coverage
-        with:
-          python-version: '3.13'
-
-  test:
-    runs-on: ubuntu-latest
-    needs: install-deps
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run tests with secrets parsed inside composite
-        uses: ./.github/actions/run-python-tests
-        with:
-          python-version: '3.13'
-          env-json: ${{ secrets.ENV_VARS }}
+          name: ${{ matrix.job }}-summary
+          path: ${{ env.WORKING_DIR }}/${{ matrix.job }}_summary.txt
+          retention-days: 7
 
   quality-summary:
     runs-on: ubuntu-latest
-    needs: [test, coverage, security, lint]
+    name: Quality Summary
+    needs: [setup, quality-checks]
     if: always()
+    
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Generate comprehensive quality report
-        uses: ./.github/actions/generate-quality-summary
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          
+      - name: Create comprehensive quality report
+        run: |
+          # Create report header
+          cat > comprehensive_report.md << 'EOF'
+          # TravelStyle AI Backend - Code Quality Report
+          
+          Generated on: $(date)
+          
+          ## 🧪 Test Results
+          EOF
+          
+          # Add test results
+          if [ -d "artifacts/test-report" ]; then
+            echo "✅ Tests completed - see pytest artifacts for details" >> comprehensive_report.md
+          else
+            echo "❌ Tests failed or not found" >> comprehensive_report.md
+          fi
+          echo "" >> comprehensive_report.md
+          
+          # Add coverage info
+          echo "## 📊 Coverage Report" >> comprehensive_report.md
+          if [ -f "artifacts/coverage-summary/coverage_summary.txt" ]; then
+            cat artifacts/coverage-summary/coverage_summary.txt >> comprehensive_report.md
+          else
+            echo "❌ Coverage report not available" >> comprehensive_report.md
+          fi
+          echo "" >> comprehensive_report.md
+          
+          # Add security info
+          echo "## 🔒 Security Scan" >> comprehensive_report.md
+          if [ -f "artifacts/security-summary/security_summary.txt" ]; then
+            cat artifacts/security-summary/security_summary.txt >> comprehensive_report.md
+          else
+            echo "❌ Security scan not available" >> comprehensive_report.md
+          fi
+          echo "" >> comprehensive_report.md
+          
+          # Add lint info
+          echo "## 🔍 Code Quality (Pylint)" >> comprehensive_report.md
+          if [ -f "artifacts/lint-summary/lint_summary.txt" ]; then
+            cat artifacts/lint-summary/lint_summary.txt >> comprehensive_report.md
+          else
+            echo "❌ Lint report not available" >> comprehensive_report.md
+          fi
+          echo "" >> comprehensive_report.md
+          
+          # Add artifacts section
+          cat >> comprehensive_report.md << 'EOF'
+          ## 📁 Available Artifacts
+          - **test-report**: Test execution logs, results, and coverage data
+          - **coverage-report**: Same as test-report (coverage included in tests)
+          - **security-report**: Security scan results (JSON + HTML)
+          - **lint-report**: Code quality reports (JSON + HTML)
+          - **quality-summary**: This comprehensive report
+          
+          ## 🎯 Quick Links
+          - [View Coverage Report](../artifacts/test-report/reports/htmlcov/index.html)
+          - [View Security Report](../artifacts/security-report/reports/bandit_report.html)
+          - [View Pylint Report](../artifacts/lint-report/reports/pylint_report.html)
+          
+          ---
+          *Report generated by TravelStyle AI Backend CI/CD Pipeline*
+          EOF
+          
+          echo "📋 Generated Quality Report:"
+          cat comprehensive_report.md
+          
+      - name: Upload comprehensive report
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-summary
+          path: comprehensive_report.md
+          retention-days: 30
