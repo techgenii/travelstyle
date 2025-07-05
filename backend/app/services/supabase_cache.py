@@ -1,28 +1,57 @@
+"""Supabase cache service for TravelStyle AI: 
+handles caching of weather, cultural, and currency data.
+This service provides caching functionality for external 
+API responses to improve performance.
+"""
 import logging
 from typing import Any, Optional, Dict
 from datetime import datetime, timedelta
 from supabase import create_client, Client
 from app.core.config import settings
-
 logger = logging.getLogger(__name__)
-
 class SupabaseCacheService:
+    """Service for caching data in Supabase tables for weather,
+    cultural insights, and currency rates. Provides methods to store 
+    and retrieve cached data with TTL support.
+    """
     def __init__(self):
-        self.client: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
-    
+        """Initialize the SupabaseCacheService with client connection."""
+        self.client: Client = create_client(
+            settings.SUPABASE_URL, settings.SUPABASE_KEY
+        )
     async def get_weather_cache(self, destination: str) -> Optional[Dict[str, Any]]:
-        """Get cached weather data for destination"""
+        """Get cached weather data for destination.
+        Args:
+            destination: The destination location.
+        Returns:
+            Cached weather data or None if not found/expired.
+        """
         try:
-            response = self.client.table('weather_cache').select('*').eq('destination', destination).eq('is_active', True).single().execute()
+            response = (
+                self.client.table('weather_cache')
+                .select('*')
+                .eq('destination', destination)
+                .eq('is_active', True)
+                .single()
+                .execute()
+            )
             if response.data and not self._is_expired(response.data.get('expires_at')):
                 return response.data.get('data')
             return None
-        except Exception as e:
-            logger.error(f"Weather cache get error: {str(e)}")
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Weather cache get error: %s", str(e))
             return None
-    
-    async def set_weather_cache(self, destination: str, data: Dict[str, Any], ttl_hours: int = 1) -> bool:
-        """Cache weather data for destination"""
+    async def set_weather_cache(
+        self, destination: str, data: Dict[str, Any], ttl_hours: int = 1
+    ) -> bool:
+        """Cache weather data for destination.
+        Args:
+            destination: The destination location.
+            data: Weather data to cache.
+            ttl_hours: Time to live in hours (default: 1).
+        Returns:
+            True if successful, False otherwise.
+        """
         try:
             expires_at = datetime.utcnow() + timedelta(hours=ttl_hours)
             cache_data = {
@@ -34,23 +63,47 @@ class SupabaseCacheService:
             }
             self.client.table('weather_cache').upsert(cache_data).execute()
             return True
-        except Exception as e:
-            logger.error(f"Weather cache set error: {str(e)}")
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Weather cache set error: %s", str(e))
             return False
-    
-    async def get_cultural_cache(self, destination: str, context: str = "leisure") -> Optional[Dict[str, Any]]:
-        """Get cached cultural insights for destination"""
+    async def get_cultural_cache(
+        self, destination: str, context: str = "leisure"
+    ) -> Optional[Dict[str, Any]]:
+        """Get cached cultural insights for destination.
+        Args:
+            destination: The destination location.
+            context: The travel context (default: leisure).
+        Returns:
+            Cached cultural data or None if not found/expired.
+        """
         try:
-            response = self.client.table('cultural_insights_cache').select('*').eq('destination', destination).eq('context', context).eq('is_active', True).single().execute()
+            response = (
+                self.client.table('cultural_insights_cache')
+                .select('*')
+                .eq('destination', destination)
+                .eq('context', context)
+                .eq('is_active', True)
+                .single()
+                .execute()
+            )
             if response.data and not self._is_expired(response.data.get('expires_at')):
                 return response.data.get('data')
             return None
-        except Exception as e:
-            logger.error(f"Cultural cache get error: {str(e)}")
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Cultural cache get error: %s", str(e))
             return None
-    
-    async def set_cultural_cache(self, destination: str, context: str, data: Dict[str, Any], ttl_hours: int = 24) -> bool:
-        """Cache cultural insights for destination"""
+    async def set_cultural_cache(
+        self, destination: str, context: str, data: Dict[str, Any], ttl_hours: int = 24
+    ) -> bool:
+        """Cache cultural insights for destination.
+        Args:
+            destination: The destination location.
+            context: The travel context.
+            data: Cultural data to cache.
+            ttl_hours: Time to live in hours (default: 24).
+        Returns:
+            True if successful, False otherwise.
+        """
         try:
             expires_at = datetime.utcnow() + timedelta(hours=ttl_hours)
             cache_data = {
@@ -63,23 +116,42 @@ class SupabaseCacheService:
             }
             self.client.table('cultural_insights_cache').upsert(cache_data).execute()
             return True
-        except Exception as e:
-            logger.error(f"Cultural cache set error: {str(e)}")
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Cultural cache set error: %s", str(e))
             return False
-    
     async def get_currency_cache(self, base_currency: str) -> Optional[Dict[str, Any]]:
-        """Get cached currency rates"""
+        """Get cached currency rates.
+        Args:
+            base_currency: The base currency code.
+        Returns:
+            Cached currency data or None if not found/expired.
+        """
         try:
-            response = self.client.table('currency_rates_cache').select('*').eq('base_currency', base_currency).eq('is_active', True).single().execute()
+            response = (
+                self.client.table('currency_rates_cache')
+                .select('*')
+                .eq('base_currency', base_currency)
+                .eq('is_active', True)
+                .single()
+                .execute()
+            )
             if response.data and not self._is_expired(response.data.get('expires_at')):
                 return response.data.get('data')
             return None
-        except Exception as e:
-            logger.error(f"Currency cache get error: {str(e)}")
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Currency cache get error: %s", str(e))
             return None
-    
-    async def set_currency_cache(self, base_currency: str, data: Dict[str, Any], ttl_hours: int = 1) -> bool:
-        """Cache currency rates"""
+    async def set_currency_cache(
+        self, base_currency: str, data: Dict[str, Any], ttl_hours: int = 1
+    ) -> bool:
+        """Cache currency rates.
+        Args:
+            base_currency: The base currency code.
+            data: Currency data to cache.
+            ttl_hours: Time to live in hours (default: 1).
+        Returns:
+            True if successful, False otherwise.
+        """
         try:
             expires_at = datetime.utcnow() + timedelta(hours=ttl_hours)
             cache_data = {
@@ -91,17 +163,20 @@ class SupabaseCacheService:
             }
             self.client.table('currency_rates_cache').upsert(cache_data).execute()
             return True
-        except Exception as e:
-            logger.error(f"Currency cache set error: {str(e)}")
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Currency cache set error: %s", str(e))
             return False
-    
     def _is_expired(self, expires_at: str) -> bool:
-        """Check if cache entry is expired"""
+        """Check if cache entry is expired.
+        Args:
+            expires_at: ISO format timestamp string.
+        Returns:
+            True if expired, False otherwise.
+        """
         try:
             expiry = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
             return datetime.utcnow() > expiry
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             return True
-
 # Singleton instance
-supabase_cache = SupabaseCacheService() 
+supabase_cache = SupabaseCacheService()

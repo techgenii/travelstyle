@@ -52,9 +52,9 @@ test-github:
 
 check: lint security test
 
-check-cov: lint security-json test-cov
+check-cov: lint-colorized security-json test-cov
 
 check-github: lint-github security-github test-github
 
 run:
-	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 
+	uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 
