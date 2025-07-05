@@ -15,28 +15,38 @@ on:
 env:
   PYTHON_VERSION: '3.13'
   WORKING_DIR: backend
-  # Remove runner.os from here - it's not available at workflow level
 
 jobs:
-  setup:
+  # Reusable job template for all quality checks
+  quality-check:
     runs-on: ubuntu-latest
-    outputs:
-      cache-key: ${{ steps.cache-key.outputs.key }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Generate cache key
-        id: cache-key
-        run: |
-          echo "key=${{ runner.os }}-pip-${{ hashFiles('backend/**/requirements*.txt') }}" >> $GITHUB_OUTPUT
-
-  quality-checks:
-    runs-on: ubuntu-latest
-    needs: setup
     strategy:
       matrix:
-        job: [test, coverage, security, lint]
+        include:
+          - job: test
+            needs_env: true
+            make_target: ci-test
+            summary_script: extract_coverage_score.py
+            summary_file: coverage_summary.txt
+            summary_format: "Coverage: {score}%"
+          - job: coverage
+            needs_env: true
+            make_target: ci-test
+            summary_script: extract_coverage_score.py
+            summary_file: coverage_summary.txt
+            summary_format: "Coverage: {score}%"
+          - job: security
+            needs_env: false
+            make_target: ci-security
+            summary_script: extract_security_score.py
+            summary_file: security_summary.txt
+            summary_format: "Security Issues Found: {score}"
+          - job: lint
+            needs_env: false
+            make_target: ci-lint
+            summary_script: extract_lint_score.py
+            summary_file: lint_summary.txt
+            summary_format: "Lint Score: {score}/10"
       fail-fast: false
     
     name: ${{ matrix.job }}
@@ -46,6 +56,7 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Configure environment
+        if: matrix.needs_env
         env:
           SECRET_VARS: ${{ secrets.ENV_VARS }}
         run: |
@@ -60,31 +71,17 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ needs.setup.outputs.cache-key }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/**/requirements*.txt') }}
           restore-keys: |
-            ${{ env.CACHE_KEY_PREFIX }}-
+            ${{ runner.os }}-pip-
             
       - name: Install dependencies
         working-directory: ${{ env.WORKING_DIR }}
         run: make install-all
           
-      - name: Run quality checks
+      - name: Run ${{ matrix.job }} check
         working-directory: ${{ env.WORKING_DIR }}
-        run: |
-          case "${{ matrix.job }}" in
-            test)
-              make ci-test
-              ;;
-            coverage)
-              make ci-test
-              ;;
-            security)
-              make ci-security
-              ;;
-            lint)
-              make ci-lint
-              ;;
-          esac
+        run: make ${{ matrix.make_target }}
           
       - name: Upload to Codecov
         if: matrix.job == 'coverage' || matrix.job == 'test'
@@ -98,38 +95,14 @@ jobs:
       - name: Generate summary
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          case "${{ matrix.job }}" in
-            coverage|test)
-              if [ -f reports/coverage.json ]; then
-                COVERAGE=$(python extract_coverage_score.py reports/coverage.json)
-                echo "Coverage: $COVERAGE%"
-                echo "Coverage: $COVERAGE%" > coverage_summary.txt
-              else
-                echo "Coverage: 0.0% (no report generated)"
-                echo "Coverage: 0.0%" > coverage_summary.txt
-              fi
-              ;;
-            security)
-              if [ -f reports/bandit_report.json ]; then
-                ISSUES=$(python extract_security_score.py reports/bandit_report.json)
-                echo "Security Issues Found: $ISSUES"
-                echo "Security Issues Found: $ISSUES" > security_summary.txt
-              else
-                echo "Security Issues Found: 0 (no report generated)"
-                echo "Security Issues Found: 0" > security_summary.txt
-              fi
-              ;;
-            lint)
-              if [ -f reports/pylint_report.json ]; then
-                LINT_SCORE=$(python extract_lint_score.py reports/pylint_report.json)
-                echo "Lint Score: $LINT_SCORE/10"
-                echo "Lint Score: $LINT_SCORE/10" > lint_summary.txt
-              else
-                echo "Lint Score: 0.0/10 (no report generated)"
-                echo "Lint Score: 0.0/10" > lint_summary.txt
-              fi
-              ;;
-          esac
+          if [ -f "reports/${matrix.job}_report.json" ]; then
+            SCORE=$(python ${{ matrix.summary_script }} reports/${matrix.job}_report.json)
+            echo "${{ matrix.summary_format }}".format(score="$SCORE")
+            echo "${{ matrix.summary_format }}".format(score="$SCORE") > ${{ matrix.summary_file }}
+          else
+            echo "${{ matrix.summary_format }}".format(score="0 (no report generated)")
+            echo "${{ matrix.summary_format }}".format(score="0") > ${{ matrix.summary_file }}
+          fi
           
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -140,9 +113,7 @@ jobs:
             ${{ env.WORKING_DIR }}/reports/
             ${{ env.WORKING_DIR }}/.pytest_cache/
             ${{ env.WORKING_DIR }}/pytest.log
-            ${{ env.WORKING_DIR }}/coverage_summary.txt
-            ${{ env.WORKING_DIR }}/security_summary.txt
-            ${{ env.WORKING_DIR }}/lint_summary.txt
+            ${{ env.WORKING_DIR }}/${{ matrix.summary_file }}
           retention-days: 30
           
       - name: Upload summary
@@ -150,13 +121,14 @@ jobs:
         if: always() && matrix.job != 'test'
         with:
           name: ${{ matrix.job }}-summary
-          path: ${{ env.WORKING_DIR }}/${{ matrix.job }}_summary.txt
+          path: ${{ env.WORKING_DIR }}/${{ matrix.summary_file }}
           retention-days: 7
 
+  # Generate comprehensive quality report
   quality-summary:
     runs-on: ubuntu-latest
     name: Quality Summary
-    needs: [setup, quality-checks]
+    needs: quality-check
     if: always()
     
     steps:
