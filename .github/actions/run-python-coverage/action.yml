@@ -1,0 +1,41 @@
+name: run-python-coverage
+description: Run coverage, generate JSON and HTML reports.
+
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.13'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Run coverage report
+      shell: bash
+      run: |
+        cd backend
+        pytest --cov=app --cov-report=json --cov-report=html --cov-report=term || true
+
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: backend/coverage.json,backend/htmlcov/
+
+    - name: Extract coverage score
+      shell: bash
+      run: |
+        python backend/extract_coverage_score.py > coverage_score.txt || echo "0.0" > coverage_score.txt
+        cat coverage_score.txt
+
+    - name: Upload coverage summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-summary
+        path: backend/coverage_score.txt
+

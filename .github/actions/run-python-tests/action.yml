@@ -1,0 +1,40 @@
+name: run-python-tests
+description: Run pytest with GitHub style output.
+
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.13'
+  env-json:
+    description: 'JSON string of environment variables'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Parse env JSON and export variables
+      shell: bash
+      run: |
+        echo '${{ inputs.env-json }}' | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
+
+    - name: Run tests
+      shell: bash
+      run: |
+        cd backend
+        pytest --tb=short -v || true
+
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: pytest-report
+        path: |
+          backend/.pytest_cache/
+          backend/test-results.xml
+          backend/pytest.log
+

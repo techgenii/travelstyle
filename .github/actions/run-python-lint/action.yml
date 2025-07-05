@@ -1,0 +1,48 @@
+name: run-python-lint
+description: Run pylint JSON and HTML reports and extract score.
+
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.13'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Run pylint JSON report
+      shell: bash
+      run: |
+        cd backend
+        pylint app/ --output-format=json > pylint_report.json || true
+
+    - name: Generate pylint HTML report
+      shell: bash
+      run: |
+        cd backend
+        pylint-json2html -f json -o pylint_report.html pylint_report.json || true
+
+    - name: Upload lint reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: pylint-report
+        path: backend/pylint_report.json,backend/pylint_report.html
+
+    - name: Extract lint score
+      shell: bash
+      run: |
+        python backend/extract_lint_score.py pylint_report.json > lint_score.txt || echo "0.0" > lint_score.txt
+        cat lint_score.txt
+      continue-on-error: true
+
+    - name: Upload lint summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: lint-summary
+        path: backend/lint_score.txt
+

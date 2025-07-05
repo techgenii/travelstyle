@@ -12,7 +12,7 @@ lint:
 	pylint app/
 
 lint-json:
-	pylint app/ -f json > pylint_report.json
+	pylint app/ --score=yes -f json > pylint_report.json
 
 lint-parseable:
 	pylint app/ -f parseable
