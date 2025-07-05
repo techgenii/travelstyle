@@ -21,6 +21,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Configure environment
+      env:
+        SECRET_VARS: ${{ secrets.ENV_VARS }}
+      run: |
+        # Process secrets without echoing them directly
+        echo "$SECRET_VARS" | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
+      
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -63,6 +70,13 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      
+    - name: Configure environment
+      env:
+        SECRET_VARS: ${{ secrets.ENV_VARS }}
+      run: |
+        # Process secrets without echoing them directly
+        echo "$SECRET_VARS" | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
       
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -133,6 +147,13 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      
+    - name: Configure environment
+      env:
+        SECRET_VARS: ${{ secrets.ENV_VARS }}
+      run: |
+        # Process secrets without echoing them directly
+        echo "$SECRET_VARS" | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
       
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -206,6 +227,13 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      
+    - name: Configure environment
+      env:
+        SECRET_VARS: ${{ secrets.ENV_VARS }}
+      run: |
+        # Process secrets without echoing them directly
+        echo "$SECRET_VARS" | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
       
     - name: Set up Python
       uses: actions/setup-python@v4
