@@ -15,7 +15,7 @@ on:
 env:
   PYTHON_VERSION: '3.13'
   WORKING_DIR: backend
-  CACHE_KEY_PREFIX: ${{ runner.os }}-pip
+  # Remove runner.os from here - it's not available at workflow level
 
 jobs:
   setup:
@@ -29,7 +29,7 @@ jobs:
       - name: Generate cache key
         id: cache-key
         run: |
-          echo "key=${{ env.CACHE_KEY_PREFIX }}-${{ hashFiles('backend/**/requirements*.txt') }}" >> $GITHUB_OUTPUT
+          echo "key=${{ runner.os }}-pip-${{ hashFiles('backend/**/requirements*.txt') }}" >> $GITHUB_OUTPUT
 
   quality-checks:
     runs-on: ubuntu-latest
