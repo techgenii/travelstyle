@@ -55,12 +55,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Configure environment
-        if: matrix.needs_env
-        env:
-          SECRET_VARS: ${{ secrets.ENV_VARS }}
-        run: |
-          echo "$SECRET_VARS" | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
+
         
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -81,6 +76,14 @@ jobs:
           
       - name: Run ${{ matrix.job }} check
         working-directory: ${{ env.WORKING_DIR }}
+        env:
+          # Only set environment variables for jobs that need them
+          OPENAI_API_KEY: ${{ matrix.needs_env && secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENAI_API_KEY || '' }}
+          QLOO_API_KEY: ${{ matrix.needs_env && secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).QLOO_API_KEY || '' }}
+          OPENWEATHER_API_KEY: ${{ matrix.needs_env && secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENWEATHER_API_KEY || '' }}
+          EXCHANGE_API_KEY: ${{ matrix.needs_env && secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).EXCHANGE_API_KEY || '' }}
+          SUPABASE_URL: ${{ matrix.needs_env && secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_URL || '' }}
+          SUPABASE_KEY: ${{ matrix.needs_env && secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_KEY || '' }}
         run: make ${{ matrix.make_target }}
           
       - name: Upload to Codecov
@@ -95,20 +98,8 @@ jobs:
       - name: Generate summary
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          if [ -f "reports/${matrix.job}_report.json" ]; then
-            SCORE=$(python ${{ matrix.summary_script }} reports/${matrix.job}_report.json)
-            SUMMARY="${{ matrix.summary_format }}"
-            SUMMARY="${SUMMARY//{score}/$SCORE}"
-            echo "$SUMMARY"
-            echo "$SUMMARY" > ${{ matrix.summary_file }}
-          else
-            SUMMARY="${{ matrix.summary_format }}"
-            SUMMARY="${SUMMARY//{score}/0 (no report generated)}"
-            echo "$SUMMARY"
-            SUMMARY="${{ matrix.summary_format }}"
-            SUMMARY="${SUMMARY//{score}/0}"
-            echo "$SUMMARY" > ${{ matrix.summary_file }}
-          fi
+          chmod +x generate_summary.sh
+          ./generate_summary.sh "${{ matrix.job }}" "${{ matrix.summary_script }}" "${{ matrix.summary_file }}" "${{ matrix.summary_format }}"
           
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
