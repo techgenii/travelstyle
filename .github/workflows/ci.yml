@@ -1,4 +1,4 @@
-name: Backend Quality CI/CD
+name: 
 
 on:
   push:
@@ -27,18 +27,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - job: test
-            needs_env: true
-            make_target: ci-test
-            summary_script: extract_coverage_score.py
-            summary_file: coverage_summary.txt
-            summary_format: "Coverage: {score}%"
-          - job: coverage
-            needs_env: true
-            make_target: ci-test
-            summary_script: extract_coverage_score.py
-            summary_file: coverage_summary.txt
-            summary_format: "Coverage: {score}%"
           - job: security
             needs_env: false
             make_target: ci-security
@@ -78,24 +66,7 @@ jobs:
           
       - name: Run ${{ matrix.job }} check
         working-directory: ${{ env.WORKING_DIR }}
-        env:
-          # Only set environment variables for jobs that need them
-          OPENAI_API_KEY: ${{ matrix.needs_env && secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENAI_API_KEY || '' }}
-          QLOO_API_KEY: ${{ matrix.needs_env && secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).QLOO_API_KEY || '' }}
-          OPENWEATHER_API_KEY: ${{ matrix.needs_env && secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENWEATHER_API_KEY || '' }}
-          EXCHANGE_API_KEY: ${{ matrix.needs_env && secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).EXCHANGE_API_KEY || '' }}
-          SUPABASE_URL: ${{ matrix.needs_env && secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_URL || '' }}
-          SUPABASE_KEY: ${{ matrix.needs_env && secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_KEY || '' }}
         run: make ${{ matrix.make_target }}
-          
-      - name: Upload to Codecov
-        if: matrix.job == 'coverage' || matrix.job == 'test'
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./backend/reports/coverage.json
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
           
       - name: Generate summary
         working-directory: ${{ env.WORKING_DIR }}
@@ -122,153 +93,3 @@ jobs:
           name: ${{ matrix.job }}-summary
           path: ${{ env.WORKING_DIR }}/${{ matrix.summary_file }}
           retention-days: 7
-
-  # Generate comprehensive quality report
-  quality-summary:
-    runs-on: ubuntu-latest
-    name: Quality Summary
-    needs: quality-check
-    if: always()
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-          
-      - name: Create comprehensive quality report
-        run: |
-          # Debug: List all artifacts
-          echo "📁 Available artifacts:"
-          find artifacts/ -type f -name "*.txt" 2>/dev/null || echo "No .txt files found"
-          echo ""
-          
-          # Create report header
-          cat > comprehensive_report.md << 'EOF'
-          # TravelStyle AI Backend - Code Quality Report
-          
-          Generated on: $(date)
-          
-          ## 🧪 Test Results
-          EOF
-          
-          # Add test results
-          if [ -d "artifacts/test-report" ]; then
-            echo "✅ Tests completed - see pytest artifacts for details" >> comprehensive_report.md
-          else
-            echo "❌ Tests failed or not found" >> comprehensive_report.md
-          fi
-          echo "" >> comprehensive_report.md
-          
-          # Add coverage info
-          echo "## 📊 Coverage Report" >> comprehensive_report.md
-          COVERAGE_FILE=$(find artifacts/ -name "coverage_summary.txt" 2>/dev/null | head -1)
-          if [ -n "$COVERAGE_FILE" ] && [ -f "$COVERAGE_FILE" ]; then
-            cat "$COVERAGE_FILE" >> comprehensive_report.md
-          else
-            echo "❌ Coverage report not available" >> comprehensive_report.md
-          fi
-          echo "" >> comprehensive_report.md
-          
-          # Add security info
-          echo "## 🔒 Security Scan" >> comprehensive_report.md
-          SECURITY_FILE=$(find artifacts/ -name "security_summary.txt" 2>/dev/null | head -1)
-          if [ -n "$SECURITY_FILE" ] && [ -f "$SECURITY_FILE" ]; then
-            cat "$SECURITY_FILE" >> comprehensive_report.md
-          else
-            echo "❌ Security scan not available" >> comprehensive_report.md
-          fi
-          echo "" >> comprehensive_report.md
-          
-          # Add lint info
-          echo "## 🔍 Code Quality (Pylint)" >> comprehensive_report.md
-          LINT_FILE=$(find artifacts/ -name "lint_summary.txt" 2>/dev/null | head -1)
-          if [ -n "$LINT_FILE" ] && [ -f "$LINT_FILE" ]; then
-            cat "$LINT_FILE" >> comprehensive_report.md
-          else
-            echo "❌ Lint report not available" >> comprehensive_report.md
-          fi
-          echo "" >> comprehensive_report.md
-          
-          # Add artifacts section
-          cat >> comprehensive_report.md << 'EOF'
-          ## 📁 Available Artifacts
-          - **test-report**: Test execution logs, results, and coverage data
-          - **coverage-report**: Same as test-report (coverage included in tests)
-          - **security-report**: Security scan results (JSON + HTML)
-          - **lint-report**: Code quality reports (JSON + HTML)
-          - **quality-summary**: This comprehensive report
-          
-          ## 🎯 Quick Links
-          - [View Coverage Report](../artifacts/test-report/reports/htmlcov/index.html)
-          - [View Security Report](../artifacts/security-report/reports/bandit_report.html)
-          - [View Pylint Report](../artifacts/lint-report/reports/pylint_report.html)
-          
-          ---
-          *Report generated by TravelStyle AI Backend CI/CD Pipeline*
-          EOF
-          
-          echo "📋 Generated Quality Report:"
-          cat comprehensive_report.md
-          
-      - name: Upload comprehensive report
-        uses: actions/upload-artifact@v4
-        with:
-          name: quality-summary
-          path: comprehensive_report.md
-          retention-days: 30
-          
-      - name: Generate and update badges
-        if: always()
-        run: |
-          # Generate Pylint Badge
-          LINT_FILE=$(find artifacts/ -name "lint_summary.txt" 2>/dev/null | head -1)
-          if [ -n "$LINT_FILE" ] && [ -f "$LINT_FILE" ]; then
-            LINT_SCORE=$(cat "$LINT_FILE" | grep -o '[0-9]\+\.[0-9]\+' | head -1 || echo "0.0")
-            COLOR="brightgreen"
-            if (( $(echo "$LINT_SCORE < 7.0" | bc -l) )); then
-              COLOR="red"
-            elif (( $(echo "$LINT_SCORE < 8.0" | bc -l) )); then
-              COLOR="orange"
-            fi
-            echo "Pylint Score: $LINT_SCORE/10"
-          else
-            LINT_SCORE="0.0"
-            COLOR="lightgrey"
-          fi
-          
-          # Generate Bandit Badge
-          SECURITY_FILE=$(find artifacts/ -name "security_summary.txt" 2>/dev/null | head -1)
-          if [ -n "$SECURITY_FILE" ] && [ -f "$SECURITY_FILE" ]; then
-            ISSUES=$(cat "$SECURITY_FILE" | grep -o '[0-9]\+' | head -1 || echo "0")
-            SEC_COLOR="brightgreen"
-            if [ "$ISSUES" -gt 5 ]; then
-              SEC_COLOR="red"
-            elif [ "$ISSUES" -gt 0 ]; then
-              SEC_COLOR="orange"
-            fi
-            echo "Security Issues: $ISSUES"
-          else
-            ISSUES="0"
-            SEC_COLOR="lightgrey"
-          fi
-          
-          # Update README with new badges
-          sed -i "s|https://img.shields.io/badge/pylint-[^)]*|https://img.shields.io/badge/pylint-${LINT_SCORE}%2F10-${COLOR}|g" README.md
-          sed -i "s|https://img.shields.io/badge/bandit-[^)]*|https://img.shields.io/badge/bandit-${ISSUES}%20issues-${SEC_COLOR}|g" README.md
-          
-          echo "Badges updated in README.md"
-          
-      - name: Commit badge updates
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add README.md
-          git diff --quiet && git diff --staged --quiet || git commit -m "Update dynamic badges [skip ci]"
-          git push
