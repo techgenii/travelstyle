@@ -3,7 +3,7 @@ handles weather data retrieval and clothing recommendations."""
 
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 
 import httpx
 
@@ -57,7 +57,7 @@ class WeatherService:
                     current_weather, forecast_data
                 ),
                 "destination": destination,
-                "retrieved_at": datetime.utcnow().isoformat()
+                "retrieved_at": datetime.now(UTC).isoformat()
             }
 
             # Cache for 1 hour

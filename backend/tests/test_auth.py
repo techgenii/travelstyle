@@ -17,11 +17,25 @@ class TestAuthRegistrationAndLogin:
         """Test successful user registration."""
         with patch('app.services.auth_service.auth_service.register') as mock_register:
             mock_register.return_value = RegisterResponse(
-                message=(
-                    "User registered successfully. Please check your email to confirm your account."
-                ),
+                access_token="test-access-token",
+                token_type="bearer",
+                expires_in=3600,
+                message="Registration successful",
                 user_id="test-user-id",
-                success=True
+                success=True,
+                user={
+                    "id": "test-user-id",
+                    "email": "test@example.com",
+                    "first_name": "John",
+                    "last_name": "Doe",
+                    "avatar_url": None,
+                    "role": "user",
+                    "status": "active",
+                    "created_at": "2023-01-01T00:00:00Z",
+                    "updated_at": "2023-01-01T00:00:00Z",
+                    "last_login": None,
+                    "preferences": None
+                }
             )
             response = client.post(
                 "/api/v1/auth/register",
@@ -34,11 +48,15 @@ class TestAuthRegistrationAndLogin:
             )
             assert response.status_code == status.HTTP_201_CREATED
             data = response.json()
-            assert data["message"] == (
-                "User registered successfully. Please check your email to confirm your account."
-            )
+            assert data["access_token"] == "test-access-token"
+            assert data["token_type"] == "bearer"
+            assert data["expires_in"] == 3600
+            assert data["message"] == "Registration successful"
             assert data["user_id"] == "test-user-id"
             assert data["success"] is True
+            assert data["user"]["email"] == "test@example.com"
+            assert data["user"]["first_name"] == "John"
+            assert data["user"]["last_name"] == "Doe"
 
     def test_register_invalid_email(self, client):
         """Test registration with invalid email."""
@@ -80,8 +98,15 @@ class TestAuthRegistrationAndLogin:
                 user={
                     "id": "test-user-id",
                     "email": "test@example.com",
+                    "first_name": "John",
+                    "last_name": "Doe",
+                    "avatar_url": None,
+                    "role": "user",
+                    "status": "active",
                     "created_at": "2023-01-01T00:00:00Z",
-                    "updated_at": "2023-01-01T00:00:00Z"
+                    "updated_at": "2023-01-01T00:00:00Z",
+                    "last_login": None,
+                    "preferences": None
                 }
             )
             response = client.post(
@@ -95,6 +120,8 @@ class TestAuthRegistrationAndLogin:
             assert data["token_type"] == "bearer"
             assert data["expires_in"] == 3600
             assert data["user"]["email"] == "test@example.com"
+            assert data["user"]["first_name"] == "John"
+            assert data["user"]["last_name"] == "Doe"
 
     def test_login_invalid_credentials(self, client):
         """Test login with invalid credentials."""
@@ -283,7 +310,7 @@ class TestAuthOtherEndpoints:
 
     def test_update_current_user_profile_success(self, authenticated_client):
         """Test successful update current user profile."""
-        with patch('app.services.auth_service.auth_service.update_user_profile') as mock_update_profile:
+        with patch('app.services.auth_service.auth_service.update_user_profile_sync') as mock_update_profile:
             mock_update_profile.return_value = {
                 "id": "test-user-id",
                 "email": "test@example.com",
@@ -321,7 +348,7 @@ class TestAuthOtherEndpoints:
 
     def test_update_current_user_profile_not_found(self, authenticated_client):
         """Test update current user profile when user not found."""
-        with patch('app.services.auth_service.auth_service.update_user_profile') as mock_update_profile:
+        with patch('app.services.auth_service.auth_service.update_user_profile_sync') as mock_update_profile:
             mock_update_profile.return_value = None
             response = authenticated_client.put(
                 "/api/v1/auth/me",

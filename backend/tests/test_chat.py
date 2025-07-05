@@ -86,9 +86,44 @@ class TestChatEndpoints:
 
     def test_get_conversation_history_error(self, authenticated_client):
         """Test conversation history when database fails."""
-        # This test would require mocking the actual endpoint logic
-        # For now, we'll test the happy path
-        response = authenticated_client.get(
-            "/api/v1/chat/conversations/test-conversation-123/history"
-        )
-        assert response.status_code == status.HTTP_200_OK
+        with patch('app.api.v1.chat.get_conversation_history') as mock_get_history:
+            # Mock the function to raise an exception
+            mock_get_history.side_effect = Exception("Database connection failed")
+            
+            response = authenticated_client.get(
+                "/api/v1/chat/conversations/test-conversation-123/history"
+            )
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to retrieve conversation" in response.json()["detail"]
+
+    def test_chat_endpoint_database_error(
+            self,
+            authenticated_client,
+            mock_chat_request):
+        """Test chat request when database operations fail."""
+        with patch('app.api.v1.chat.get_conversation_history') as mock_get_history:
+            # Mock database function to raise an exception
+            mock_get_history.side_effect = Exception("Database connection failed")
+            
+            response = authenticated_client.post(
+                "/api/v1/chat/",
+                json=mock_chat_request
+            )
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to process chat request" in response.json()["detail"]
+
+    def test_chat_endpoint_user_profile_error(
+            self,
+            authenticated_client,
+            mock_chat_request):
+        """Test chat request when user profile retrieval fails."""
+        with patch('app.api.v1.chat.get_user_profile') as mock_get_profile:
+            # Mock user profile function to raise an exception
+            mock_get_profile.side_effect = Exception("User profile not found")
+            
+            response = authenticated_client.post(
+                "/api/v1/chat/",
+                json=mock_chat_request
+            )
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to process chat request" in response.json()["detail"]

@@ -12,7 +12,7 @@ lint:
 	pylint app/
 
 lint-json:
-	pylint app/ -f json -o pylint_report.json
+	pylint app/ -f json > pylint_report.json
 
 lint-parseable:
 	pylint app/ -f parseable
@@ -42,7 +42,10 @@ test:
 	pytest
 
 test-cov:
-	pytest --cov=app --cov-report=html --cov-report=term
+	pytest --cov=app --cov-report=html --cov-report=term --cov-report=json
+
+test-cov-json:
+	pytest --cov=app --cov-report=json --cov-report=term
 
 test-fast:
 	pytest -x -v
@@ -52,7 +55,9 @@ test-github:
 
 check: lint security test
 
-check-cov: lint-colorized security-json test-cov
+check-cov: lint-colorized security-html test-cov
+
+check-cov-json: lint-json security-json test-cov-json
 
 check-github: lint-github security-github test-github
 

@@ -41,20 +41,13 @@ class AuthService:
             })
             if not response.user:
                 raise ValueError("Invalid credentials")
-            user_data = {
-                "id": response.user.id,
-                "email": response.user.email,
-                "created_at": response.user.created_at,
-                "updated_at": response.user.updated_at,
-                "email_confirmed_at": response.user.email_confirmed_at,
-                "last_sign_in_at": response.user.last_sign_in_at
-            }
+            user_profile = extract_user_profile(response.user)
             return LoginResponse(
                 access_token=response.session.access_token,
                 refresh_token=response.session.refresh_token,
-                token_type="bearer",
+                token_type="bearer",  # nosec
                 expires_in=response.session.expires_in,
-                user=user_data
+                user=user_profile
             )
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Login failed for email %s: %s", login_data.email, str(e))
@@ -116,7 +109,7 @@ class AuthService:
             return RefreshTokenResponse(
                 access_token=response.session.access_token,
                 refresh_token=response.session.refresh_token,
-                token_type="bearer",
+                token_type="bearer",  # nosec
                 expires_in=response.session.expires_in
             )
         except Exception as e:  # pylint: disable=broad-except
@@ -140,12 +133,20 @@ class AuthService:
             })
             if not response.user:
                 raise ValueError("Failed to create user")
+            # Immediately sign in to get token after registration
+            login_response = self.client.auth.sign_in_with_password({
+                "email": email,
+                "password": password
+            })
+            user_profile = extract_user_profile(login_response.user)
             return RegisterResponse(
-                message=(
-                    "User registered successfully. Please check your email to confirm your account."
-                ),
-                user_id=response.user.id,
-                success=True
+                access_token=login_response.session.access_token,
+                token_type="bearer",  # nosec
+                expires_in=login_response.session.expires_in,
+                message="Registration successful",
+                user_id=user_profile.get("id"),
+                success=True,
+                user=user_profile
             )
         except Exception as e:  # pylint: disable=broad-except
             logger.error("User registration failed for %s: %s", email, str(e))
@@ -177,6 +178,70 @@ class AuthService:
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to update user profile for %s: %s", user_id, str(e))
             return None
+
+    async def update_user_profile_sync(self, user_id: str,
+                                     updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update user profile and sync across all tables."""
+        try:
+            # Update Supabase auth user metadata
+            auth_response = self.client.auth.admin.update_user_by_id(
+                user_id,
+                {"user_metadata": updates}
+            )
+
+            if not auth_response.user:
+                logger.error("Failed to update auth user for %s", user_id)
+                return None
+
+            # Update public.users table
+            user_updates = {}
+            if 'first_name' in updates:
+                user_updates['first_name'] = updates['first_name']
+            if 'last_name' in updates:
+                user_updates['last_name'] = updates['last_name']
+
+            # Update profile_completed status
+            if 'first_name' in updates or 'last_name' in updates:
+                first_name = (updates.get('first_name') or
+                            auth_response.user.raw_user_meta_data.get('first_name'))
+                last_name = (updates.get('last_name') or
+                           auth_response.user.raw_user_meta_data.get('last_name'))
+                user_updates['profile_completed'] = bool(first_name and last_name)
+
+            if user_updates:
+                user_updates['updated_at'] = 'now()'
+                self.client.table('users').update(user_updates).eq('id', user_id).execute()
+
+            # Update user_preferences if style preferences are included
+            if 'style_preferences' in updates:
+                self.client.table('user_preferences').update({
+                    'style_preferences': updates['style_preferences'],
+                    'updated_at': 'now()'
+                }).eq('user_id', user_id).execute()
+
+            # Return updated profile
+            return extract_user_profile(auth_response.user)
+
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Failed to update user profile for %s: %s", user_id, str(e))
+            return None
+
+    async def update_user_preferences(self, user_id: str,
+                                    preferences: Dict[str, Any]) -> bool:
+        """Update user preferences in the database."""
+        try:
+            # Update user_preferences table
+            self.client.table('user_preferences').update({
+                **preferences,
+                'updated_at': 'now()'
+            }).eq('user_id', user_id).execute()
+
+            logger.info("User preferences updated successfully for %s", user_id)
+            return True
+
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Failed to update user preferences for %s: %s", user_id, str(e))
+            return False
 
 # Singleton instance
 auth_service = AuthService()
