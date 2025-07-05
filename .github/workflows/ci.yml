@@ -6,13 +6,13 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/ci.yml'
-      - '.github/actions/*'
+      - '.github/actions/**'
   pull_request:
     branches: [main, develop]
     paths:
       - 'backend/**'
       - '.github/workflows/ci.yml'
-      - '.github/actions/*'
+      - '.github/actions/**'
 
 jobs:
   install-deps:
