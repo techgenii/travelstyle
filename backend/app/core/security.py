@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from supabase import create_client, Client
 from app.core.config import settings
+from app.utils.user_utils import extract_user_profile
 
 logger = logging.getLogger(__name__)
 
@@ -50,18 +51,13 @@ class SupabaseAuth:
             logger.error("Token verification error: %s", str(e))
             return None
 
+    # pylint: disable=duplicate-code
     async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user data from Supabase by user ID"""
         try:
             response = self.client.auth.admin.get_user_by_id(user_id)
             if response.user:
-                return {
-                    "id": response.user.id,
-                    "email": response.user.email,
-                    "is_active": not response.user.banned_until,
-                    "created_at": response.user.created_at,
-                    "updated_at": response.user.updated_at
-                }
+                return extract_user_profile(response.user)
             return None
         except (ValueError, KeyError, AttributeError) as e:
             logger.error("Get user by ID error: %s", str(e))

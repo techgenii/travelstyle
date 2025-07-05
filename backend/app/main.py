@@ -12,7 +12,7 @@ import uvicorn
 
 from app.core.config import settings
 # Redis removed - using Supabase cache instead
-from app.api.v1 import chat, recommendations, user
+from app.api.v1 import chat, recommendations, user, auth
 from app.utils.error_handlers import custom_http_exception_handler
 
 # Logging configuration
@@ -54,6 +54,11 @@ app.add_middleware(
 app.add_exception_handler(HTTPException, custom_http_exception_handler)
 
 # Include routers
+app.include_router(
+    auth.router,
+    prefix=f"{settings.API_V1_STR}/auth",
+    tags=["authentication"]
+)
 app.include_router(
     chat.router,
     prefix=f"{settings.API_V1_STR}/chat",

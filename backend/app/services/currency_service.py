@@ -10,7 +10,6 @@ from app.services.supabase_cache import supabase_cache
 
 logger = logging.getLogger(__name__)
 
-
 class CurrencyService:
     """Service for handling currency exchange rates and conversions."""
 
