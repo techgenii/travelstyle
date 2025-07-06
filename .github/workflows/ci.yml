@@ -21,7 +21,7 @@ env:
   WORKING_DIR: backend
 
 jobs:
-  # Job 1: Setup and Quality Checks
+  # Combined quality checks
   quality-checks:
     runs-on: ubuntu-latest
     steps:
@@ -35,21 +35,25 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('backend/**/requirements*.txt') }}
           restore-keys: ${{ runner.os }}-pip-
 
+      # Install dependencies
       - name: Install dependencies
         working-directory: ${{ env.WORKING_DIR }}
         run: make install-dev
 
+      # Run lint (produces XML)
       - name: Run lint
         working-directory: ${{ env.WORKING_DIR }}
         run: make prod-lint
         continue-on-error: true
 
+      # Run security scan (produces JSON, convert to XML summary)
       - name: Run security scan
         working-directory: ${{ env.WORKING_DIR }}
         run: make prod-security
         continue-on-error: true
 
-      - name: Run tests with coverage
+      # Run tests with coverage (produces both XML and JSON)
+      - name: Run tests
         working-directory: ${{ env.WORKING_DIR }}
         env:
           OPENAI_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENAI_API_KEY || '' }}
@@ -58,11 +62,24 @@ jobs:
           EXCHANGE_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).EXCHANGE_API_KEY || '' }}
           SUPABASE_URL: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_URL || '' }}
           SUPABASE_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_KEY || '' }}
-        run: make prod-test
+        run: |
+          # Run your existing test command
+          make prod-test
         continue-on-error: true
 
-      - name: Upload quality reports
-        uses: actions/upload-artifact@v4
+      # Upload coverage reports to Codecov
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          fail_ci_if_error: false # optional (default = false)
+          directory: ./${{ env.WORKING_DIR }}/reports
+          files: ./test-coverage.xml, ./test-results.xml
+          verbose: true # optional (default = false)
+
+      # Upload all XML artifacts
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: quality-reports
@@ -72,164 +89,118 @@ jobs:
             ${{ env.WORKING_DIR }}/reports/pytest-results.xml
             ${{ env.WORKING_DIR }}/reports/pytest-coverage.json
             ${{ env.WORKING_DIR }}/reports/pytest-coverage.xml
+            ${{ env.WORKING_DIR }}/reports/pytest-coverage.txt
           retention-days: 30
 
-  # Job 2: Upload Coverage to External Services
-  upload-coverage:
+  # Generate badges from XML artifacts
+  update-badges:
     runs-on: ubuntu-latest
-    needs: quality-checks
+    needs: [quality-checks]
     if: always()
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/download-artifact@v4
         with:
-          name: quality-reports
-          path: ${{ env.WORKING_DIR }}/reports/
+          path: artifacts/
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        with:
-          fail_ci_if_error: false
-          directory: ./${{ env.WORKING_DIR }}/reports
-          files: ./pytest-coverage.xml, ./pytest-results.xml
-          verbose: true
-
-  # Job 3: Update README with All Changes
-  update-readme:
-    runs-on: ubuntu-latest
-    needs: quality-checks
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Download quality reports
-        uses: actions/download-artifact@v4
-        with:
-          name: quality-reports
-          path: ${{ env.WORKING_DIR }}/reports/
-
-      - name: Generate quality metrics and update README
+      - name: Extract scores and update badges
         run: |
-          # Extract metrics from reports
-          LINT_ISSUES=$(xmllint --xpath "count(//testcase[@classname='ruff']/failure)" ${{ env.WORKING_DIR }}/reports/ruff_junit.xml 2>/dev/null || echo "0")
-
+          # Extract lint score from ruff XML
+          LINT_ISSUES=$(xmllint --xpath "count(//testcase[@classname='ruff']/failure)" artifacts/quality-reports/ruff_junit.xml 2>/dev/null || echo "0")
+          # Extract security issues from bandit JSON
           SECURITY_ISSUES=$(python3 -c "
           import json
           try:
-              with open('${{ env.WORKING_DIR }}/reports/bandit_report.json', 'r') as f:
+              with open('artifacts/quality-reports/bandit_report.json', 'r') as f:
                   data = json.load(f)
                   print(len(data.get('results', [])))
           except:
               print('0')
           " 2>/dev/null || echo "0")
-
+          # Extract coverage from coverage JSON
           COVERAGE=$(python3 -c "
           import json
           try:
-              with open('${{ env.WORKING_DIR }}/reports/pytest-coverage.json', 'r') as f:
+              with open('artifacts/quality-reports/pytest-coverage.json', 'r') as f:
                   data = json.load(f)
                   print(int(data.get('totals', {}).get('percent_covered', 0)))
           except:
               print('0')
           " 2>/dev/null || echo "0")
-
-          TEST_FAILURES=$(xmllint --xpath "count(//testcase/failure)" ${{ env.WORKING_DIR }}/reports/pytest-results.xml 2>/dev/null || echo "0")
-          TEST_ERRORS=$(xmllint --xpath "count(//testcase/error)" ${{ env.WORKING_DIR }}/reports/tpyest-results.xml 2>/dev/null || echo "0")
-          TOTAL_TESTS=$(xmllint --xpath "count(//testcase)" ${{ env.WORKING_DIR }}/reports/pytest-results.xml 2>/dev/null || echo "0")
-
+          # Extract test results from XML
+          TEST_FAILURES=$(xmllint --xpath "count(//testcase/failure)" artifacts/quality-reports/pytest-results.xml 2>/dev/null || echo "0")
+          TEST_ERRORS=$(xmllint --xpath "count(//testcase/error)" artifacts/quality-reports/pytest-results.xml 2>/dev/null || echo "0")
+          TOTAL_TESTS=$(xmllint --xpath "count(//testcase)" artifacts/quality-reports/pytest-results.xml 2>/dev/null || echo "0")
           # Calculate badge colors
-          if [ "$LINT_ISSUES" -eq 0 ]; then LINT_COLOR="brightgreen"
-          elif [ "$LINT_ISSUES" -le 5 ]; then LINT_COLOR="orange"
-          else LINT_COLOR="red"; fi
-
-          if [ "$SECURITY_ISSUES" -eq 0 ]; then SEC_COLOR="brightgreen"
-          elif [ "$SECURITY_ISSUES" -le 2 ]; then SEC_COLOR="orange"
-          else SEC_COLOR="red"; fi
-
-          if [ "$COVERAGE" -ge 80 ]; then COV_COLOR="brightgreen"
-          elif [ "$COVERAGE" -ge 60 ]; then COV_COLOR="orange"
-          else COV_COLOR="red"; fi
-
-          if [ "$TEST_FAILURES" -eq 0 ] && [ "$TEST_ERRORS" -eq 0 ]; then TEST_COLOR="brightgreen"
-          else TEST_COLOR="red"; fi
-
-          # Update README with coverage HTML
-          sed -i '/<!-- Pytest Coverage Comment:Begin -->/,/<!-- Pytest Coverage Comment:End -->/c\<!-- Pytest Coverage Comment:Begin -->\n${{ steps.coverageComment.outputs.coverageHtml }}\n<!-- Pytest Coverage Comment:End -->' ./README.md
-
-          # Update or add quality badges
-          if grep -q "img.shields.io/badge/ruff" README.md; then
-            # Update existing badges
+          if [ "$LINT_ISSUES" -eq 0 ]; then
+            LINT_COLOR="brightgreen"
+          elif [ "$LINT_ISSUES" -le 5 ]; then
+            LINT_COLOR="orange"
+          else
+            LINT_COLOR="red"
+          fi
+          if [ "$SECURITY_ISSUES" -eq 0 ]; then
+            SEC_COLOR="brightgreen"
+          elif [ "$SECURITY_ISSUES" -le 2 ]; then
+            SEC_COLOR="orange"
+          else
+            SEC_COLOR="red"
+          fi
+          if [ "$COVERAGE" -ge 80 ]; then
+            COV_COLOR="brightgreen"
+          elif [ "$COVERAGE" -ge 60 ]; then
+            COV_COLOR="orange"
+          else
+            COV_COLOR="red"
+          fi
+          if [ "$TEST_FAILURES" -eq 0 ] && [ "$TEST_ERRORS" -eq 0 ]; then
+            TEST_COLOR="brightgreen"
+          else
+            TEST_COLOR="red"
+          fi
+          # Create or update README badges (excluding Codecov badge)
+          if [ -f "README.md" ]; then
+            # Update existing badges or add new ones
             sed -i "s|https://img.shields.io/badge/ruff-[^)]*|https://img.shields.io/badge/ruff-${LINT_ISSUES}%20issues-${LINT_COLOR}|g" README.md
             sed -i "s|https://img.shields.io/badge/bandit-[^)]*|https://img.shields.io/badge/bandit-${SECURITY_ISSUES}%20issues-${SEC_COLOR}|g" README.md
-            sed -i "s|https://img.shields.io/badge/coverage-[^)]*|https://img.shields.io/badge/coverage-${COVERAGE}%25-${COV_COLOR}|g" README.md
-            sed -i "s|https://img.shields.io/badge/tests-[^)]*|https://img.shields.io/badge/tests-${TOTAL_TESTS}%20total-${TEST_COLOR}|g" README.md
-          else
-            # Add new badge section at the top
-            BADGE_LINE="![Ruff](https://img.shields.io/badge/ruff-${LINT_ISSUES}%20issues-${LINT_COLOR}) ![Bandit](https://img.shields.io/badge/bandit-${SECURITY_ISSUES}%20issues-${SEC_COLOR}) ![Coverage](https://img.shields.io/badge/coverage-${COVERAGE}%25-${COV_COLOR}) ![Tests](https://img.shields.io/badge/tests-${TOTAL_TESTS}%20total-${TEST_COLOR})"
-
-            # Add badges after the first heading or at the top
-            if grep -q "^# " README.md; then
-              # Add after first heading
-              sed -i "0,/^# .*$/s/^# .*$/&\n\n${BADGE_LINE}/" README.md
-            else
-              # Add at the very top
-              sed -i "1i\\${BADGE_LINE}\n" README.md
+            sed -i "s|https://img.shields.io/badge/tests-[^)]*|https://img.shields.io/badge/tests-${TOTAL_TESTS}%20passed-${TEST_COLOR}|g" README.md
+            # If badges don't exist, add them to the top of README
+            if ! grep -q "img.shields.io/badge/ruff" README.md; then
+              sed -i '1i\
+              ![Ruff](https://img.shields.io/badge/ruff-'${LINT_ISSUES}'%20issues-'${LINT_COLOR}') \
+              ![Bandit](https://img.shields.io/badge/bandit-'${SECURITY_ISSUES}'%20issues-'${SEC_COLOR}') \
+              ![Tests](https://img.shields.io/badge/tests-'${TOTAL_TESTS}'%20passed-'${TEST_COLOR}')\
+              ' README.md
             fi
           fi
-
-          # Create summary report for job output
+          # Create summary report
           cat > quality_summary.md << EOF
           # Quality Report - $(date)
-
           ## 📊 Metrics
           - **Lint Issues**: ${LINT_ISSUES}
           - **Security Issues**: ${SECURITY_ISSUES}
           - **Test Coverage**: ${COVERAGE}%
           - **Tests**: ${TOTAL_TESTS} total, ${TEST_FAILURES} failures, ${TEST_ERRORS} errors
-
           ## 🎯 Status
           - Lint: $([ "$LINT_ISSUES" -eq 0 ] && echo "✅ PASS" || echo "❌ ISSUES FOUND")
           - Security: $([ "$SECURITY_ISSUES" -eq 0 ] && echo "✅ PASS" || echo "❌ ISSUES FOUND")
           - Coverage: $([ "$COVERAGE" -ge 80 ] && echo "✅ PASS" || echo "❌ BELOW THRESHOLD")
           - Tests: $([ "$TEST_FAILURES" -eq 0 ] && [ "$TEST_ERRORS" -eq 0 ] && echo "✅ PASS" || echo "❌ FAILURES")
           EOF
-
           echo "Quality Summary:"
           cat quality_summary.md
-
-      - name: Check if README was modified
-        id: readme-check
-        run: |
-          if git diff --quiet README.md; then
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "No changes to README.md"
-          else
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "README.md has been modified"
-            echo "Changes:"
-            git diff README.md
-          fi
-
-      - name: Commit and push README changes
-        if: steps.readme-check.outputs.changed == 'true'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add README.md
-          git commit -m "Update coverage and quality badges [skip ci]"
-          git push origin main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload quality summary
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: quality-summary
           path: quality_summary.md
           retention-days: 30
+
+      - name: Commit badge updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update quality badges [skip ci]"
+          git push
