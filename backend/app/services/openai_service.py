@@ -79,7 +79,7 @@ class OpenAIService:
             return self._process_response(ai_message)
 
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("OpenAI API error: %s", str(e))
+            logger.error("OpenAI API error: %s", type(e).__name__)
             return ChatResponse(
                 message=(
                     "I apologize, but I'm having trouble processing your request right now. "

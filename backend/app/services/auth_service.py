@@ -37,7 +37,7 @@ class AuthService:
             self.client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
             logger.info("Supabase client initialized successfully")
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Failed to initialize Supabase client: %s", str(e))
+            logger.error("Failed to initialize Supabase client: %s", type(e).__name__)
             raise
 
     async def login(self, login_data: LoginRequest) -> LoginResponse:
@@ -63,7 +63,7 @@ class AuthService:
                 user=user_profile,
             )
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Login failed for email %s: %s", login_data.email, str(e))
+            logger.error("Login failed for email %s: %s", login_data.email, type(e).__name__)
             raise ValueError("Invalid credentials") from e
 
     async def logout(self, refresh_token: str | None = None) -> LogoutResponse:
@@ -77,7 +77,7 @@ class AuthService:
                 self.client.auth.sign_out()
             return LogoutResponse(message="Successfully logged out", success=True)
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Logout failed: %s", str(e))
+            logger.error("Logout failed: %s", type(e).__name__)
             return LogoutResponse(message="Logged out successfully", success=True)
 
     async def forgot_password(self, email: str) -> ForgotPasswordResponse:
@@ -90,7 +90,7 @@ class AuthService:
                 message="Password reset email sent successfully", success=True
             )
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Password reset email failed for %s: %s", email, str(e))
+            logger.error("Password reset email failed: %s", type(e).__name__)
             return ForgotPasswordResponse(
                 message="If the email exists, a password reset link has been sent", success=True
             )
@@ -105,7 +105,7 @@ class AuthService:
             self.client.auth.update_user({"password": new_password})
             return ResetPasswordResponse(message="Password reset successfully", success=True)
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Password reset failed: %s", str(e))
+            logger.error("Password reset failed: %s", type(e).__name__)
             raise ValueError("Invalid or expired reset token") from e
 
     async def refresh_token(self, refresh_token: str) -> RefreshTokenResponse:
@@ -123,7 +123,7 @@ class AuthService:
                 expires_in=response.session.expires_in,
             )
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Token refresh failed: %s", str(e))
+            logger.error("Token refresh failed: %s", type(e).__name__)
             raise ValueError("Invalid refresh token") from e
 
     async def register(
@@ -170,7 +170,7 @@ class AuthService:
                 user=user_profile,
             )
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("User registration failed for %s: %s", email, str(e))
+            logger.error("User registration failed: %s", type(e).__name__)
             raise ValueError("Registration failed. Email may already be in use.") from e
 
     # pylint: disable=duplicate-code
@@ -184,7 +184,7 @@ class AuthService:
                 return extract_user_profile(response.user)
             return None
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Failed to get user profile for %s: %s", user_id, str(e))
+            logger.error("Failed to get user profile for %s: %s", user_id, type(e).__name__)
             return None
 
     async def update_user_profile(
@@ -199,7 +199,7 @@ class AuthService:
                 return extract_user_profile(response.user)
             return None
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Failed to update user profile for %s: %s", user_id, str(e))
+            logger.error("Failed to update user profile for %s: %s", user_id, type(e).__name__)
             return None
 
     async def update_user_profile_sync(
@@ -252,7 +252,7 @@ class AuthService:
             return extract_user_profile(auth_response.user)
 
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Failed to update user profile for %s: %s", user_id, str(e))
+            logger.error("Failed to update user profile for %s: %s", user_id, type(e).__name__)
             return None
 
     async def update_user_preferences(self, user_id: str, preferences: dict[str, Any]) -> bool:
@@ -269,7 +269,7 @@ class AuthService:
             return True
 
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Failed to update user preferences for %s: %s", user_id, str(e))
+            logger.error("Failed to update user preferences for %s: %s", user_id, type(e).__name__)
             return False
 
 

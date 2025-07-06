@@ -67,7 +67,7 @@ class WeatherService:
             return weather_data
 
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Weather service error: %s", str(e))
+            logger.error("Weather service error: %s", type(e).__name__)
             return None
 
     async def _get_current_weather(self, destination: str) -> dict[str, Any] | None:
@@ -99,7 +99,7 @@ class WeatherService:
                 }
 
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Current weather error: %s", str(e))
+            logger.error("Current weather error: %s", type(e).__name__)
             return None
 
     async def _get_forecast(self, destination: str) -> dict[str, Any] | None:
@@ -170,7 +170,7 @@ class WeatherService:
                 }
 
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Forecast error: %s", str(e))
+            logger.error("Forecast error: %s", type(e).__name__)
             return None
 
     def _calculate_precipitation_chance(self, conditions: list[str]) -> int:

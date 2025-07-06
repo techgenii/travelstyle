@@ -4,12 +4,13 @@
 ![Python Version](https://img.shields.io/badge/python-3.13-blue)
 [![TypeScript](https://img.shields.io/badge/typescript-4.0+-blue.svg)](https://www.typescriptlang.org/)
 
-## 🚀 Quality & Status
+## 📊 Quality & Status
 
 [![CI/CD](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg)](https://github.com/techgenii/travelstyle/actions)
 [![codecov](https://codecov.io/github/techgenii/travelstyle/branch/main/graph/badge.svg?token=09BL7TAJDH)](https://codecov.io/github/techgenii/travelstyle)
-[![Pylint](https://img.shields.io/badge/pylint-0.0%2F10-red)](https://github.com/techgenii/travelstyle/actions)
+[![Ruff](https://img.shields.io/badge/ruff-0%20issues-brightgreen)](https://github.com/techgenii/travelstyle/actions)
 [![Bandit](https://img.shields.io/badge/bandit-0%20issues-brightgreen)](https://github.com/techgenii/travelstyle/actions)
+[![Tests](https://img.shields.io/badge/tests-0%20passed-brightgreen)](https://github.com/techgenii/travelstyle/actions)
 
 ## Product Vision
 TravelStyle AI is an intelligent travel companion chat application that provides personalized wardrobe recommendations, cultural style guidance, and currency conversion tools to help travelers dress appropriately and confidently for any destination.
@@ -57,11 +58,15 @@ Database Layer (Supabase/PostgreSQL)
 - PostgreSQL (via Supabase)
 
 ### Where to get API Keys
-OpenAI: https://platform.openai.com/api-keys
-Qloo: https://www.qloo.com/api
-OpenWeather: https://openweathermap.org/api
-Exchange Rate API: https://www.exchangerate-api.com/
-Supabase: https://supabase.com/dashboard
+- OpenAI: https://platform.openai.com/api-keys
+
+- Qloo: https://www.qloo.com/api
+
+- OpenWeather: https://openweathermap.org/api
+
+- Exchange Rate API: https://www.exchangerate-api.com/
+
+- Supabase: https://supabase.com/dashboard
 
 ### Setup
 1. **Clone the repository:**

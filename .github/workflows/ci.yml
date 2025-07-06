@@ -52,7 +52,7 @@ jobs:
         run: make prod-security
         continue-on-error: true
 
-      # Run tests (produces XML)
+      # Run tests with coverage (produces both XML and JSON)
       - name: Run tests
         working-directory: ${{ env.WORKING_DIR }}
         env:
@@ -62,8 +62,21 @@ jobs:
           EXCHANGE_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).EXCHANGE_API_KEY || '' }}
           SUPABASE_URL: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_URL || '' }}
           SUPABASE_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_KEY || '' }}
-        run: make prod-test
+        run: |
+          # Run your existing test command
+          make prod-test
         continue-on-error: true
+
+      # Upload coverage reports to Codecov
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          fail_ci_if_error: false # optional (default = false)
+          directory: ./${{ env.WORKING_DIR }}/reports
+          files: ./test-coverage.xml, ./test-results.xml
+          verbose: true # optional (default = false)
 
       # Upload all XML artifacts
       - uses: actions/upload-artifact@v4
@@ -75,6 +88,7 @@ jobs:
             ${{ env.WORKING_DIR }}/reports/bandit_report.json
             ${{ env.WORKING_DIR }}/reports/test-results.xml
             ${{ env.WORKING_DIR }}/reports/coverage.json
+            ${{ env.WORKING_DIR }}/reports/test-coverage.xml
           retention-days: 30
 
   # Generate badges from XML artifacts
@@ -153,12 +167,11 @@ jobs:
             TEST_COLOR="red"
           fi
 
-          # Create or update README badges
+          # Create or update README badges (excluding Codecov badge)
           if [ -f "README.md" ]; then
             # Update existing badges or add new ones
             sed -i "s|https://img.shields.io/badge/ruff-[^)]*|https://img.shields.io/badge/ruff-${LINT_ISSUES}%20issues-${LINT_COLOR}|g" README.md
             sed -i "s|https://img.shields.io/badge/bandit-[^)]*|https://img.shields.io/badge/bandit-${SECURITY_ISSUES}%20issues-${SEC_COLOR}|g" README.md
-            sed -i "s|https://img.shields.io/badge/coverage-[^)]*|https://img.shields.io/badge/coverage-${COVERAGE}%25-${COV_COLOR}|g" README.md
             sed -i "s|https://img.shields.io/badge/tests-[^)]*|https://img.shields.io/badge/tests-${TOTAL_TESTS}%20passed-${TEST_COLOR}|g" README.md
 
             # If badges don't exist, add them to the top of README
@@ -166,7 +179,6 @@ jobs:
               sed -i '1i\
               ![Ruff](https://img.shields.io/badge/ruff-'${LINT_ISSUES}'%20issues-'${LINT_COLOR}') \
               ![Bandit](https://img.shields.io/badge/bandit-'${SECURITY_ISSUES}'%20issues-'${SEC_COLOR}') \
-              ![Coverage](https://img.shields.io/badge/coverage-'${COVERAGE}'%25-'${COV_COLOR}') \
               ![Tests](https://img.shields.io/badge/tests-'${TOTAL_TESTS}'%20passed-'${TEST_COLOR}')\
               ' README.md
             fi

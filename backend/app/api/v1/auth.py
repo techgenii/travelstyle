@@ -44,17 +44,14 @@ async def login(login_data: LoginRequest):
     """
     try:
         response = await auth_service.login(login_data)
-        logger.info("User logged in successfully: %s", login_data.email)
         return response
     except ValueError as e:
-        logger.warning("Login failed for email %s: %s", login_data.email, str(e))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         ) from e
     except Exception as e:  # pylint: disable=broad-except
-        logger.error("Unexpected error during login: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         ) from e
@@ -72,10 +69,9 @@ async def logout(
     try:
         refresh_token_value = logout_data.refresh_token if logout_data else None
         response = await auth_service.logout(refresh_token_value)
-        logger.info("User logged out successfully: %s", current_user.get("email"))
         return response
     except Exception as e:  # pylint: disable=broad-except
-        logger.error("Logout error: %s", str(e))
+        logger.error("Logout error: %s", type(e).__name__)
         return LogoutResponse(message="Logged out successfully", success=True)
 
 
@@ -90,10 +86,9 @@ async def forgot_password(forgot_data: ForgotPasswordRequest):
     """
     try:
         response = await auth_service.forgot_password(forgot_data.email)
-        logger.info("Password reset email sent to: %s", forgot_data.email)
         return response
     except Exception as e:  # pylint: disable=broad-except
-        logger.error("Forgot password error: %s", str(e))
+        logger.error("Forgot password error: %s", type(e).__name__)
         return ForgotPasswordResponse(
             message="If the email exists, a password reset link has been sent", success=True
         )
@@ -113,12 +108,10 @@ async def reset_password(reset_data: ResetPasswordRequest):
         logger.info("Password reset successful")
         return response
     except ValueError as e:
-        logger.warning("Password reset failed: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token"
         ) from e
     except Exception as e:  # pylint: disable=broad-except
-        logger.error("Password reset error: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         ) from e
@@ -136,14 +129,12 @@ async def refresh_token(refresh_data: RefreshTokenRequest):
         logger.info("Token refreshed successfully")
         return response
     except ValueError as e:
-        logger.warning("Token refresh failed: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
             headers={"WWW-Authenticate": "Bearer"},  # pylint: disable=line-too-long
         ) from e
     except Exception as e:  # pylint: disable=broad-except
-        logger.error("Token refresh error: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         ) from e
@@ -163,20 +154,13 @@ async def register(register_data: RegisterRequest):
             first_name=register_data.first_name,
             last_name=register_data.last_name,
         )
-        logger.info("User registered successfully: %s", register_data.email)
         return response
     except ValueError as e:
-        logger.warning(
-            "User registration failed for %s: %s",
-            register_data.email,
-            str(e),  # pylint: disable=line-too-long
-        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),  # pylint: disable=line-too-long
+            detail=type(e).__name__,  # pylint: disable=line-too-long
         ) from e
     except Exception as e:  # pylint: disable=broad-except
-        logger.error("Registration error: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         ) from e
@@ -204,7 +188,7 @@ async def get_current_user_profile(current_user: dict = current_user_dependency)
     except HTTPException:
         raise
     except Exception as e:  # pylint: disable=broad-except
-        logger.error("Get user profile error: %s", str(e))
+        logger.error("Get user profile error: %s", type(e).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         ) from e
@@ -242,12 +226,10 @@ async def update_current_user_profile(updates: dict, current_user: dict = curren
                 status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found"
             )
 
-        logger.info("User profile updated successfully: %s", user_id)
         return profile
     except HTTPException:
         raise
     except Exception as e:  # pylint: disable=broad-except
-        logger.error("Update user profile error: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         ) from e
@@ -293,12 +275,11 @@ async def update_current_user_preferences(
                 detail="Failed to update user preferences",
             )
 
-        logger.info("User preferences updated successfully: %s", user_id)
         return {"message": "Preferences updated successfully", "success": True}
     except HTTPException:
         raise
     except Exception as e:  # pylint: disable=broad-except
-        logger.error("Update user preferences error: %s", str(e))
+        logger.error("Update user preferences error: %s", type(e).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         ) from e

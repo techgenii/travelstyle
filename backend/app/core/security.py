@@ -2,6 +2,7 @@
 Security utilities for TravelStyle AI application.
 Handles JWT token verification and Supabase authentication.
 """
+
 import logging
 from typing import Any
 
@@ -12,6 +13,7 @@ from app.utils.user_utils import extract_user_profile
 from supabase import Client, create_client
 
 logger = logging.getLogger(__name__)
+
 
 class SupabaseAuth:
     """Supabase authentication client for JWT token verification and user management."""
@@ -26,7 +28,7 @@ class SupabaseAuth:
             payload = jwt.decode(
                 token,
                 key="",  # Supabase handles signature verification
-                options={"verify_signature": False}
+                options={"verify_signature": False},
             )
 
             # Extract user information
@@ -43,14 +45,14 @@ class SupabaseAuth:
                 "is_active": is_active,
                 "aud": payload.get("aud"),  # Audience (usually 'authenticated')
                 "exp": payload.get("exp"),  # Expiration time
-                "iat": payload.get("iat")   # Issued at time
+                "iat": payload.get("iat"),  # Issued at time
             }
 
         except JWTError as e:
-            logger.error("JWT decode error: %s", str(e))
+            logger.error("JWT decode error: %s", type(e).__name__)
             return None
         except (ValueError, KeyError) as e:
-            logger.error("Token verification error: %s", str(e))
+            logger.error("Token verification error: %s", type(e).__name__)
             return None
 
     # pylint: disable=duplicate-code
@@ -62,7 +64,7 @@ class SupabaseAuth:
                 return extract_user_profile(response.user)
             return None
         except (ValueError, KeyError, AttributeError) as e:
-            logger.error("Get user by ID error: %s", str(e))
+            logger.error("Get user by ID error: %s", type(e).__name__)
             return None
 
     async def revoke_token(self, token: str) -> bool:  # pylint: disable=unused-argument
@@ -72,17 +74,20 @@ class SupabaseAuth:
             # You can also implement custom token blacklisting if needed
             return True
         except (ValueError, KeyError) as e:
-            logger.error("Token revocation error: %s", str(e))
+            logger.error("Token revocation error: %s", type(e).__name__)
             return False
+
 
 # Singleton instance
 supabase_auth = SupabaseAuth()
+
 
 def create_access_token(data: dict) -> str:  # pylint: disable=unused-argument
     """Create a JWT token (mainly for testing - Supabase handles this)"""
     # This is mainly for testing purposes
     # In production, Supabase handles token creation
     return ""
+
 
 def verify_token(token: str) -> dict[str, Any] | None:
     """Verify a JWT token and return user data"""

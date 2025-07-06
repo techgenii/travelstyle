@@ -45,7 +45,7 @@ class SupabaseCacheService:
                 return response.data.get("data")
             return None
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Weather cache get error: %s", str(e))
+            logger.error("Weather cache get error: %s", type(e).__name__)
             return None
 
     async def set_weather_cache(
@@ -71,7 +71,7 @@ class SupabaseCacheService:
             self.client.table("weather_cache").upsert(cache_data).execute()
             return True
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Weather cache set error: %s", str(e))
+            logger.error("Weather cache set error: %s", type(e).__name__)
             return False
 
     async def get_cultural_cache(
@@ -99,7 +99,7 @@ class SupabaseCacheService:
                 return response.data.get("data")
             return None
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Cultural cache get error: %s", str(e))
+            logger.error("Cultural cache get error: %s", type(e).__name__)
             return None
 
     async def set_cultural_cache(
@@ -127,7 +127,7 @@ class SupabaseCacheService:
             self.client.table("cultural_insights_cache").upsert(cache_data).execute()
             return True
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Cultural cache set error: %s", str(e))
+            logger.error("Cultural cache set error: %s", type(e).__name__)
             return False
 
     async def get_currency_cache(self, base_currency: str) -> dict[str, Any] | None:
@@ -151,7 +151,7 @@ class SupabaseCacheService:
                 return response.data.get("data")
             return None
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Currency cache get error: %s", str(e))
+            logger.error("Currency cache get error: %s", type(e).__name__)
             return None
 
     async def set_currency_cache(
@@ -177,7 +177,7 @@ class SupabaseCacheService:
             self.client.table("currency_rates_cache").upsert(cache_data).execute()
             return True
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Currency cache set error: %s", str(e))
+            logger.error("Currency cache set error: %s", type(e).__name__)
             return False
 
     def _is_expired(self, expires_at: str) -> bool:

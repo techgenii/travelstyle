@@ -25,7 +25,7 @@ async def get_current_user_profile(current_user: dict = current_user_dependency)
             "is_active": current_user.get("is_active", True),
         }
     except Exception as e:
-        logger.error("Get user profile error: %s", str(e))
+        logger.error("Get user profile error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to retrieve user profile") from e
 
 
@@ -36,7 +36,7 @@ async def get_user_preferences(current_user: dict = current_user_dependency):
         # In a real implementation, you'd fetch from Supabase user_preferences table
         return {"style_preferences": {}, "travel_patterns": {}, "size_info": {}}
     except Exception as e:
-        logger.error("Get user preferences error: %s", str(e))
+        logger.error("Get user preferences error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to retrieve user preferences") from e
 
 
@@ -50,5 +50,5 @@ async def update_user_preferences(
         # In a real implementation, you'd update Supabase user_preferences table
         return {"message": "Preferences updated successfully", "user_id": current_user["id"]}
     except Exception as e:
-        logger.error("Update user preferences error: %s", str(e))
+        logger.error("Update user preferences error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to update user preferences") from e

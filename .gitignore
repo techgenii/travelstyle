@@ -117,4 +117,7 @@ Thumbs.db
 
 # Postgres/Redis data (if mapped locally)
 postgres_data/
-redis_data/ 
+redis_data/
+
+#backend reports
+backend/reports/

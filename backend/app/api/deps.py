@@ -35,7 +35,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = security_
         return user_data
 
     except Exception as e:
-        logger.error("Authentication error: %s", str(e))
+        logger.error("Authentication error: %s", type(e).__name__)
         raise credentials_exception from e
 
 

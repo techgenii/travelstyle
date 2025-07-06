@@ -95,6 +95,7 @@ prod-test: | $(REPORT_DIR)
 		--junitxml=$(REPORT_DIR)/test-results.xml \
 		--cov=$(APP_DIR) \
 		--cov-report=json:$(REPORT_DIR)/coverage.json \
+		--cov-report=xml:$(REPORT_DIR)/test-coverage.xml \
 		--cov-report=term || true
 	@echo "$(GREEN)Test results generated: $(REPORT_DIR)/test-results.xml$(NC)"
 

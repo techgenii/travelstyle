@@ -59,7 +59,7 @@ async def chat(
         return response
 
     except Exception as e:
-        logger.error("Chat endpoint error: %s", str(e))
+        logger.error("Chat endpoint error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to process chat request") from e
 
 
@@ -75,7 +75,7 @@ async def get_conversation(conversation_id: str, current_user: dict = current_us
         return {"conversation_id": conversation_id, "history": history}
 
     except Exception as e:
-        logger.error("Get conversation error: %s", str(e))
+        logger.error("Get conversation error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to retrieve conversation") from e
 
 

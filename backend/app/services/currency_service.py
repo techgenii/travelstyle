@@ -10,6 +10,7 @@ from app.services.supabase_cache import supabase_cache
 
 logger = logging.getLogger(__name__)
 
+
 class CurrencyService:
     """Service for handling currency exchange rates and conversions."""
 
@@ -42,7 +43,7 @@ class CurrencyService:
                 rates_data = {
                     "base": data["base"],
                     "rates": data["rates"],
-                    "last_updated": data["date"]
+                    "last_updated": data["date"],
                 }
 
                 # Cache for 1 hour
@@ -51,20 +52,17 @@ class CurrencyService:
                 return rates_data
 
         except httpx.RequestError as e:
-            logger.error("Currency service request error: %s", str(e))
+            logger.error("Currency service request error: %s", type(e).__name__)
             return None
         except httpx.HTTPError as e:
-            logger.error("Currency service HTTP error: %s", str(e))
+            logger.error("Currency service HTTP error: %s", type(e).__name__)
             return None
         except ValueError as e:
-            logger.error("Currency service JSON decode error: %s", str(e))
+            logger.error("Currency service JSON decode error: %s", type(e).__name__)
             return None
 
     async def convert_currency(
-        self,
-        amount: float,
-        from_currency: str,
-        to_currency: str
+        self, amount: float, from_currency: str, to_currency: str
     ) -> dict[str, Any] | None:
         """Convert currency amounts.
 
@@ -91,14 +89,14 @@ class CurrencyService:
                 "original": {"amount": amount, "currency": from_currency},
                 "converted": {"amount": converted_amount, "currency": to_currency},
                 "rate": conversion_rate,
-                "last_updated": rates["last_updated"]
+                "last_updated": rates["last_updated"],
             }
 
         except KeyError as e:
-            logger.error("Currency conversion key error: %s", str(e))
+            logger.error("Currency conversion key error: %s", type(e).__name__)
             return None
         except TypeError as e:
-            logger.error("Currency conversion type error: %s", str(e))
+            logger.error("Currency conversion type error: %s", type(e).__name__)
             return None
 
 

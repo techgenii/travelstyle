@@ -114,7 +114,7 @@ class TravelOrchestratorService:
             return self._enhance_response(ai_response, enhanced_context)
 
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Orchestration error: %s", str(e))
+            logger.error("Orchestration error: %s", type(e).__name__)
             return ChatResponse(
                 message=(
                     "I apologize, but I'm having trouble processing your "
@@ -129,7 +129,7 @@ class TravelOrchestratorService:
         try:
             return await api_func(*args, **kwargs)
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("API call failed: %s - %s", api_func.__name__, str(e))
+            logger.error("API call failed: %s - %s", api_func.__name__, type(e).__name__)
             return None
 
     async def _return_none(self):

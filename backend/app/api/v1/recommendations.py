@@ -46,7 +46,7 @@ async def get_cultural_insights(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Cultural insights error: %s", str(e))
+        logger.error("Cultural insights error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to retrieve cultural insights") from e
 
 
@@ -72,7 +72,7 @@ async def get_weather_forecast(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Weather forecast error: %s", str(e))
+        logger.error("Weather forecast error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to retrieve weather forecast") from e
 
 
@@ -94,7 +94,7 @@ async def get_exchange_rates(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Exchange rates error: %s", str(e))
+        logger.error("Exchange rates error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to retrieve exchange rates") from e
 
 
@@ -121,5 +121,5 @@ async def convert_currency(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Currency conversion error: %s", str(e))
+        logger.error("Currency conversion error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to convert currency") from e

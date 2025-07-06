@@ -10,8 +10,6 @@ from functools import wraps
 from fastapi import HTTPException, Request
 from jose import JWTError, jwt
 
-from app.core.config import settings
-
 logger = logging.getLogger(__name__)
 
 # In-memory rate limit storage (use Redis in production)
@@ -50,7 +48,9 @@ def rate_limit(calls: int, period: int):
                 try:
                     token = auth_header.replace("Bearer ", "")
                     payload = jwt.decode(
-                        token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+                        token,
+                        key="",  # Supabase handles signature verification
+                        options={"verify_signature": False},
                     )
                     client_id = payload.get("sub", client_id)
                 except (JWTError, ValueError, KeyError) as e:

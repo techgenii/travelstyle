@@ -66,7 +66,7 @@ class QlooService:
         except httpx.TimeoutException:
             logger.error("Qloo API timeout")
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Qloo API error: %s", str(e))
+            logger.error("Qloo API error: %s", type(e).__name__)
 
         # Return fallback data
         return self._get_fallback_cultural_data(destination)
@@ -125,7 +125,7 @@ class QlooService:
                 return processed_data
 
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Qloo style recommendations error: %s", str(e))
+            logger.error("Qloo style recommendations error: %s", type(e).__name__)
             return self._get_fallback_style_data(destination)
 
     def _process_cultural_data(self, qloo_response: dict, destination: str) -> dict[str, Any]:
