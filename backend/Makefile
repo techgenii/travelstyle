@@ -94,6 +94,8 @@ ci-lint: | $(REPORT_DIR)
 	@if command -v pylint >/dev/null 2>&1; then \
 		pylint $(APP_DIR) --output-format=html > $(REPORT_DIR)/pylint_report.html || true; \
 	fi
+	# Extract score to a simple text file
+	@pylint $(APP_DIR) 2>/dev/null | grep "Your code has been rated at" | grep -o '[0-9]\+\.[0-9]\+' > $(REPORT_DIR)/pylint_score.txt || echo "0.0" > $(REPORT_DIR)/pylint_score.txt
 	@echo "$(GREEN)CI lint checks completed$(NC)"
 
 # Security targets

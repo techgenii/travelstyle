@@ -36,7 +36,7 @@ jobs:
           - job: lint
             needs_env: false
             make_target: ci-lint
-            summary_script: extract_lint_score.py
+            summary_script: extract_lint_score_simple.py
             summary_file: lint_summary.txt
             summary_format: "Lint Score: {score}/10"
       fail-fast: false

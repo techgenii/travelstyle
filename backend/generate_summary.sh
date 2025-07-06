@@ -23,7 +23,7 @@ case "$JOB_NAME" in
         REPORT_FILE="reports/bandit_report.json"
         ;;
     "lint")
-        REPORT_FILE="reports/pylint_report.json"
+        REPORT_FILE="reports/pylint_score.txt"
         ;;
     *)
         REPORT_FILE="reports/${JOB_NAME}_report.json"
