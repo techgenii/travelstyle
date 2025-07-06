@@ -158,7 +158,7 @@ async def register(register_data: RegisterRequest):
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=type(e).__name__,  # pylint: disable=line-too-long
+            detail=str(e),
         ) from e
     except Exception as e:  # pylint: disable=broad-except
         raise HTTPException(
