@@ -1,0 +1,115 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.5, pytest-8.4.1, pluggy-1.6.0 -- /opt/hostedtoolcache/Python/3.13.5/x64/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/travelstyle/travelstyle/backend
+configfile: pytest.ini
+plugins: asyncio-1.0.0, xdist-3.8.0, anyio-4.9.0, mock-3.14.1, cov-6.2.1
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 55 items
+
+tests/test_auth.py::TestAuthRegistrationAndLogin::test_register_success PASSED [  1%]
+tests/test_auth.py::TestAuthRegistrationAndLogin::test_register_invalid_email PASSED [  3%]
+tests/test_auth.py::TestAuthRegistrationAndLogin::test_register_short_password PASSED [  5%]
+tests/test_auth.py::TestAuthRegistrationAndLogin::test_register_service_error PASSED [  7%]
+tests/test_auth.py::TestAuthRegistrationAndLogin::test_login_success PASSED [  9%]
+tests/test_auth.py::TestAuthRegistrationAndLogin::test_login_invalid_credentials PASSED [ 10%]
+tests/test_auth.py::TestAuthRegistrationAndLogin::test_login_invalid_email PASSED [ 12%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_logout_success PASSED   [ 14%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_logout_without_token PASSED [ 16%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_logout_unauthorized PASSED [ 18%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_forgot_password_success PASSED [ 20%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_forgot_password_invalid_email PASSED [ 21%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_reset_password_success PASSED [ 23%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_reset_password_invalid_token PASSED [ 25%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_reset_password_short_password PASSED [ 27%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_refresh_token_success PASSED [ 29%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_refresh_token_invalid PASSED [ 30%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_get_current_user_profile_success PASSED [ 32%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_get_current_user_profile_not_found PASSED [ 34%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_get_current_user_profile_unauthorized PASSED [ 36%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_update_current_user_profile_success PASSED [ 38%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_update_current_user_profile_no_valid_fields PASSED [ 40%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_update_current_user_profile_not_found PASSED [ 41%]
+tests/test_auth.py::TestAuthOtherEndpoints::test_update_current_user_profile_unauthorized PASSED [ 43%]
+tests/test_chat.py::TestChatEndpoints::test_chat_endpoint_success PASSED [ 45%]
+tests/test_chat.py::TestChatEndpoints::test_chat_endpoint_no_auth PASSED [ 47%]
+tests/test_chat.py::TestChatEndpoints::test_chat_endpoint_invalid_request PASSED [ 49%]
+tests/test_chat.py::TestChatEndpoints::test_chat_endpoint_orchestrator_error PASSED [ 50%]
+tests/test_chat.py::TestChatEndpoints::test_get_conversation_history_success PASSED [ 52%]
+tests/test_chat.py::TestChatEndpoints::test_get_conversation_history_no_auth PASSED [ 54%]
+tests/test_chat.py::TestChatEndpoints::test_get_conversation_history_error PASSED [ 56%]
+tests/test_chat.py::TestChatEndpoints::test_chat_endpoint_database_error PASSED [ 58%]
+tests/test_chat.py::TestChatEndpoints::test_chat_endpoint_user_profile_error PASSED [ 60%]
+tests/test_main.py::test_root PASSED                                     [ 61%]
+tests/test_main.py::test_health PASSED                                   [ 63%]
+tests/test_main.py::test_docs PASSED                                     [ 65%]
+tests/test_main.py::test_openapi PASSED                                  [ 67%]
+tests/test_main.py::test_redoc PASSED                                    [ 69%]
+tests/test_recommendations.py::TestRecommendationsEndpoints::test_cultural_insights_success PASSED [ 70%]
+tests/test_recommendations.py::TestRecommendationsEndpoints::test_cultural_insights_not_found PASSED [ 72%]
+tests/test_recommendations.py::TestRecommendationsEndpoints::test_weather_forecast_success PASSED [ 74%]
+tests/test_recommendations.py::TestRecommendationsEndpoints::test_weather_forecast_not_found PASSED [ 76%]
+tests/test_recommendations.py::TestRecommendationsEndpoints::test_exchange_rates_success PASSED [ 78%]
+tests/test_recommendations.py::TestRecommendationsEndpoints::test_exchange_rates_not_found PASSED [ 80%]
+tests/test_recommendations.py::TestRecommendationsEndpoints::test_currency_conversion_success PASSED [ 81%]
+tests/test_recommendations.py::TestRecommendationsEndpoints::test_currency_conversion_failure PASSED [ 83%]
+tests/test_recommendations.py::TestRecommendationsEndpoints::test_recommendations_no_auth PASSED [ 85%]
+tests/test_user.py::TestUserEndpoints::test_get_current_user_profile_success PASSED [ 87%]
+tests/test_user.py::TestUserEndpoints::test_get_current_user_profile_error PASSED [ 89%]
+tests/test_user.py::TestUserEndpoints::test_get_user_preferences_success PASSED [ 90%]
+tests/test_user.py::TestUserEndpoints::test_get_user_preferences_error PASSED [ 92%]
+tests/test_user.py::TestUserEndpoints::test_update_user_preferences_success PASSED [ 94%]
+tests/test_user.py::TestUserEndpoints::test_update_user_preferences_error PASSED [ 96%]
+tests/test_user.py::TestUserEndpoints::test_user_endpoints_no_auth PASSED [ 98%]
+tests/test_user.py::TestUserEndpoints::test_update_user_preferences_invalid_data PASSED [100%]
+
+=============================== warnings summary ===============================
+../../../../../../opt/hostedtoolcache/Python/3.13.5/x64/lib/python3.13/site-packages/pydantic/_internal/_config.py:323
+  /opt/hostedtoolcache/Python/3.13.5/x64/lib/python3.13/site-packages/pydantic/_internal/_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+tests/test_chat.py::TestChatEndpoints::test_chat_endpoint_success
+  /opt/hostedtoolcache/Python/3.13.5/x64/lib/python3.13/site-packages/pydantic/main.py:253: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /home/runner/work/travelstyle/travelstyle/backend/reports/pytest-results.xml -
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.13.5-final-0 ________________
+
+Name                               Stmts   Miss  Cover
+------------------------------------------------------
+app/__init__.py                        0      0   100%
+app/api/__init__.py                    0      0   100%
+app/api/deps.py                       22     12    45%
+app/api/v1/__init__.py                 0      0   100%
+app/api/v1/auth.py                   117     38    68%
+app/api/v1/chat.py                    34      0   100%
+app/api/v1/recommendations.py         64     12    81%
+app/api/v1/user.py                    27      9    67%
+app/core/__init__.py                   0      0   100%
+app/core/config.py                    26      0   100%
+app/core/security.py                  45     29    36%
+app/main.py                           32      4    88%
+app/models/__init__.py                 0      0   100%
+app/models/auth.py                    46      0   100%
+app/models/responses.py               23      0   100%
+app/models/travel.py                 103    103     0%
+app/models/user.py                    78     78     0%
+app/services/__init__.py               0      0   100%
+app/services/auth_service.py         150    124    17%
+app/services/currency_service.py      49     35    29%
+app/services/openai_service.py        55     35    36%
+app/services/orchestrator.py          73     56    23%
+app/services/qloo_service.py          55     37    33%
+app/services/supabase_cache.py        73     56    23%
+app/services/weather_service.py      108     90    17%
+app/utils/__init__.py                  0      0   100%
+app/utils/error_handlers.py            9      1    89%
+app/utils/rate_limiter.py             51     33    35%
+app/utils/user_utils.py               12     11     8%
+------------------------------------------------------
+TOTAL                               1252    763    39%
+Coverage XML written to file reports/pytest-coverage.xml
+Coverage JSON written to file reports/pytest-coverage.json
+======================== 55 passed, 2 warnings in 1.10s ========================
