@@ -69,9 +69,9 @@ jobs:
           path: |
             ${{ env.WORKING_DIR }}/reports/ruff_junit.xml
             ${{ env.WORKING_DIR }}/reports/bandit_report.json
-            ${{ env.WORKING_DIR }}/reports/test-results.xml
-            ${{ env.WORKING_DIR }}/reports/coverage.json
-            ${{ env.WORKING_DIR }}/reports/test-coverage.xml
+            ${{ env.WORKING_DIR }}/reports/pytest-results.xml
+            ${{ env.WORKING_DIR }}/reports/pytest-coverage.json
+            ${{ env.WORKING_DIR }}/reports/pytest-coverage.xml
           retention-days: 30
 
   # Job 2: Upload Coverage to External Services
@@ -93,7 +93,7 @@ jobs:
         with:
           fail_ci_if_error: false
           directory: ./${{ env.WORKING_DIR }}/reports
-          files: ./test-coverage.xml, ./test-results.xml
+          files: ./pytest-coverage.xml, ./pytest-results.xml
           verbose: true
 
   # Job 3: Update README with All Changes
@@ -119,7 +119,8 @@ jobs:
         uses: MishaKav/pytest-coverage-comment@main
         with:
           hide-comment: true
-          pytest-xml-coverage-path: ./backend/reports/test-coverage.xml
+          pytest-xml-coverage-path: ./backend/reports/pytest-coverage.xml
+          pytest-coverage-path: ./backend/reports/pytest-coverage.txt
           title: Code
           badge-title: Code
 
@@ -141,16 +142,16 @@ jobs:
           COVERAGE=$(python3 -c "
           import json
           try:
-              with open('${{ env.WORKING_DIR }}/reports/coverage.json', 'r') as f:
+              with open('${{ env.WORKING_DIR }}/reports/pytest-coverage.json', 'r') as f:
                   data = json.load(f)
                   print(int(data.get('totals', {}).get('percent_covered', 0)))
           except:
               print('0')
           " 2>/dev/null || echo "0")
 
-          TEST_FAILURES=$(xmllint --xpath "count(//testcase/failure)" ${{ env.WORKING_DIR }}/reports/test-results.xml 2>/dev/null || echo "0")
-          TEST_ERRORS=$(xmllint --xpath "count(//testcase/error)" ${{ env.WORKING_DIR }}/reports/test-results.xml 2>/dev/null || echo "0")
-          TOTAL_TESTS=$(xmllint --xpath "count(//testcase)" ${{ env.WORKING_DIR }}/reports/test-results.xml 2>/dev/null || echo "0")
+          TEST_FAILURES=$(xmllint --xpath "count(//testcase/failure)" ${{ env.WORKING_DIR }}/reports/pytest-results.xml 2>/dev/null || echo "0")
+          TEST_ERRORS=$(xmllint --xpath "count(//testcase/error)" ${{ env.WORKING_DIR }}/reports/tpyest-results.xml 2>/dev/null || echo "0")
+          TOTAL_TESTS=$(xmllint --xpath "count(//testcase)" ${{ env.WORKING_DIR }}/reports/pytest-results.xml 2>/dev/null || echo "0")
 
           # Calculate badge colors
           if [ "$LINT_ISSUES" -eq 0 ]; then LINT_COLOR="brightgreen"
@@ -232,7 +233,7 @@ jobs:
           git config --local user.name "GitHub Action"
           git add README.md
           git commit -m "Update coverage and quality badges [skip ci]"
-          git push
+          git push origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

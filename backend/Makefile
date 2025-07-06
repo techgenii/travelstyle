@@ -92,12 +92,12 @@ prod-security: | $(REPORT_DIR)
 prod-test: | $(REPORT_DIR)
 	@echo "$(BLUE)Running tests for CI...$(NC)"
 	pytest --tb=short -v \
-		--junitxml=$(REPORT_DIR)/test-results.xml \
+		--junitxml=$(REPORT_DIR)/pytest-results.xml \
 		--cov=$(APP_DIR) \
-		--cov-report=json:$(REPORT_DIR)/coverage.json \
-		--cov-report=xml:$(REPORT_DIR)/test-coverage.xml \
-		--cov-report=term || true
-	@echo "$(GREEN)Test results generated: $(REPORT_DIR)/test-results.xml$(NC)"
+		--cov-report=json:$(REPORT_DIR)/pytest-coverage.json \
+		--cov-report=xml:$(REPORT_DIR)/pytest-coverage.xml \
+		--cov-report=term | tee $(REPORT_DIR)/pytest-coverage.txt || true
+	@echo "$(GREEN)Test results generated: $(REPORT_DIR)/pytest-results.xml$(NC)"
 
 # Development server
 .PHONY: run
