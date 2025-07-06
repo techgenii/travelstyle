@@ -206,8 +206,12 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add README.md
-          git diff --quiet && git diff --staged --quiet || git commit -m "Update quality badges [skip ci]"
-          git push
+          if ! git diff --staged --quiet; then
+            git commit -m "Update quality badges [skip ci]"
+            git push
+          else
+            echo "No changes to README.md, skipping commit"
+          fi
 
   # Generate test coverage from XML artifacts
   update-coverage-on-readme:
@@ -244,5 +248,5 @@ jobs:
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main
         with:
-          pytest-coverage-path: ./pytest-coverage.txt
-          junitxml-path: ./pytest.xml
+          pytest-coverage-path: ./${{ env.PYTHON_VERSION }}/pytest-coverage.txt
+          junitxml-path: ./${{ env.PYTHON_VERSION }}/pytest.xml
