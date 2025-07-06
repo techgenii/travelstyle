@@ -249,4 +249,8 @@ jobs:
         uses: MishaKav/pytest-coverage-comment@main
         with:
           pytest-coverage-path: ./${{ env.WORKING_DIR }}/pytest-coverage.txt
+          title: Code Coverage Report
+          create-new-comment: true
           junitxml-path: ./${{ env.WORKING_DIR }}/pytest.xml
+          junitxml-title: Code Unit Tests Summary
+
