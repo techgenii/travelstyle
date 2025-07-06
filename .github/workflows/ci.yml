@@ -114,16 +114,6 @@ jobs:
           name: quality-reports
           path: ${{ env.WORKING_DIR }}/reports/
 
-      - name: Update coverage in README
-        id: coverageComment
-        uses: MishaKav/pytest-coverage-comment@main
-        with:
-          hide-comment: true
-          pytest-xml-coverage-path: ./backend/reports/pytest-coverage.xml
-          pytest-coverage-path: ./backend/reports/pytest-coverage.txt
-          title: Code
-          badge-title: Code
-
       - name: Generate quality metrics and update README
         run: |
           # Extract metrics from reports
