@@ -79,7 +79,7 @@ jobs:
         with:
           fail_ci_if_error: false # optional (default = false)
           directory: ./${{ env.WORKING_DIR }}/reports
-          files: ./test-coverage.xml, ./test-results.xml
+          files: ./pytest-coverage.xml, ./pytest-results.xml
           verbose: true # optional (default = false)
 
       # Upload all XML artifacts
@@ -242,18 +242,17 @@ jobs:
         run: |
           # Run your existing test command
           make install-dev
-          pytest --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=app tests/ | tee pytest-coverage.txt
+          pytest -v --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=app tests/ | tee pytest-coverage.txt
         continue-on-error: true
 
       - name: Pytest coverage comment
         id: coverageComment
         uses: MishaKav/pytest-coverage-comment@main
         with:
-          hide-comment: true
           pytest-coverage-path: ./${{ env.WORKING_DIR }}/pytest-coverage.txt
           title: Code Coverage Report
           junitxml-path: ./${{ env.WORKING_DIR }}/pytest.xml
-          junitxml-title: Code Unit Tests Summary
+          junitxml-title: Code Unit Test Report
 
       - name: Update Readme with Coverage Html
         if: ${{ github.ref == 'refs/heads/main' }}
