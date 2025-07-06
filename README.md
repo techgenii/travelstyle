@@ -1,8 +1,3 @@
-    ![Ruff](https://img.shields.io/badge/ruff-0%20issues-brightgreen) 
-    ![Bandit](https://img.shields.io/badge/bandit-0%20issues-brightgreen) 
-    ![Coverage](https://img.shields.io/badge/coverage-39%25-red) 
-    ![Tests](https://img.shields.io/badge/tests-0%20passed-brightgreen)
-    
 # TravelStyle AI
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
@@ -12,7 +7,7 @@
 ## 🚀 Quality & Status
 
 [![CI/CD](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg)](https://github.com/techgenii/travelstyle/actions)
-[![codecov](https://codecov.io/github/techgenii/travelstyle/branch/main/graph/badge.svg?token=09BL7TAJDH)](https://codecov.io/github/techgenii/travelstyle)Codecov
+[![codecov](https://codecov.io/github/techgenii/travelstyle/branch/main/graph/badge.svg?token=09BL7TAJDH)](https://codecov.io/github/techgenii/travelstyle)
 [![Pylint](https://img.shields.io/badge/pylint-0.0%2F10-red)](https://github.com/techgenii/travelstyle/actions)
 [![Bandit](https://img.shields.io/badge/bandit-0%20issues-brightgreen)](https://github.com/techgenii/travelstyle/actions)
 
