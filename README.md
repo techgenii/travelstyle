@@ -10,7 +10,6 @@
 [![codecov](https://codecov.io/github/techgenii/travelstyle/branch/main/graph/badge.svg?token=09BL7TAJDH)](https://codecov.io/github/techgenii/travelstyle)
 [![Ruff](https://img.shields.io/badge/ruff-0%20issues-brightgreen)](https://github.com/techgenii/travelstyle/actions)
 [![Bandit](https://img.shields.io/badge/bandit-0%20issues-brightgreen)](https://github.com/techgenii/travelstyle/actions)
-[![Tests](https://img.shields.io/badge/tests-0%20passed-brightgreen)](https://github.com/techgenii/travelstyle/actions)
 
 ## Product Vision
 TravelStyle AI is an intelligent travel companion chat application that provides personalized wardrobe recommendations, cultural style guidance, and currency conversion tools to help travelers dress appropriately and confidently for any destination.
@@ -116,6 +115,10 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 ![GitHub last commit](https://img.shields.io/github/last-commit/techgenii/travelstyle)
 ![GitHub issues](https://img.shields.io/github/issues/techgenii/travelstyle)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/techgenii/travelstyle)
+
+## 📊 Test Coverage
+<!-- Pytest Coverage Comment:Begin -->
+<!-- Pytest Coverage Comment:End -->
 
 ---
 
