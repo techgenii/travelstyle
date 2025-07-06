@@ -8,8 +8,8 @@
 
 [![CI/CD](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg)](https://github.com/techgenii/travelstyle/actions)
 [![Codecov](https://codecov.io/gh/techgenii/travelstyle/branch/main/graph/badge.svg)](https://codecov.io/gh/techgenii/travelstyle)
-[![Pylint](https://img.shields.io/badge/pylint-0.0%2F10-lightgrey)](https://github.com/techgenii/travelstyle/actions)
-[![Bandit](https://img.shields.io/badge/bandit-0%20issues-lightgrey)](https://github.com/techgenii/travelstyle/actions)
+[![Pylint](https://img.shields.io/badge/pylint-%2F10-red)](https://github.com/techgenii/travelstyle/actions)
+[![Bandit](https://img.shields.io/badge/bandit-%20issues-red)](https://github.com/techgenii/travelstyle/actions)
 
 ## Product Vision
 TravelStyle AI is an intelligent travel companion chat application that provides personalized wardrobe recommendations, cultural style guidance, and currency conversion tools to help travelers dress appropriately and confidently for any destination.
