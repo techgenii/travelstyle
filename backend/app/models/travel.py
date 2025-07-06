@@ -4,9 +4,10 @@ Defines Pydantic models for travel context, style preferences, and recommendatio
 """
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 from pydantic import BaseModel, Field
+
 
 class PackingMethod(str, Enum):
     """Supported packing methods from the PRD"""
@@ -42,23 +43,23 @@ class StyleCategory(str, Enum):
 class TripContext(BaseModel):
     """Trip context and details"""
     destination: str
-    travel_dates: Optional[List[str]] = None
-    duration_days: Optional[int] = None
+    travel_dates: list[str] | None = None
+    duration_days: int | None = None
     context: TravelContext = TravelContext.LEISURE
-    packing_method: Optional[PackingMethod] = None
-    budget_range: Optional[str] = None
-    activities: Optional[List[str]] = None
-    accommodation_type: Optional[str] = None
+    packing_method: PackingMethod | None = None
+    budget_range: str | None = None
+    activities: list[str] | None = None
+    accommodation_type: str | None = None
 
 class StylePreferences(BaseModel):
     """User style preferences"""
-    preferred_colors: Optional[List[str]] = None
-    style_categories: Optional[List[StyleCategory]] = None
-    formality_level: Optional[str] = None  # casual, smart_casual, business, formal
-    body_type: Optional[str] = None
-    size_info: Optional[Dict[str, Any]] = None
-    budget_range: Optional[str] = None
-    climate_preferences: Optional[Dict[str, Any]] = None
+    preferred_colors: list[str] | None = None
+    style_categories: list[StyleCategory] | None = None
+    formality_level: str | None = None  # casual, smart_casual, business, formal
+    body_type: str | None = None
+    size_info: dict[str, Any] | None = None
+    budget_range: str | None = None
+    climate_preferences: dict[str, Any] | None = None
 
 class WeatherData(BaseModel):
     """Weather information for destination"""
@@ -67,28 +68,28 @@ class WeatherData(BaseModel):
     humidity: int
     description: str
     wind_speed: float
-    visibility: Optional[float] = None
+    visibility: float | None = None
     pressure: int
-    forecast: Optional[Dict[str, Any]] = None
-    clothing_recommendations: Optional[Dict[str, Any]] = None
+    forecast: dict[str, Any] | None = None
+    clothing_recommendations: dict[str, Any] | None = None
 
 class CulturalInsights(BaseModel):
     """Cultural insights and etiquette"""
-    dress_codes: List[str] = []
-    color_preferences: List[str] = []
-    style_norms: List[str] = []
-    taboos: List[str] = []
+    dress_codes: list[str] = []
+    color_preferences: list[str] = []
+    style_norms: list[str] = []
+    taboos: list[str] = []
     formality_level: str = "moderate"
-    seasonal_considerations: List[str] = []
-    cultural_significance: List[str] = []
+    seasonal_considerations: list[str] = []
+    cultural_significance: list[str] = []
 
 class PackingRecommendation(BaseModel):
     """Packing recommendation structure"""
     method: PackingMethod
-    framework: Dict[str, Any]
-    specific_items: Optional[List[str]] = None
-    cultural_notes: Optional[List[str]] = None
-    weather_considerations: Optional[List[str]] = None
+    framework: dict[str, Any]
+    specific_items: list[str] | None = None
+    cultural_notes: list[str] | None = None
+    weather_considerations: list[str] | None = None
     confidence_score: float = Field(default=0.8, ge=0.0, le=1.0)
 
 class CurrencyInfo(BaseModel):
@@ -96,16 +97,16 @@ class CurrencyInfo(BaseModel):
     base_currency: str
     target_currency: str
     rate: float
-    converted_amount: Optional[float] = None
-    original_amount: Optional[float] = None
+    converted_amount: float | None = None
+    original_amount: float | None = None
     last_updated: str
 
 class ChatSession(BaseModel):
     """Chat session information"""
     session_id: str
     user_id: str
-    trip_context: Optional[TripContext] = None
-    style_preferences: Optional[StylePreferences] = None
+    trip_context: TripContext | None = None
+    style_preferences: StylePreferences | None = None
     created_at: datetime
     updated_at: datetime
     is_active: bool = True
@@ -118,7 +119,7 @@ class ConversationMessage(BaseModel):
     message_type: str  # "user" or "assistant"
     content: str
     timestamp: datetime
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 class RecommendationHistory(BaseModel):
     """Track recommendation quality and usage"""
@@ -126,7 +127,7 @@ class RecommendationHistory(BaseModel):
     user_id: str
     destination: str
     recommendation_type: str  # "wardrobe", "cultural", "weather", "currency"
-    content: Dict[str, Any]
-    user_feedback: Optional[str] = None
+    content: dict[str, Any]
+    user_feedback: str | None = None
     created_at: datetime
-    used_at: Optional[datetime] = None
+    used_at: datetime | None = None

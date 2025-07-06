@@ -1,7 +1,7 @@
 """Qloo service for TravelStyle AI: handles cultural insights and style recommendations."""
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Any
 
 import httpx
 
@@ -21,11 +21,8 @@ class QlooService:
         self.timeout = 30.0
 
     async def get_cultural_insights(
-        self,
-        destination: str,
-        context: str = "leisure",
-        categories: List[str] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, destination: str, context: str = "leisure", categories: list[str] | None = None
+    ) -> dict[str, Any] | None:
         """Get cultural insights for destination.
 
         Args:
@@ -37,7 +34,7 @@ class QlooService:
             Dictionary containing cultural insights or None if error.
         """
         if categories is None:
-            categories = ['fashion', 'etiquette', 'social_norms']
+            categories = ["fashion", "etiquette", "social_norms"]
 
         # Check cache first
         cached_data = await supabase_cache.get_cultural_cache(destination, context)
@@ -50,13 +47,9 @@ class QlooService:
                     f"{self.base_url}/cultural-insights",
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
                     },
-                    json={
-                        "location": destination,
-                        "context": context,
-                        "categories": categories
-                    }
+                    json={"location": destination, "context": context, "categories": categories},
                 )
                 response.raise_for_status()
 
@@ -81,10 +74,10 @@ class QlooService:
     async def get_style_recommendations(
         self,
         destination: str,
-        user_preferences: Dict[str, Any],
+        user_preferences: dict[str, Any],
         occasion: str,
-        weather_data: Optional[Dict[str, Any]] = None
-    ) -> Optional[Dict[str, Any]]:
+        weather_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """Get style recommendations based on location and preferences.
 
         Args:
@@ -106,9 +99,9 @@ class QlooService:
                     "user_profile": {
                         "style_preferences": user_preferences.get("style", {}),
                         "body_type": user_preferences.get("body_type"),
-                        "budget_range": user_preferences.get("budget")
+                        "budget_range": user_preferences.get("budget"),
                     },
-                    "occasion": occasion
+                    "occasion": occasion,
                 }
 
                 if weather_data:
@@ -118,9 +111,9 @@ class QlooService:
                     f"{self.base_url}/style-recommendations",
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
                     },
-                    json=payload
+                    json=payload,
                 )
                 response.raise_for_status()
 
@@ -135,7 +128,7 @@ class QlooService:
             logger.error("Qloo style recommendations error: %s", str(e))
             return self._get_fallback_style_data(destination)
 
-    def _process_cultural_data(self, qloo_response: Dict, destination: str) -> Dict[str, Any]:
+    def _process_cultural_data(self, qloo_response: dict, destination: str) -> dict[str, Any]:
         """Process and structure Qloo cultural data.
 
         Args:
@@ -150,18 +143,18 @@ class QlooService:
                 "dress_codes": qloo_response.get("etiquette", {}).get("dress_codes", []),
                 "color_preferences": qloo_response.get("fashion", {}).get("color_trends", []),
                 "style_norms": qloo_response.get("fashion", {}).get("local_styles", []),
-                "taboos": qloo_response.get("etiquette", {}).get("fashion_taboos", [])
+                "taboos": qloo_response.get("etiquette", {}).get("fashion_taboos", []),
             },
             "local_context": {
                 "formality_level": qloo_response.get("context", {}).get("formality", "moderate"),
                 "seasonal_considerations": qloo_response.get("context", {}).get("seasonal", []),
-                "cultural_significance": qloo_response.get("context", {}).get("cultural_notes", [])
+                "cultural_significance": qloo_response.get("context", {}).get("cultural_notes", []),
             },
             "destination": destination,
-            "data_source": "qloo"
+            "data_source": "qloo",
         }
 
-    def _process_style_data(self, qloo_response: Dict) -> Dict[str, Any]:
+    def _process_style_data(self, qloo_response: dict) -> dict[str, Any]:
         """Process and structure Qloo style recommendations.
 
         Args:
@@ -175,13 +168,13 @@ class QlooService:
                 "recommended_styles": qloo_response.get("recommendations", {}).get("styles", []),
                 "specific_items": qloo_response.get("recommendations", {}).get("items", []),
                 "color_palette": qloo_response.get("recommendations", {}).get("colors", []),
-                "accessories": qloo_response.get("recommendations", {}).get("accessories", [])
+                "accessories": qloo_response.get("recommendations", {}).get("accessories", []),
             },
             "confidence_score": qloo_response.get("confidence", 0.8),
-            "data_source": "qloo"
+            "data_source": "qloo",
         }
 
-    def _get_fallback_cultural_data(self, destination: str) -> Dict[str, Any]:
+    def _get_fallback_cultural_data(self, destination: str) -> dict[str, Any]:
         """Fallback cultural data when API fails.
 
         Args:
@@ -195,18 +188,18 @@ class QlooService:
                 "dress_codes": ["Smart casual recommended", "Respect local customs"],
                 "color_preferences": ["Neutral colors are safe", "Avoid overly bright colors"],
                 "style_norms": ["Conservative dress recommended"],
-                "taboos": ["Research local dress codes"]
+                "taboos": ["Research local dress codes"],
             },
             "local_context": {
                 "formality_level": "moderate",
                 "seasonal_considerations": ["Check weather conditions"],
-                "cultural_significance": ["Be respectful of local customs"]
+                "cultural_significance": ["Be respectful of local customs"],
             },
             "destination": destination,
-            "data_source": "fallback"
+            "data_source": "fallback",
         }
 
-    def _get_fallback_style_data(self, destination: str) -> Dict[str, Any]:
+    def _get_fallback_style_data(self, destination: str) -> dict[str, Any]:
         """Fallback style recommendations when API fails.
 
         Args:
@@ -221,11 +214,12 @@ class QlooService:
                 "recommended_styles": ["Smart casual", "Comfortable walking shoes"],
                 "specific_items": ["Versatile pants", "Breathable tops"],
                 "color_palette": ["Navy", "White", "Beige"],
-                "accessories": ["Comfortable walking shoes", "Light jacket"]
+                "accessories": ["Comfortable walking shoes", "Light jacket"],
             },
             "confidence_score": 0.5,
-            "data_source": "fallback"
+            "data_source": "fallback",
         }
+
 
 # Singleton instance
 qloo_service = QlooService()

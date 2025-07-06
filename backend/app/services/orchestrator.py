@@ -5,27 +5,28 @@ This service gathers data from multiple APIs and generates comprehensive travel 
 import asyncio
 import logging
 import re
-from typing import Dict, Any, Optional, List
+from typing import Any
 
+from app.models.responses import ChatResponse, ConversationContext, QuickReply
+from app.services.currency_service import currency_service
 from app.services.openai_service import openai_service
 from app.services.qloo_service import qloo_service
 from app.services.weather_service import weather_service
-from app.services.currency_service import currency_service
-from app.models.responses import ChatResponse, ConversationContext
 
 logger = logging.getLogger(__name__)
 
 
 class TravelOrchestratorService:
     """Main orchestration service that coordinates all external APIs."""
+
     # pylint: disable=too-few-public-methods
 
     async def generate_travel_recommendations(
         self,
         user_message: str,
         context: ConversationContext,
-        conversation_history: List[Dict[str, str]],
-        user_profile: Optional[Dict[str, Any]] = None
+        conversation_history: list[dict[str, str]],
+        user_profile: dict[str, Any] | None = None,
     ) -> ChatResponse:
         """
         Main orchestration function that gathers data from all APIs
@@ -44,7 +45,7 @@ class TravelOrchestratorService:
                     self._safe_api_call(
                         qloo_service.get_cultural_insights,
                         trip_context["destination"],
-                        trip_context.get("context", "leisure")
+                        trip_context.get("context", "leisure"),
                     )
                 )
 
@@ -53,7 +54,7 @@ class TravelOrchestratorService:
                     self._safe_api_call(
                         weather_service.get_weather_data,
                         trip_context["destination"],
-                        trip_context.get("dates")
+                        trip_context.get("dates"),
                     )
                 )
 
@@ -64,7 +65,7 @@ class TravelOrchestratorService:
                             qloo_service.get_style_recommendations,
                             trip_context["destination"],
                             user_profile,
-                            trip_context.get("occasion", "leisure")
+                            trip_context.get("occasion", "leisure"),
                         )
                     )
                 else:
@@ -74,20 +75,20 @@ class TravelOrchestratorService:
                 api_tasks = [
                     asyncio.create_task(self._return_none()),
                     asyncio.create_task(self._return_none()),
-                    asyncio.create_task(self._return_none())
+                    asyncio.create_task(self._return_none()),
                 ]
 
             # Currency data (always fetch for user's home currency)
-            home_currency = (
-                user_profile.get("home_currency", "USD") if user_profile else "USD"
-            )
+            home_currency = user_profile.get("home_currency", "USD") if user_profile else "USD"
             api_tasks.append(
-                self._safe_api_call(currency_service.get_exchange_rates, home_currency)
+                asyncio.create_task(
+                    self._safe_api_call(currency_service.get_exchange_rates, home_currency)
+                )
             )
 
             # Execute all API calls concurrently
-            cultural_data, weather_data, style_data, currency_data = (
-                await asyncio.gather(*api_tasks)
+            cultural_data, weather_data, style_data, currency_data = await asyncio.gather(
+                *api_tasks
             )
 
             # Combine all context data
@@ -97,7 +98,7 @@ class TravelOrchestratorService:
                 "style_recommendations": style_data,
                 "currency_info": currency_data,
                 "trip_context": trip_context,
-                "user_profile": user_profile
+                "user_profile": user_profile,
             }
 
             # Generate AI response with all context
@@ -106,24 +107,21 @@ class TravelOrchestratorService:
                 conversation_history=conversation_history,
                 cultural_context=cultural_data,
                 weather_context=weather_data,
-                user_profile=user_profile
+                user_profile=user_profile,
             )
 
             # Enhance response with additional context
             return self._enhance_response(ai_response, enhanced_context)
 
         except Exception as e:  # pylint: disable=broad-except
-            logger.error(
-                "Orchestration error: %s",
-                str(e)
-            )
+            logger.error("Orchestration error: %s", str(e))
             return ChatResponse(
                 message=(
                     "I apologize, but I'm having trouble processing your "
                     "request. Please try again or be more specific about your "
                     "travel plans."
                 ),
-                confidence_score=0.0
+                confidence_score=0.0,
             )
 
     async def _safe_api_call(self, api_func, *args, **kwargs):
@@ -131,11 +129,7 @@ class TravelOrchestratorService:
         try:
             return await api_func(*args, **kwargs)
         except Exception as e:  # pylint: disable=broad-except
-            logger.error(
-                "API call failed: %s - %s",
-                api_func.__name__,
-                str(e)
-            )
+            logger.error("API call failed: %s - %s", api_func.__name__, str(e))
             return None
 
     async def _return_none(self):
@@ -143,37 +137,28 @@ class TravelOrchestratorService:
         return None
 
     def _parse_trip_context(
-            self,
-            user_message: str,
-            context: ConversationContext) -> Dict[str, Any]:
+        self, user_message: str, context: ConversationContext
+    ) -> dict[str, Any]:
         """Parse user message and context to extract trip information."""
         trip_context = {
             "destination": context.destination,
             "dates": context.travel_dates,
             "purpose": context.trip_purpose,
-            "context": "leisure"  # default
+            "context": "leisure",  # default
         }
         # Simple keyword detection (could be enhanced with NLP)
         message_lower = user_message.lower()
         # Detect travel purpose/context
-        if any(word in message_lower for word in [
-            "business", "work", "meeting", "conference"
-        ]):
+        if any(word in message_lower for word in ["business", "work", "meeting", "conference"]):
             trip_context["context"] = "business"
             trip_context["occasion"] = "business"
-        elif any(word in message_lower for word in [
-            "formal", "dinner", "wedding", "event"
-        ]):
+        elif any(word in message_lower for word in ["formal", "dinner", "wedding", "event"]):
             trip_context["context"] = "formal"
             trip_context["occasion"] = "formal"
-        elif any(word in message_lower for word in [
-            "beach", "vacation", "holiday", "leisure"
-        ]):
+        elif any(word in message_lower for word in ["beach", "vacation", "holiday", "leisure"]):
             trip_context["context"] = "leisure"
             trip_context["occasion"] = "leisure"
-        elif any(word in message_lower for word in [
-            "hiking", "outdoor", "adventure", "active"
-        ]):
+        elif any(word in message_lower for word in ["hiking", "outdoor", "adventure", "active"]):
             trip_context["context"] = "active"
             trip_context["occasion"] = "active"
         # Try to extract destination from message if not in context
@@ -182,7 +167,7 @@ class TravelOrchestratorService:
             destination_patterns = [
                 r"to ([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
                 r"in ([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
-                r"visiting ([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)"
+                r"visiting ([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
             ]
             for pattern in destination_patterns:
                 match = re.search(pattern, user_message)
@@ -191,32 +176,28 @@ class TravelOrchestratorService:
                     break
         return trip_context
 
-    def _enhance_response(self, ai_response: ChatResponse, context: Dict[str, Any]) -> ChatResponse:
+    def _enhance_response(self, ai_response: ChatResponse, context: dict[str, Any]) -> ChatResponse:
         """Enhance AI response with additional context and suggestions."""
         # Add contextual quick replies based on available data
         if context.get("weather_conditions"):
-            ai_response.quick_replies.append({
-                "text": "More weather details",
-                "action": "get_weather_details"
-            })
+            ai_response.quick_replies.append(
+                QuickReply(text="More weather details", action="get_weather_details")
+            )
         if context.get("cultural_intelligence"):
-            ai_response.quick_replies.append({
-                "text": "Cultural tips",
-                "action": "get_cultural_tips"
-            })
+            ai_response.quick_replies.append(
+                QuickReply(text="Cultural tips", action="get_cultural_tips")
+            )
         if context.get("currency_info"):
-            ai_response.quick_replies.append({
-                "text": "Currency help",
-                "action": "currency_conversion"
-            })
+            ai_response.quick_replies.append(
+                QuickReply(text="Currency help", action="currency_conversion")
+            )
         # Add suggestions based on context
         if context.get("trip_context", {}).get("destination"):
-            ai_response.suggestions.extend([
-                "Get packing checklist",
-                "Local shopping tips",
-                "Emergency contact info"
-            ])
+            ai_response.suggestions.extend(
+                ["Get packing checklist", "Local shopping tips", "Emergency contact info"]
+            )
         return ai_response
+
 
 # Singleton instance
 orchestrator_service = TravelOrchestratorService()

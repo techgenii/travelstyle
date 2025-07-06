@@ -7,7 +7,7 @@
 ## 🚀 Quality & Status
 
 [![CI/CD](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg)](https://github.com/techgenii/travelstyle/actions)
-[![Codecov](https://codecov.io/gh/techgenii/travelstyle/branch/main/graph/badge.svg)](https://codecov.io/gh/techgenii/travelstyle)
+[![codecov](https://codecov.io/github/techgenii/travelstyle/branch/main/graph/badge.svg?token=09BL7TAJDH)](https://codecov.io/github/techgenii/travelstyle)Codecov
 [![Pylint](https://img.shields.io/badge/pylint-0.0%2F10-red)](https://github.com/techgenii/travelstyle/actions)
 [![Bandit](https://img.shields.io/badge/bandit-0%20issues-brightgreen)](https://github.com/techgenii/travelstyle/actions)
 

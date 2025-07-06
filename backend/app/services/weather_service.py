@@ -1,9 +1,9 @@
-"""Weather service for TravelStyle AI: 
-handles weather data retrieval and clothing recommendations."""
+"""Weather service for TravelStyle AI:
+Handles weather data retrieval and clothing recommendations."""
 
 import logging
-from typing import Dict, Any, Optional, List
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 
@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class WeatherService:
     """Service for retrieving weather data and generating clothing recommendations."""
+
     # pylint: disable=too-few-public-methods
 
     def __init__(self):
@@ -26,8 +27,8 @@ class WeatherService:
     async def get_weather_data(
         self,
         destination: str,
-        dates: Optional[List[str]] = None  # pylint: disable=unused-argument
-    ) -> Optional[Dict[str, Any]]:
+        dates: list[str] | None = None,  # pylint: disable=unused-argument
+    ) -> dict[str, Any] | None:
         """Get comprehensive weather data for destination.
 
         Args:
@@ -57,7 +58,7 @@ class WeatherService:
                     current_weather, forecast_data
                 ),
                 "destination": destination,
-                "retrieved_at": datetime.now(UTC).isoformat()
+                "retrieved_at": datetime.now(UTC).isoformat(),
             }
 
             # Cache for 1 hour
@@ -69,7 +70,7 @@ class WeatherService:
             logger.error("Weather service error: %s", str(e))
             return None
 
-    async def _get_current_weather(self, destination: str) -> Optional[Dict[str, Any]]:
+    async def _get_current_weather(self, destination: str) -> dict[str, Any] | None:
         """Get current weather conditions.
 
         Args:
@@ -82,11 +83,7 @@ class WeatherService:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
                     f"{self.base_url}/weather",
-                    params={
-                        "q": destination,
-                        "appid": self.api_key,
-                        "units": "metric"
-                    }
+                    params={"q": destination, "appid": self.api_key, "units": "metric"},
                 )
                 response.raise_for_status()
 
@@ -98,14 +95,14 @@ class WeatherService:
                     "description": data["weather"][0]["description"],
                     "wind_speed": data["wind"]["speed"],
                     "visibility": data.get("visibility", 0) / 1000,  # Convert to km
-                    "pressure": data["main"]["pressure"]
+                    "pressure": data["main"]["pressure"],
                 }
 
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Current weather error: %s", str(e))
             return None
 
-    async def _get_forecast(self, destination: str) -> Optional[Dict[str, Any]]:
+    async def _get_forecast(self, destination: str) -> dict[str, Any] | None:
         """Get 5-day weather forecast.
 
         Args:
@@ -119,11 +116,7 @@ class WeatherService:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
                     f"{self.base_url}/forecast",
-                    params={
-                        "q": destination,
-                        "appid": self.api_key,
-                        "units": "metric"
-                    }
+                    params={"q": destination, "appid": self.api_key, "units": "metric"},
                 )
                 response.raise_for_status()
 
@@ -141,18 +134,19 @@ class WeatherService:
 
                     if current_date != date_str:
                         if current_date is not None:
-                            daily_forecasts.append({
-                                "date": current_date,
-                                "temp_min": min(daily_temps),
-                                "temp_max": max(daily_temps),
-                                "conditions": max(
-                                    set(daily_conditions),
-                                    key=daily_conditions.count
-                                ),
-                                "precipitation_chance": self._calculate_precipitation_chance(
-                                    daily_conditions
-                                )
-                            })
+                            daily_forecasts.append(
+                                {
+                                    "date": current_date,
+                                    "temp_min": min(daily_temps),
+                                    "temp_max": max(daily_temps),
+                                    "conditions": max(
+                                        set(daily_conditions), key=daily_conditions.count
+                                    ),
+                                    "precipitation_chance": self._calculate_precipitation_chance(
+                                        daily_conditions
+                                    ),
+                                }
+                            )
 
                         current_date = date_str
                         daily_temps = []
@@ -170,18 +164,16 @@ class WeatherService:
                     "daily_forecasts": daily_forecasts[:7],  # 7 days max
                     "temp_range": {
                         "min": min(temp_mins) if daily_forecasts else 0,
-                        "max": max(temp_maxs) if daily_forecasts else 0
+                        "max": max(temp_maxs) if daily_forecasts else 0,
                     },
-                    "precipitation_chance": (
-                        max(precip_chances) if daily_forecasts else 0
-                    )
+                    "precipitation_chance": (max(precip_chances) if daily_forecasts else 0),
                 }
 
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Forecast error: %s", str(e))
             return None
 
-    def _calculate_precipitation_chance(self, conditions: List[str]) -> int:
+    def _calculate_precipitation_chance(self, conditions: list[str]) -> int:
         """Calculate precipitation chance from conditions.
 
         Args:
@@ -195,10 +187,8 @@ class WeatherService:
         return int((rain_count / len(conditions)) * 100) if conditions else 0
 
     def _generate_clothing_recommendations(
-        self,
-        current: Dict[str, Any],
-        forecast: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, current: dict[str, Any], forecast: dict[str, Any] | None
+    ) -> dict[str, Any]:
         """Generate clothing recommendations based on weather.
 
         Args:
@@ -213,53 +203,41 @@ class WeatherService:
             "footwear": [],
             "accessories": [],
             "materials": [],
-            "special_considerations": []
+            "special_considerations": [],
         }
 
         if not current:
             return recommendations
 
         temp = current["temperature"]
-        # pylint: disable=unused-variable
-        feels_like = current["feels_like"]  # May be used in future enhancements
+        # May be used in future enhancements
+        # feels_like = current["feels_like"]
 
         # Temperature-based recommendations
         if temp < 0:
-            recommendations["layers"].extend([
-                "Heavy winter coat", "Thermal underwear", "Warm sweater"
-            ])
+            recommendations["layers"].extend(
+                ["Heavy winter coat", "Thermal underwear", "Warm sweater"]
+            )
             recommendations["footwear"].extend(["Insulated boots", "Warm socks"])
             recommendations["accessories"].extend(["Winter hat", "Gloves", "Scarf"])
         elif temp < 10:
-            recommendations["layers"].extend([
-                "Warm jacket", "Long pants", "Long sleeves"
-            ])
+            recommendations["layers"].extend(["Warm jacket", "Long pants", "Long sleeves"])
             recommendations["footwear"].extend(["Closed shoes", "Warm socks"])
             recommendations["accessories"].append("Light scarf")
         elif temp < 20:
-            recommendations["layers"].extend([
-                "Light jacket or cardigan", "Long pants or jeans"
-            ])
+            recommendations["layers"].extend(["Light jacket or cardigan", "Long pants or jeans"])
             recommendations["footwear"].extend(["Comfortable walking shoes"])
         elif temp < 30:
-            recommendations["layers"].extend([
-                "Light clothing", "T-shirts", "Shorts or light pants"
-            ])
+            recommendations["layers"].extend(
+                ["Light clothing", "T-shirts", "Shorts or light pants"]
+            )
             recommendations["footwear"].extend(["Breathable shoes", "Sandals"])
             recommendations["accessories"].extend(["Sun hat", "Sunglasses"])
         else:
-            recommendations["layers"].extend([
-                "Very light clothing", "Breathable fabrics"
-            ])
-            recommendations["footwear"].extend([
-                "Open-toe sandals", "Breathable shoes"
-            ])
-            recommendations["accessories"].extend([
-                "Sun hat", "Sunglasses", "Sunscreen"
-            ])
-            recommendations["special_considerations"].append(
-                "Stay hydrated and seek shade"
-            )
+            recommendations["layers"].extend(["Very light clothing", "Breathable fabrics"])
+            recommendations["footwear"].extend(["Open-toe sandals", "Breathable shoes"])
+            recommendations["accessories"].extend(["Sun hat", "Sunglasses", "Sunscreen"])
+            recommendations["special_considerations"].append("Stay hydrated and seek shade")
 
         # Weather condition recommendations
         if "rain" in current["description"].lower():
@@ -269,25 +247,19 @@ class WeatherService:
 
         # Forecast-based recommendations
         if forecast and forecast["precipitation_chance"] > 50:
-            recommendations["accessories"].extend([
-                "Pack rain gear", "Waterproof bag"
-            ])
-            recommendations["special_considerations"].append(
-                "High chance of rain during trip"
-            )
+            recommendations["accessories"].extend(["Pack rain gear", "Waterproof bag"])
+            recommendations["special_considerations"].append("High chance of rain during trip")
 
         # Wind considerations
         if current.get("wind_speed", 0) > 10:
             recommendations["accessories"].append("Windbreaker")
-            recommendations["special_considerations"].append(
-                "Windy conditions expected"
-            )
+            recommendations["special_considerations"].append("Windy conditions expected")
 
         # Humidity considerations
         if current.get("humidity", 0) > 80:
-            recommendations["materials"].extend([
-                "Breathable fabrics", "Moisture-wicking materials"
-            ])
+            recommendations["materials"].extend(
+                ["Breathable fabrics", "Moisture-wicking materials"]
+            )
             recommendations["special_considerations"].append(
                 "High humidity - choose breathable clothing"
             )

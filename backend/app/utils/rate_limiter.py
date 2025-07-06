@@ -2,20 +2,21 @@
 Rate limiting utilities for the TravelStyle AI application.
 Provides decorators and functions for API rate limiting.
 """
+
 import logging
 import time
 from functools import wraps
-from typing import Dict, Tuple
 
 from fastapi import HTTPException, Request
-from jose import jwt
+from jose import JWTError, jwt
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 # In-memory rate limit storage (use Redis in production)
-rate_limit_storage: Dict[str, Tuple[int, float]] = {}
+rate_limit_storage: dict[str, tuple[int, float]] = {}
+
 
 def rate_limit(calls: int, period: int):
     """
@@ -25,6 +26,7 @@ def rate_limit(calls: int, period: int):
         calls: Number of allowed calls
         period: Time period in seconds
     """
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -40,7 +42,7 @@ def rate_limit(calls: int, period: int):
                 return await func(*args, **kwargs)
 
             # Get client identifier (IP address or user ID)
-            client_id = request.client.host
+            client_id = request.client.host if request.client else "unknown"
 
             # Check if user is authenticated and use user ID instead
             auth_header = request.headers.get("authorization")
@@ -51,7 +53,7 @@ def rate_limit(calls: int, period: int):
                         token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
                     )
                     client_id = payload.get("sub", client_id)
-                except (jwt.JWTError, ValueError, KeyError) as e:
+                except (JWTError, ValueError, KeyError) as e:
                     logger.debug("JWT decode failed, using IP address: %s", e)
                     # Fall back to IP address
 
@@ -74,7 +76,7 @@ def rate_limit(calls: int, period: int):
                         raise HTTPException(
                             status_code=429,
                             detail=f"Rate limit exceeded. Try again in {reset_time} seconds.",
-                            headers={"Retry-After": str(reset_time)}
+                            headers={"Retry-After": str(reset_time)},
                         )
 
                     # Increment counter
@@ -90,7 +92,9 @@ def rate_limit(calls: int, period: int):
             return await func(*args, **kwargs)
 
         return wrapper
+
     return decorator
+
 
 def cleanup_old_entries(current_time: float, max_age: int):
     """Clean up old rate limit entries"""

@@ -4,6 +4,5 @@ pytest-cov
 pytest-mock
 pytest-xdist
 
-pylint
-pylint-json2html
+ruff
 bandit

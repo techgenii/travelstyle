@@ -1,7 +1,7 @@
 """Currency service for handling exchange rates and currency conversions."""
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any
 
 import httpx
 
@@ -19,7 +19,7 @@ class CurrencyService:
         self.api_key = settings.EXCHANGE_API_KEY
         self.timeout = 10.0
 
-    async def get_exchange_rates(self, base_currency: str = "USD") -> Optional[Dict[str, Any]]:
+    async def get_exchange_rates(self, base_currency: str = "USD") -> dict[str, Any] | None:
         """Get current exchange rates.
 
         Args:
@@ -65,7 +65,7 @@ class CurrencyService:
         amount: float,
         from_currency: str,
         to_currency: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Convert currency amounts.
 
         Args:

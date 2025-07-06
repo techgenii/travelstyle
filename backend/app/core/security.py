@@ -3,11 +3,13 @@ Security utilities for TravelStyle AI application.
 Handles JWT token verification and Supabase authentication.
 """
 import logging
-from typing import Optional, Dict, Any
+from typing import Any
+
 from jose import JWTError, jwt
-from supabase import create_client, Client
+
 from app.core.config import settings
 from app.utils.user_utils import extract_user_profile
+from supabase import Client, create_client
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,7 @@ class SupabaseAuth:
     def __init__(self):
         self.client: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
-    def verify_jwt_token(self, token: str) -> Optional[Dict[str, Any]]:
+    def verify_jwt_token(self, token: str) -> dict[str, Any] | None:
         """Verify Supabase JWT token and return user data"""
         try:
             # Decode the JWT token
@@ -52,7 +54,7 @@ class SupabaseAuth:
             return None
 
     # pylint: disable=duplicate-code
-    async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_user_by_id(self, user_id: str) -> dict[str, Any] | None:
         """Get user data from Supabase by user ID"""
         try:
             response = self.client.auth.admin.get_user_by_id(user_id)
@@ -82,6 +84,6 @@ def create_access_token(data: dict) -> str:  # pylint: disable=unused-argument
     # In production, Supabase handles token creation
     return ""
 
-def verify_token(token: str) -> Optional[Dict[str, Any]]:
+def verify_token(token: str) -> dict[str, Any] | None:
     """Verify a JWT token and return user data"""
     return supabase_auth.verify_jwt_token(token)
