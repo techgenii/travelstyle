@@ -39,7 +39,7 @@ jobs:
         run: |
           make install-all
           make ci-security
-          ./generate_summary.sh security extract_security_score.py security_summary.txt "Security Issues Found: {score}"
+          bash generate_summary.sh security extract_security_score.py security_summary.txt "Security Issues Found: {score}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -67,7 +67,7 @@ jobs:
         run: |
           make install-all
           make ci-lint
-          ./generate_summary.sh lint extract_lint_score_simple.py lint_summary.txt "Lint Score: {score}/10"
+          bash generate_summary.sh lint extract_lint_score_simple.py lint_summary.txt "Lint Score: {score}/10"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -104,7 +104,7 @@ jobs:
           SUPABASE_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_KEY || '' }}
         run: |
           make test-github
-          ./generate_summary.sh test extract_coverage_score.py coverage_summary.txt "Coverage: {score}%"
+          bash generate_summary.sh test extract_coverage_score.py coverage_summary.txt "Coverage: {score}%"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
