@@ -244,28 +244,5 @@ jobs:
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main
         with:
-          pytest-coverage-path: ./${{ env.WORKING_DIR }}/pytest-coverage.txt
-          pytest-xml-coverage-path: ./${{ env.WORKING_DIR }}/coverage.xml
-          title: My Code
-          badge-title: My Code
-          hide-badge: false
-          hide-report: false
-          create-new-comment: false
-          hide-comment: false
-          report-only-changed-files: false
-          remove-link-from-badge: false
-          unique-id-for-comment: python3.13
-          junitxml-path: ./${{ env.WORKING_DIR }}/pytest.xml
-          junitxml-title: My Code
-
-      - name: Update Readme with Coverage Html
-        if: ${{ github.ref == 'refs/heads/main' }}
-        run: |
-          sed -i '/<!-- Pytest Coverage Comment:Begin -->/,/<!-- Pytest Coverage Comment:End -->/c\<!-- Pytest Coverage Comment:Begin -->\n\${{ steps.coverageComment.outputs.coverageHtml }}\n<!-- Pytest Coverage Comment:End -->' ./README.md
-
-      - name: Commit & Push changes to Readme
-        if: ${{ github.ref == 'refs/heads/main' }}
-        uses: actions-js/push@master
-        with:
-          message: Update coverage on Readme [skip ci]
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pytest-coverage-path: ./pytest-coverage.txt
+          junitxml-path: ./pytest.xml
