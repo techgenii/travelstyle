@@ -1,4 +1,4 @@
-name: 
+name: Backend Quality CI/CD
 
 on:
   push:
@@ -21,75 +21,185 @@ env:
   WORKING_DIR: backend
 
 jobs:
-  # Reusable job template for all quality checks
-  quality-check:
+  # Security scan - no env vars needed
+  security:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - job: security
-            needs_env: false
-            make_target: ci-security
-            summary_script: extract_security_score.py
-            summary_file: security_summary.txt
-            summary_format: "Security Issues Found: {score}"
-          - job: lint
-            needs_env: false
-            make_target: ci-lint
-            summary_script: extract_lint_score_simple.py
-            summary_file: lint_summary.txt
-            summary_format: "Lint Score: {score}/10"
-      fail-fast: false
-    
-    name: ${{ matrix.job }}
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          
-      - name: Cache pip dependencies
-        uses: actions/cache@v3
+      - uses: actions/cache@v3
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('backend/**/requirements*.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-            
+          restore-keys: ${{ runner.os }}-pip-
+      - name: Install and run security scan
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          make install-all
+          make ci-security
+          ./generate_summary.sh security extract_security_score.py security_summary.txt "Security Issues Found: {score}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-report
+          path: |
+            ${{ env.WORKING_DIR }}/reports/
+            ${{ env.WORKING_DIR }}/security_summary.txt
+          retention-days: 30
+
+  # Lint check - no env vars needed
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/**/requirements*.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+      - name: Install and run lint
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          make install-all
+          make ci-lint
+          ./generate_summary.sh lint extract_lint_score_simple.py lint_summary.txt "Lint Score: {score}/10"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lint-report
+          path: |
+            ${{ env.WORKING_DIR }}/reports/
+            ${{ env.WORKING_DIR }}/lint_summary.txt
+          retention-days: 30
+
+  # Test with coverage - needs env vars
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/**/requirements*.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
       - name: Install dependencies
         working-directory: ${{ env.WORKING_DIR }}
         run: make install-all
-          
-      - name: Run ${{ matrix.job }} check
+      - name: Run tests with coverage
         working-directory: ${{ env.WORKING_DIR }}
-        run: make ${{ matrix.make_target }}
-          
-      - name: Generate summary
-        working-directory: ${{ env.WORKING_DIR }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENAI_API_KEY || '' }}
+          QLOO_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).QLOO_API_KEY || '' }}
+          OPENWEATHER_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENWEATHER_API_KEY || '' }}
+          EXCHANGE_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).EXCHANGE_API_KEY || '' }}
+          SUPABASE_URL: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_URL || '' }}
+          SUPABASE_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_KEY || '' }}
         run: |
-          chmod +x generate_summary.sh
-          ./generate_summary.sh "${{ matrix.job }}" "${{ matrix.summary_script }}" "${{ matrix.summary_file }}" "${{ matrix.summary_format }}"
-          
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+          make test-github
+          ./generate_summary.sh test extract_coverage_score.py coverage_summary.txt "Coverage: {score}%"
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ${{ matrix.job }}-report
+          name: test-report
           path: |
             ${{ env.WORKING_DIR }}/reports/
             ${{ env.WORKING_DIR }}/.pytest_cache/
             ${{ env.WORKING_DIR }}/pytest.log
-            ${{ env.WORKING_DIR }}/${{ matrix.summary_file }}
+            ${{ env.WORKING_DIR }}/coverage_summary.txt
+          retention-days: 30
+      - name: Upload to Codecov
+        if: '!cancelled()'
+        uses: codecov/codecov-action@v5
+        with:
+          file: ./${{ env.WORKING_DIR }}/reports/coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - uses: codecov/test-results-action@v1
+        if: '!cancelled()'
+        with:
+          file: ./${{ env.WORKING_DIR }}/reports/test-results.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # Generate summary and update badges
+  quality-summary:
+    runs-on: ubuntu-latest
+    needs: [security, lint, test]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+      - name: Generate quality report and update badges
+        run: |
+          # Extract scores from summary files
+          COVERAGE=$(find artifacts/ -name "coverage_summary.txt" -exec grep -o '[0-9]\+%' {} \; | head -1 | tr -d '%' || echo "0")
+          SECURITY_ISSUES=$(find artifacts/ -name "security_summary.txt" -exec grep -o '[0-9]\+' {} \; | head -1 || echo "0")
+          LINT_SCORE=$(find artifacts/ -name "lint_summary.txt" -exec grep -o '[0-9]\+\.[0-9]\+' {} \; | head -1 || echo "0.0")
+          
+          # Determine badge colors
+          if (( $(echo "$LINT_SCORE >= 8.0" | bc -l) )); then
+            LINT_COLOR="brightgreen"
+          elif (( $(echo "$LINT_SCORE >= 7.0" | bc -l) )); then
+            LINT_COLOR="orange"
+          else
+            LINT_COLOR="red"
+          fi
+          
+          if [ "$SECURITY_ISSUES" -eq 0 ]; then
+            SEC_COLOR="brightgreen"
+          elif [ "$SECURITY_ISSUES" -le 5 ]; then
+            SEC_COLOR="orange"
+          else
+            SEC_COLOR="red"
+          fi
+          
+          # Create comprehensive report
+          cat > comprehensive_report.md << EOF
+          # TravelStyle AI Backend - Code Quality Report
+          
+          Generated on: $(date)
+          
+          ## 📊 Summary
+          - **Test Coverage**: ${COVERAGE}%
+          - **Security Issues**: ${SECURITY_ISSUES}
+          - **Lint Score**: ${LINT_SCORE}/10
+          
+          ## 🔗 Detailed Reports
+          - [Coverage Report](../artifacts/test-report/reports/htmlcov/index.html)
+          - [Security Report](../artifacts/security-report/reports/bandit_report.html)
+          - [Lint Report](../artifacts/lint-report/reports/pylint_report.html)
+          
+          ---
+          *Generated by TravelStyle AI Backend CI/CD Pipeline*
+          EOF
+          
+          # Update badges in README
+          sed -i "s|https://img.shields.io/badge/pylint-[^)]*|https://img.shields.io/badge/pylint-${LINT_SCORE}%2F10-${LINT_COLOR}|g" README.md
+          sed -i "s|https://img.shields.io/badge/bandit-[^)]*|https://img.shields.io/badge/bandit-${SECURITY_ISSUES}%20issues-${SEC_COLOR}|g" README.md
+          
+          echo "Quality Report Generated:"
+          cat comprehensive_report.md
+          
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quality-summary
+          path: comprehensive_report.md
           retention-days: 30
           
-      - name: Upload summary
-        uses: actions/upload-artifact@v4
-        if: always() && matrix.job != 'test'
-        with:
-          name: ${{ matrix.job }}-summary
-          path: ${{ env.WORKING_DIR }}/${{ matrix.summary_file }}
-          retention-days: 7
+      - name: Commit badge updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update quality badges [skip ci]"
+          git push
