@@ -30,25 +30,28 @@ class CurrencyService:
             Dictionary containing exchange rates or None if error
         """
         # Check cache first
-        cached_data = await supabase_cache.get_currency_cache(base_currency)
+        new_currency = base_currency.strip().upper()
+        cached_data = await supabase_cache.get_currency_cache(new_currency)
         if cached_data:
             return cached_data
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(f"{self.base_url}/{base_currency}")
+                # Ensure no double slashes
+                latest_url = f"{self.base_url}{self.api_key}/latest/{new_currency}"
+                response = await client.get(latest_url)
                 response.raise_for_status()
 
-                data = response.json()
+                data = await response.json()
                 rates_data = {
-                    "base": data["base"],
-                    "rates": data["rates"],
-                    "last_updated": data["date"],
+                    "base_code": data["base_code"],
+                    "conversion_rates": data["conversion_rates"],
+                    "last_updated_unix": data["time_last_update_unix"],
+                    "last_updated_utc": data["time_last_update_utc"],
                 }
 
                 # Cache for 1 hour
-                await supabase_cache.set_currency_cache(base_currency, rates_data, 1)
-
+                await supabase_cache.set_currency_cache(new_currency, rates_data, 1)
                 return rates_data
 
         except httpx.RequestError as e:
@@ -74,29 +77,43 @@ class CurrencyService:
         Returns:
             Dictionary containing conversion result or None if error
         """
-        rates = await self.get_exchange_rates(from_currency)
-        if not rates:
+        pair_data = await self.get_pair_exchange_rate(from_currency, to_currency)
+        if not pair_data:
             return None
 
+        conversion_rate = pair_data["rate"]
+        converted_amount = round(amount * conversion_rate, 2)
+        return {
+            "original": {"amount": amount, "currency": from_currency},
+            "converted": {"amount": converted_amount, "currency": to_currency},
+            "rate": conversion_rate,
+            "last_updated_unix": pair_data["last_updated_unix"],
+            "last_updated_utc": pair_data["last_updated_utc"],
+        }
+
+    async def get_pair_exchange_rate(
+        self, base_currency: str = "USD", target_currency: str = "USD"
+    ) -> dict[str, Any] | None:
         try:
-            if to_currency not in rates["rates"]:
-                return None
+            base_currency = base_currency.strip().upper()
+            target_currency = target_currency.strip().upper()
+            pair_url = f"{self.base_url}{self.api_key}/pair/{base_currency}/{target_currency}"
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(pair_url)
+                response.raise_for_status()
+                data = await response.json()
+                if data.get("result") != "success":
+                    return None
 
-            conversion_rate = rates["rates"][to_currency]
-            converted_amount = round(amount * conversion_rate, 2)
-
-            return {
-                "original": {"amount": amount, "currency": from_currency},
-                "converted": {"amount": converted_amount, "currency": to_currency},
-                "rate": conversion_rate,
-                "last_updated": rates["last_updated"],
-            }
-
-        except KeyError as e:
-            logger.error("Currency conversion key error: %s", type(e).__name__)
-            return None
-        except TypeError as e:
-            logger.error("Currency conversion type error: %s", type(e).__name__)
+                return {
+                    "base_code": data["base_code"],
+                    "target_code": data["target_code"],
+                    "rate": data["conversion_rate"],
+                    "last_updated_unix": data["time_last_update_unix"],
+                    "last_updated_utc": data["time_last_update_utc"],
+                }
+        except Exception as e:
+            logger.error("Pair exchange rate error: %s", type(e).__name__)
             return None
 
 

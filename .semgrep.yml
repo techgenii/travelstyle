@@ -1,0 +1,77 @@
+rules:
+  - id: python-logger-credential-disclosure
+    pattern: logger.error(..., str($E))
+    message: "Potential credential leak in logging statement"
+    severity: WARNING
+    fix: logger.error(..., type($E).__name__)
+    languages: [python]
+
+  - id: python-actual-secrets
+    pattern-either:
+      - pattern: $VAR_API_KEY = "$VAL"
+      - pattern: $VAR_SECRET = "$VAL"
+      - pattern: $VAR_TOKEN = "$VAL"
+      - pattern: $VAR_PASSWORD = "$VAL"
+    pattern-not-either:
+      # Exclude empty strings - the main legitimate case
+      - pattern: $VAR = ""
+      # Exclude specific known non-secrets from your codebase
+      - pattern: $VAR = "gpt-4"
+      - pattern: $VAR = "now()"
+      - pattern: $VAR = "1.0.0"
+      - pattern: $VAR = "/api/v1"
+      - pattern: $VAR = "business"
+      - pattern: $VAR = "formal"
+      - pattern: $VAR = "leisure"
+      - pattern: $VAR = "active"
+      - pattern: $VAR = "user"
+      - pattern: $VAR = "admin"
+      - pattern: $VAR = "premium"
+      - pattern: $VAR = "inactive"
+      - pattern: $VAR = "suspended"
+      - pattern: $VAR = "pending"
+      - pattern: $VAR = "moderate"
+      - pattern: $VAR = "california_casual"
+      - pattern: $VAR = "business_professional"
+      - pattern: $VAR = "smart_casual"
+      - pattern: $VAR = "resort_wear"
+      - pattern: $VAR = "urban_chic"
+      - pattern: $VAR = "conservative_formal"
+      - pattern: $VAR = "beach_coastal"
+      - pattern: $VAR = "mountain_outdoor"
+      - pattern: $VAR = "beach"
+      - pattern: $VAR = "urban"
+      - pattern: $VAR = "mountain"
+      - pattern: $VAR = "5-4-3-2-1"
+      - pattern: $VAR = "3x3x3"
+      - pattern: $VAR = "rule_of_3s"
+      - pattern: $VAR = "10x10"
+      - pattern: $VAR = "12-piece"
+      - pattern: $VAR = "4x4"
+      - pattern: $VAR = "1-2-3-4-5-6"
+    message: "Hardcoded secret detected - review for actual credentials"
+    severity: WARNING
+    languages: [python]
+
+  - id: python-long-hardcoded-secrets
+    pattern-regex: |
+      ^\s*\w*(?:API_KEY|SECRET|TOKEN|PASSWORD)\s*[:=]\s*"[A-Za-z0-9+/=_-]{20,}"\s*$
+    message: "Potential hardcoded API key or secret detected (long value)"
+    severity: ERROR
+    languages: [python]
+
+  - id: python-exclude-urls-and-patterns
+    pattern-either:
+      - pattern: $VAR = "https://..."
+      - pattern: $VAR = r"..."
+    message: "URL or regex pattern detected (likely not a secret)"
+    severity: INFO
+    languages: [python]
+
+  - id: python-sql-injection
+    pattern: |
+      f"SELECT * FROM {table} WHERE id = {user_input}"
+    message: "Potential SQL injection"
+    severity: ERROR
+    languages: [python]
+

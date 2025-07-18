@@ -29,6 +29,7 @@ class SupabaseAuth:
                 token,
                 key="",  # Supabase handles signature verification
                 options={"verify_signature": False},
+                audience="authenticated",
             )
 
             # Extract user information
@@ -49,10 +50,10 @@ class SupabaseAuth:
             }
 
         except JWTError as e:
-            logger.error("JWT decode error: %s", type(e).__name__)
+            logger.error("JWT decode error: %s - %s", type(e).__name__, str(e))
             return None
         except (ValueError, KeyError) as e:
-            logger.error("Token verification error: %s", type(e).__name__)
+            logger.error("Token verification error: %s - %s", type(e).__name__, str(e))
             return None
 
     # pylint: disable=duplicate-code

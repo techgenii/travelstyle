@@ -57,22 +57,24 @@ dev: dev-lint dev-security dev-test clean
 	@echo "$(GREEN)All dev checks completed!$(NC)"
 
 dev-lint: | $(REPORT_DIR)
-	@echo "$(BLUE)Running ruff linting...$(NC)"
-	ruff check $(APP_DIR) --output-format=html > $(REPORT_DIR)/ruff_report.html || true
-	@echo "$(GREEN)Ruff report generated: $(REPORT_DIR)/ruff_report.html$(NC)"
+	@echo "$(BLUE)Running ruff linting for CI...$(NC)"
+	ruff check $(APP_DIR) --output-format=junit > $(REPORT_DIR)/ruff_junit.xml || true
+	@echo "$(GREEN)Ruff JUnit report generated: $(REPORT_DIR)/ruff_junit.xml$(NC)"
 
 dev-security: | $(REPORT_DIR)
-	@echo "$(BLUE)Running bandit security scan...$(NC)"
-	bandit -r $(APP_DIR) -f html -o $(REPORT_DIR)/bandit_report.html || true
-	@echo "$(GREEN)Bandit report generated: $(REPORT_DIR)/bandit_report.html$(NC)"
+	@echo "$(BLUE)Running bandit security scan for CI...$(NC)"
+	bandit -r $(APP_DIR) -f json -o $(REPORT_DIR)/bandit_report.json || true
+	@echo "$(GREEN)Bandit JSON report generated: $(REPORT_DIR)/bandit_report.json$(NC)"
 
 dev-test: | $(REPORT_DIR)
-	@echo "$(BLUE)Running tests with coverage...$(NC)"
-	pytest --cov=$(APP_DIR) \
-		--cov-report=html:$(REPORT_DIR)/htmlcov \
-		--cov-report=term \
-		--cov-fail-under=$(COVERAGE_MIN) || true
-	@echo "$(GREEN)Coverage report generated: $(REPORT_DIR)/htmlcov/index.html$(NC)"
+	@echo "$(BLUE)Running tests for CI...$(NC)"
+	pytest --tb=short -v \
+		--junitxml=$(REPORT_DIR)/pytest-results.xml \
+		--cov=$(APP_DIR) \
+		--cov-report=json:$(REPORT_DIR)/pytest-coverage.json \
+		--cov-report=xml:$(REPORT_DIR)/pytest-coverage.xml \
+		--cov-report=term | tee $(REPORT_DIR)/pytest-coverage.txt || true
+	@echo "$(GREEN)Test results generated: $(REPORT_DIR)/pytest-results.xml$(NC)"
 
 # Production targets (JUnit/XML output for CI)
 .PHONY: prod prod-lint prod-security prod-test

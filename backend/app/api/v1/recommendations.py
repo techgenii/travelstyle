@@ -8,6 +8,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import get_current_user
+from app.models.travel import CurrencyConvertRequest, CurrencyPairRequest
 from app.services.currency_service import currency_service
 from app.services.qloo_service import qloo_service
 from app.services.weather_service import weather_service
@@ -101,16 +102,16 @@ async def get_exchange_rates(
 @router.post("/currency/convert")
 @rate_limit(calls=15, period=60)
 async def convert_currency(
-    amount: float,
-    from_currency: str,
-    to_currency: str,
+    payload: CurrencyConvertRequest,
     current_user: dict = current_user_dependency,
 ):
     """Convert currency amounts"""
 
     try:
         conversion = await currency_service.convert_currency(
-            amount=amount, from_currency=from_currency.upper(), to_currency=to_currency.upper()
+            amount=payload.amount,
+            from_currency=payload.from_currency.strip().upper(),
+            to_currency=payload.to_currency.strip().upper(),
         )
 
         if not conversion:
@@ -123,3 +124,23 @@ async def convert_currency(
     except Exception as e:
         logger.error("Currency conversion error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to convert currency") from e
+
+
+@router.post("/currency/pair")
+@rate_limit(calls=10, period=60)
+async def get_pair_exchange_rate(
+    payload: CurrencyPairRequest,
+    current_user: dict = current_user_dependency,
+):
+    try:
+        result = await currency_service.get_pair_exchange_rate(
+            payload.base_currency, payload.target_currency
+        )
+        if not result:
+            raise HTTPException(status_code=404, detail="Exchange rate not available")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Pair exchange rate error: %s", type(e).__name__)
+        raise HTTPException(status_code=500, detail="Failed to retrieve pair exchange rate") from e

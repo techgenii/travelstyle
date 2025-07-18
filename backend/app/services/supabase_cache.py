@@ -142,16 +142,15 @@ class SupabaseCacheService:
                 self.client.table("currency_rates_cache")
                 .select("*")
                 .eq("base_currency", base_currency)
-                .eq("is_active", True)
-                .single()
                 .execute()
             )
-            expires_at = response.data.get("expires_at")
-            if response.data and expires_at and not self._is_expired(expires_at):
-                return response.data.get("data")
+            # response.data is a list of rows
+            if response.data and len(response.data) > 0:
+                # Return the rates_data field from the first row
+                return response.data[0]["rates_data"]
             return None
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Currency cache get error: %s", type(e).__name__)
+            logger.error("Currency cache get error: %s - %s", type(e).__name__, str(e))
             return None
 
     async def set_currency_cache(
@@ -169,15 +168,15 @@ class SupabaseCacheService:
             expires_at = datetime.now(UTC) + timedelta(hours=ttl_hours)
             cache_data = {
                 "base_currency": base_currency,
-                "data": data,
+                "rates_data": data,  # Use correct column name
                 "expires_at": expires_at.isoformat(),
-                "is_active": True,
-                "created_at": datetime.now(UTC).isoformat(),
+                "api_source": "exchangerate-api",
+                # created_at and updated_at are auto-set by the DB
             }
             self.client.table("currency_rates_cache").upsert(cache_data).execute()
             return True
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Currency cache set error: %s", type(e).__name__)
+            logger.error("Currency cache set error: %s - %s", type(e).__name__, str(e))
             return False
 
     def _is_expired(self, expires_at: str) -> bool:
