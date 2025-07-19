@@ -56,19 +56,29 @@ jobs:
         run: make prod-security
         continue-on-error: true
 
-      # Run tests with coverage (produces both XML and JSON)
-      - name: Run tests
+      # Create the enviornment file
+      - name: Create env file
         working-directory: ${{ env.WORKING_DIR }}
-        env:
+        run: |
+          cat > .env << EOF
           OPENAI_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENAI_API_KEY || '' }}
           QLOO_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).QLOO_API_KEY || '' }}
           OPENWEATHER_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENWEATHER_API_KEY || '' }}
           EXCHANGE_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).EXCHANGE_API_KEY || '' }}
           SUPABASE_URL: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_URL || '' }}
           SUPABASE_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_KEY || '' }}
+          EOF
+          chmod 600 .env
+          echo "::add-mask::$(cat .env)"
+
+      # Run tests with coverage (produces both XML and JSON)
+      - name: Run tests
+        working-directory: ${{ env.WORKING_DIR }}
         run: |
           # Run your existing test command
+          source .env
           make prod-test
+          rm -f .env
         continue-on-error: true
 
       # Upload coverage reports to Codecov
@@ -229,20 +239,30 @@ jobs:
         with:
           path: artifacts/
 
-      # Run tests with coverage (produces both XML and JSON)
-      - name: Run tests
+      # Create the enviornment file
+      - name: Create env file
         working-directory: ${{ env.WORKING_DIR }}
-        env:
+        run: |
+          cat > .env << EOF
           OPENAI_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENAI_API_KEY || '' }}
           QLOO_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).QLOO_API_KEY || '' }}
           OPENWEATHER_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENWEATHER_API_KEY || '' }}
           EXCHANGE_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).EXCHANGE_API_KEY || '' }}
           SUPABASE_URL: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_URL || '' }}
           SUPABASE_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_KEY || '' }}
+          EOF
+          chmod 600 .env
+          echo "::add-mask::$(cat .env)"
+
+      # Run tests with coverage (produces both XML and JSON)
+      - name: Run tests
+        working-directory: ${{ env.WORKING_DIR }}
         run: |
           # Run your existing test command
+          source .env
           make install-dev
           pytest -v --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=app tests/ | tee pytest-coverage.txt
+          rm -f .env
         continue-on-error: true
 
       - name: Pytest coverage comment
