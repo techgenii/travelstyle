@@ -56,30 +56,46 @@ jobs:
         run: make prod-security
         continue-on-error: true
 
-      # Create the enviornment file
-      - name: Create env file
-        working-directory: ${{ env.WORKING_DIR }}
+      # Method 3: Most secure approach with validation
+      - name: Validate and mask secrets
         run: |
-          cat > .env << EOF
-          OPENAI_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENAI_API_KEY || '' }}
-          QLOO_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).QLOO_API_KEY || '' }}
-          OPENWEATHER_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENWEATHER_API_KEY || '' }}
-          EXCHANGE_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).EXCHANGE_API_KEY || '' }}
-          SUPABASE_URL: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_URL || '' }}
-          SUPABASE_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_KEY || '' }}
-          EOF
-          chmod 600 .env
-          echo "::add-mask::$(cat .env)"
+          # Validate secrets exist
+          if [[ -z "$OPENAI_API_KEY" || -z "$QLOO_API_KEY" ]]; then
+            echo "❌ Required secrets are missing"
+            exit 1
+          fi
 
-      # Run tests with coverage (produces both XML and JSON)
+          # Mask secrets
+          echo "::add-mask::$OPENAI_API_KEY"
+          echo "::add-mask::$OPENAI_API_ORG"
+          echo "::add-mask::$QLOO_API_KEY"
+          echo "::add-mask::$OPENWEATHER_API_KEY"
+          echo "::add-mask::$EXCHANGE_API_KEY"
+          echo "::add-mask::$SUPABASE_URL"
+          echo "::add-mask::$SUPABASE_KEY"
+          echo "✅ Secrets validated and masked"
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_ORG: ${{ secrets.OPENAI_API_ORG }}
+          QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
       - name: Run tests
         working-directory: ${{ env.WORKING_DIR }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_ORG: ${{ secrets.OPENAI_API_ORG }}
+          QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
-          # Run your existing test command
-          source .env
+          echo "🚀 Running tests with masked environment variables"
           make prod-test
-          rm -f .env
-        continue-on-error: true
 
       # Upload coverage reports to Codecov
       - name: Upload coverage reports to Codecov
@@ -239,30 +255,48 @@ jobs:
         with:
           path: artifacts/
 
-      # Create the enviornment file
-      - name: Create env file
-        working-directory: ${{ env.WORKING_DIR }}
+      # Method 3: Most secure approach with validation
+      - name: Validate and mask secrets
         run: |
-          cat > .env << EOF
-          OPENAI_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENAI_API_KEY || '' }}
-          QLOO_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).QLOO_API_KEY || '' }}
-          OPENWEATHER_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).OPENWEATHER_API_KEY || '' }}
-          EXCHANGE_API_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).EXCHANGE_API_KEY || '' }}
-          SUPABASE_URL: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_URL || '' }}
-          SUPABASE_KEY: ${{ secrets.ENV_VARS != '' && fromJSON(secrets.ENV_VARS).SUPABASE_KEY || '' }}
-          EOF
-          chmod 600 .env
-          echo "::add-mask::$(cat .env)"
+          # Validate secrets exist
+          if [[ -z "$OPENAI_API_KEY" || -z "$QLOO_API_KEY" ]]; then
+            echo "❌ Required secrets are missing"
+            exit 1
+          fi
+
+          # Mask secrets
+          echo "::add-mask::$OPENAI_API_KEY"
+          echo "::add-mask::$OPENAI_API_ORG"
+          echo "::add-mask::$QLOO_API_KEY"
+          echo "::add-mask::$OPENWEATHER_API_KEY"
+          echo "::add-mask::$EXCHANGE_API_KEY"
+          echo "::add-mask::$SUPABASE_URL"
+          echo "::add-mask::$SUPABASE_KEY"
+          echo "✅ Secrets validated and masked"
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_ORG: ${{ secrets.OPENAI_API_ORG }}
+          QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
       # Run tests with coverage (produces both XML and JSON)
       - name: Run tests
         working-directory: ${{ env.WORKING_DIR }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_ORG: ${{ secrets.OPENAI_API_ORG }}
+          QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           # Run your existing test command
-          source .env
           make install-dev
           pytest -v --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=app tests/ | tee pytest-coverage.txt
-          rm -f .env
         continue-on-error: true
 
       - name: Pytest coverage comment
