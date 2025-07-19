@@ -298,43 +298,23 @@ tests/test_recommendations.py: 9 warnings
     validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-- generated xml file: /home/runner/work/travelstyle/travelstyle/backend/reports/pytest-results.xml -
+- generated xml file: /home/runner/work/travelstyle/travelstyle/backend/pytest.xml -
 ================================ tests coverage ================================
 _______________ coverage: platform linux, python 3.13.5-final-0 ________________
 
-Name                               Stmts   Miss  Cover
-------------------------------------------------------
-app/__init__.py                        0      0   100%
-app/api/__init__.py                    0      0   100%
-app/api/deps.py                       22      0   100%
-app/api/v1/__init__.py                 0      0   100%
-app/api/v1/auth.py                   117      3    97%
-app/api/v1/chat.py                    34      0   100%
-app/api/v1/recommendations.py         78      0   100%
-app/api/v1/user.py                    27      3    89%
-app/core/__init__.py                   0      0   100%
-app/core/config.py                    26      0   100%
-app/core/security.py                  45      3    93%
-app/main.py                           32      4    88%
-app/models/__init__.py                 0      0   100%
-app/models/auth.py                    46      0   100%
-app/models/responses.py               23      0   100%
-app/models/travel.py                 113      0   100%
-app/models/user.py                    78      0   100%
-app/services/__init__.py               0      0   100%
-app/services/auth_service.py         150      1    99%
-app/services/currency_service.py      69      0   100%
-app/services/openai_service.py        55      1    98%
-app/services/orchestrator.py          73      2    97%
-app/services/qloo_service.py          55      3    95%
-app/services/supabase_cache.py        72      0   100%
-app/services/weather_service.py      135      0   100%
-app/utils/__init__.py                  0      0   100%
-app/utils/error_handlers.py            9      1    89%
-app/utils/rate_limiter.py             51      0   100%
-app/utils/user_utils.py               12      0   100%
-------------------------------------------------------
-TOTAL                               1322     21    98%
-Coverage XML written to file reports/pytest-coverage.xml
-Coverage JSON written to file reports/pytest-coverage.json
-====================== 279 passed, 14 warnings in 19.25s =======================
+Name                             Stmts   Miss  Cover   Missing
+--------------------------------------------------------------
+app/api/v1/auth.py                 117      3    97%   179, 207, 250
+app/api/v1/user.py                  27      3    89%   38-40
+app/core/security.py                45      3    93%   77-79
+app/main.py                         32      4    88%   27-30, 82
+app/services/auth_service.py       150      1    99%   162
+app/services/openai_service.py      55      1    98%   77
+app/services/orchestrator.py        73      2    97%   159-160
+app/services/qloo_service.py        55      3    95%   65, 67, 108
+app/utils/error_handlers.py          9      1    89%   16
+--------------------------------------------------------------
+TOTAL                             1322     21    98%
+
+20 files skipped due to complete coverage.
+====================== 279 passed, 14 warnings in 39.01s =======================
