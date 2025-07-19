@@ -51,9 +51,9 @@ class QlooService:
                     },
                     json={"location": destination, "context": context, "categories": categories},
                 )
-                await response.raise_for_status()
+                response.raise_for_status()
 
-                data = await response.json()
+                data = response.json()
                 processed_data = self._process_cultural_data(data, destination)
 
                 # Cache for 24 hours
@@ -115,9 +115,9 @@ class QlooService:
                     },
                     json=payload,
                 )
-                await response.raise_for_status()
+                response.raise_for_status()
 
-                data = await response.json()
+                data = response.json()
                 processed_data = self._process_style_data(data)
 
                 # Note: Style recommendations not cached in MVP

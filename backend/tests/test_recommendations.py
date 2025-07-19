@@ -2,13 +2,15 @@
 Tests for recommendations API endpoints.
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.models.responses import ChatResponse, ConversationContext
-from app.services.currency_service import CurrencyService
-from app.services.orchestrator import TravelOrchestratorService
-from app.services.qloo_service import QlooService
+from app.services.currency_service import CurrencyService, currency_service
+from app.services.openai_service import openai_service
+from app.services.orchestrator import TravelOrchestratorService, orchestrator_service
+from app.services.qloo_service import QlooService, qloo_service
+from app.services.weather_service import weather_service
 from fastapi import status
 from httpx import RequestError
 
@@ -16,8 +18,9 @@ from httpx import RequestError
 class MockAsyncResponse:
     def __init__(self, data):
         self._data = data
+        self.raise_for_status = MagicMock(return_value=None)  # Make this a mock
 
-    async def json(self):
+    def json(self):
         return self._data
 
     async def raise_for_status(self):
@@ -81,8 +84,9 @@ class TestRecommendationsEndpoints:
                 "pressure": 1013,
                 "clothing_recommendations": ["Light jacket", "Comfortable shoes"],
             }
-            response = authenticated_client.get(
-                "/api/v1/recommendations/weather/Paris?dates=2024-06-01&dates=2024-06-02"
+            response = authenticated_client.post(
+                "/api/v1/recommendations/weather",
+                json={"destination": "Paris", "dates": ["2024-06-01", "2024-06-02"]},
             )
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
@@ -96,7 +100,10 @@ class TestRecommendationsEndpoints:
             "app.services.weather_service.weather_service.get_weather_data"
         ) as mock_get_weather:
             mock_get_weather.return_value = None
-            response = authenticated_client.get("/api/v1/recommendations/weather/UnknownCity")
+            response = authenticated_client.post(
+                "/api/v1/recommendations/weather",
+                json={"destination": "UnknownCity"},
+            )
             assert response.status_code == status.HTTP_404_NOT_FOUND
             assert "Weather data not available" in response.json()["detail"]
 
@@ -106,7 +113,10 @@ class TestRecommendationsEndpoints:
             "app.services.weather_service.weather_service.get_weather_data"
         ) as mock_get_weather:
             mock_get_weather.side_effect = Exception("Service error")
-            response = authenticated_client.get("/api/v1/recommendations/weather/Paris")
+            response = authenticated_client.post(
+                "/api/v1/recommendations/weather",
+                json={"destination": "Paris"},
+            )
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
             assert "Failed to retrieve weather forecast" in response.json()["detail"]
 
@@ -203,7 +213,10 @@ class TestRecommendationsEndpoints:
         response = client.get("/api/v1/recommendations/cultural/Paris")
         assert response.status_code == status.HTTP_403_FORBIDDEN
         # Test weather forecast
-        response = client.get("/api/v1/recommendations/weather/Paris")
+        response = client.post(
+            "/api/v1/recommendations/weather",
+            json={"destination": "Paris"},
+        )
         assert response.status_code == status.HTTP_403_FORBIDDEN
         # Test exchange rates
         response = client.get("/api/v1/recommendations/currency/USD")
@@ -594,8 +607,7 @@ async def test_get_style_recommendations_success():
                 }
             )
         ),
-    ) as mock_post:
-        mock_post.raise_for_status.return_value = None
+    ):
         result = await service.get_style_recommendations("Paris", {"style": {}}, "leisure")
         assert result is not None
         assert "style_recommendations" in result
@@ -653,3 +665,278 @@ def test_get_fallback_style_data():
     result = service._get_fallback_style_data("Paris")
     assert result["data_source"] == "fallback"
     assert "style_recommendations" in result
+
+
+@pytest.mark.asyncio
+async def test_generate_travel_recommendations_orchestration_error():
+    """Test generate_travel_recommendations when orchestration raises an exception."""
+    orchestrator_service = TravelOrchestratorService()
+    with patch.object(
+        orchestrator_service, "_parse_trip_context", side_effect=Exception("Parse error")
+    ):
+        result = await orchestrator_service.generate_travel_recommendations(
+            "I want to go to Paris",
+            ConversationContext(
+                user_id="user-1",
+                destination="Paris",
+                travel_dates=["2024-06-01"],
+                trip_purpose="leisure",
+            ),
+            [],
+            {"id": "user-1"},
+        )
+        assert result.confidence_score == 0.0
+        assert "I apologize, but I'm having trouble processing" in result.message
+
+
+@pytest.mark.asyncio
+async def test_safe_api_call_exception():
+    """Test _safe_api_call when API function raises an exception."""
+    orchestrator_service = TravelOrchestratorService()
+
+    async def failing_api():
+        raise Exception("API error")
+
+    result = await orchestrator_service._safe_api_call(failing_api)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_parse_trip_context_destination_extraction():
+    """Test _parse_trip_context with destination extraction from message."""
+    orchestrator_service = TravelOrchestratorService()
+    context = ConversationContext(
+        user_id="user-1", destination=None, travel_dates=["2024-06-01"], trip_purpose="leisure"
+    )
+    result = orchestrator_service._parse_trip_context("I want to go to Tokyo", context)
+    assert result["destination"] == "Tokyo"
+
+
+@pytest.mark.asyncio
+async def test_parse_trip_context_destination_extraction_visiting():
+    """Test _parse_trip_context with 'visiting' keyword."""
+    orchestrator_service = TravelOrchestratorService()
+    context = ConversationContext(
+        user_id="user-1", destination=None, travel_dates=["2024-06-01"], trip_purpose="leisure"
+    )
+    result = orchestrator_service._parse_trip_context("I'm visiting London next week", context)
+    assert result["destination"] == "London"
+
+
+@pytest.mark.asyncio
+async def test_parse_trip_context_destination_extraction_in():
+    """Test _parse_trip_context with 'in' keyword."""
+    orchestrator_service = TravelOrchestratorService()
+    context = ConversationContext(
+        user_id="user-1", destination=None, travel_dates=["2024-06-01"], trip_purpose="leisure"
+    )
+    result = orchestrator_service._parse_trip_context("I'll be in New York", context)
+    assert result["destination"] == "New York"
+
+
+@pytest.mark.asyncio
+async def test_parse_trip_context_business_context():
+    """Test _parse_trip_context with business keywords."""
+    orchestrator_service = TravelOrchestratorService()
+    context = ConversationContext(
+        user_id="user-1", destination="Berlin", travel_dates=["2024-06-01"], trip_purpose="leisure"
+    )
+    result = orchestrator_service._parse_trip_context(
+        "I have a business meeting in Berlin", context
+    )
+    assert result["context"] == "business"
+    assert result["occasion"] == "business"
+
+
+@pytest.mark.asyncio
+async def test_parse_trip_context_formal_context():
+    """Test _parse_trip_context with formal keywords."""
+    orchestrator_service = TravelOrchestratorService()
+    context = ConversationContext(
+        user_id="user-1", destination="Rome", travel_dates=["2024-06-01"], trip_purpose="leisure"
+    )
+    result = orchestrator_service._parse_trip_context(
+        "I'm attending a formal dinner in Rome", context
+    )
+    assert result["context"] == "formal"
+    assert result["occasion"] == "formal"
+
+
+@pytest.mark.asyncio
+async def test_parse_trip_context_active_context():
+    """Test _parse_trip_context with active/adventure keywords."""
+    orchestrator_service = TravelOrchestratorService()
+    context = ConversationContext(
+        user_id="user-1",
+        destination="Switzerland",
+        travel_dates=["2024-06-01"],
+        trip_purpose="leisure",
+    )
+    result = orchestrator_service._parse_trip_context("I'm going hiking in Switzerland", context)
+    assert result["context"] == "active"
+    assert result["occasion"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_enhance_response_with_all_context():
+    """Test _enhance_response with all context data available."""
+    orchestrator_service = TravelOrchestratorService()
+    ai_response = ChatResponse(
+        message="Here are your travel recommendations",
+        confidence_score=0.9,
+        quick_replies=[],
+        suggestions=[],
+    )
+
+    context = {
+        "weather_conditions": {"temperature": 25},
+        "cultural_intelligence": {"customs": "data"},
+        "currency_info": {"rates": "data"},
+        "trip_context": {"destination": "Paris"},
+    }
+
+    result = orchestrator_service._enhance_response(ai_response, context)
+
+    # Check that quick replies were added
+    quick_reply_texts = [qr.text for qr in result.quick_replies]
+    assert "More weather details" in quick_reply_texts
+    assert "Cultural tips" in quick_reply_texts
+    assert "Currency help" in quick_reply_texts
+
+    # Check that suggestions were added
+    assert "Get packing checklist" in result.suggestions
+    assert "Local shopping tips" in result.suggestions
+    assert "Emergency contact info" in result.suggestions
+
+
+@pytest.mark.asyncio
+async def test_enhance_response_with_partial_context():
+    """Test _enhance_response with only some context data available."""
+    orchestrator_service = TravelOrchestratorService()
+    ai_response = ChatResponse(
+        message="Here are your travel recommendations",
+        confidence_score=0.9,
+        quick_replies=[],
+        suggestions=[],
+    )
+
+    context = {
+        "weather_conditions": {"temperature": 25},
+        "cultural_intelligence": None,
+        "currency_info": None,
+        "trip_context": {"destination": "Paris"},
+    }
+
+    result = orchestrator_service._enhance_response(ai_response, context)
+
+    # Check that only weather quick reply was added
+    quick_reply_texts = [qr.text for qr in result.quick_replies]
+    assert "More weather details" in quick_reply_texts
+    assert "Cultural tips" not in quick_reply_texts
+    assert "Currency help" not in quick_reply_texts
+
+    # Check that suggestions were still added
+    assert "Get packing checklist" in result.suggestions
+
+
+@pytest.mark.asyncio
+async def test_enhance_response_with_no_destination():
+    """Test _enhance_response when no destination is specified."""
+    orchestrator_service = TravelOrchestratorService()
+    ai_response = ChatResponse(
+        message="Here are your travel recommendations",
+        confidence_score=0.9,
+        quick_replies=[],
+        suggestions=[],
+    )
+
+    context = {
+        "weather_conditions": {"temperature": 25},
+        "cultural_intelligence": {"customs": "data"},
+        "currency_info": {"rates": "data"},
+        "trip_context": {"destination": None},
+    }
+
+    result = orchestrator_service._enhance_response(ai_response, context)
+
+    # Check that quick replies were added
+    quick_reply_texts = [qr.text for qr in result.quick_replies]
+    assert "More weather details" in quick_reply_texts
+    assert "Cultural tips" in quick_reply_texts
+    assert "Currency help" in quick_reply_texts
+
+    # Check that no suggestions were added (no destination)
+    assert len(result.suggestions) == 0
+
+
+@pytest.mark.asyncio
+async def test_generate_travel_recommendations_no_destination():
+    """Test generate_travel_recommendations when no destination is specified."""
+    with (
+        patch.object(qloo_service, "get_cultural_insights", new=AsyncMock(return_value=None)),
+        patch.object(weather_service, "get_weather_data", new=AsyncMock(return_value=None)),
+        patch.object(qloo_service, "get_style_recommendations", new=AsyncMock(return_value=None)),
+        patch.object(
+            currency_service, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
+        ),
+        patch.object(
+            openai_service,
+            "generate_response",
+            new=AsyncMock(
+                return_value=ChatResponse(
+                    message="Here are your recommendations", confidence_score=0.8
+                )
+            ),
+        ),
+    ):
+        result = await orchestrator_service.generate_travel_recommendations(
+            "I need travel advice",
+            ConversationContext(
+                user_id="user-1",
+                destination=None,
+                travel_dates=["2024-06-01"],
+                trip_purpose="leisure",
+            ),
+            [],
+            {"id": "user-1", "home_currency": "USD"},
+        )
+        assert result.confidence_score == 0.8
+        assert "Here are your recommendations" in result.message
+
+
+@pytest.mark.asyncio
+async def test_generate_travel_recommendations_no_user_profile():
+    """Test generate_travel_recommendations when no user profile is provided."""
+    with (
+        patch.object(
+            qloo_service, "get_cultural_insights", new=AsyncMock(return_value={"insights": "data"})
+        ),
+        patch.object(
+            weather_service, "get_weather_data", new=AsyncMock(return_value={"weather": "data"})
+        ),
+        patch.object(
+            currency_service, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
+        ),
+        patch.object(
+            openai_service,
+            "generate_response",
+            new=AsyncMock(
+                return_value=ChatResponse(
+                    message="Here are your recommendations", confidence_score=0.8
+                )
+            ),
+        ),
+    ):
+        result = await orchestrator_service.generate_travel_recommendations(
+            "I want to go to Paris",
+            ConversationContext(
+                user_id="user-1",
+                destination="Paris",
+                travel_dates=["2024-06-01"],
+                trip_purpose="leisure",
+            ),
+            [],
+            None,  # No user profile
+        )
+        assert result.confidence_score == 0.8
+        assert "Here are your recommendations" in result.message

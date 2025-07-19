@@ -41,8 +41,16 @@ class CurrencyService:
                 latest_url = f"{self.base_url}{self.api_key}/latest/{new_currency}"
                 response = await client.get(latest_url)
                 response.raise_for_status()
+                try:
+                    data = response.json()
+                except Exception as e:
+                    logger.error("Failed to parse JSON: %s, content: %s", e, response.content)
+                    return None
 
-                data = await response.json()
+                logger.debug("Currency exchange rate API response: %s", data)
+                if not isinstance(data, dict):
+                    return None
+
                 rates_data = {
                     "base_code": data["base_code"],
                     "conversion_rates": data["conversion_rates"],
@@ -101,8 +109,14 @@ class CurrencyService:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(pair_url)
                 response.raise_for_status()
-                data = await response.json()
-                if data.get("result") != "success":
+                try:
+                    data = response.json()
+                except Exception as e:
+                    logger.error("Failed to parse JSON: %s, content: %s", e, response.content)
+                    return None
+
+                logger.debug("Pair exchange rate API response: %s", data)
+                if not isinstance(data, dict) or data.get("result") != "success":
                     return None
 
                 return {

@@ -8,7 +8,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import get_current_user
-from app.models.travel import CurrencyConvertRequest, CurrencyPairRequest
+from app.models.travel import CurrencyConvertRequest, CurrencyPairRequest, WeatherRequest
 from app.services.currency_service import currency_service
 from app.services.qloo_service import qloo_service
 from app.services.weather_service import weather_service
@@ -51,21 +51,20 @@ async def get_cultural_insights(
         raise HTTPException(status_code=500, detail="Failed to retrieve cultural insights") from e
 
 
-@router.get("/weather/{destination}")
+@router.post("/weather")
 @rate_limit(calls=30, period=60)
 async def get_weather_forecast(
-    destination: str,
-    dates: list[str] | None = dates_query,
+    request: WeatherRequest,
     current_user: dict = current_user_dependency,
 ):
     """Get weather forecast for destination"""
 
     try:
-        weather_data = await weather_service.get_weather_data(destination, dates)
+        weather_data = await weather_service.get_weather_data(request.destination, request.dates)
 
         if not weather_data:
             raise HTTPException(
-                status_code=404, detail=f"Weather data not available for {destination}"
+                status_code=404, detail=f"Weather data not available for {request.destination}"
             )
 
         return weather_data

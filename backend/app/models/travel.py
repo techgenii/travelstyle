@@ -72,6 +72,11 @@ class StylePreferences(BaseModel):
     climate_preferences: dict[str, Any] | None = None
 
 
+class WeatherRequest(BaseModel):
+    destination: str
+    dates: list[str] | None = None
+
+
 class WeatherData(BaseModel):
     """Weather information for destination"""
 

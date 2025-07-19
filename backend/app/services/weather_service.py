@@ -24,10 +24,35 @@ class WeatherService:
         self.api_key = settings.OPENWEATHER_API_KEY
         self.timeout = 15.0
 
+    async def get_lat_lon_for_city(
+        self, city: str, state: str | None = None, country: str | None = None, limit: int = 1
+    ):
+        """Get latitude and longitude for a city using OpenWeatherMap Geocoding API."""
+        try:
+            q = city
+            if state:
+                q += f",{state}"
+            if country:
+                q += f",{country}"
+            url = f"{self.base_url}/geo/1.0/direct"
+            params = {"q": q, "limit": limit, "appid": self.api_key}
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.get(url, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                if not data:
+                    return None, None
+                return data[0]["lat"], data[0]["lon"]
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Geocoding error: %s", type(e).__name__)
+            return None, None
+
     async def get_weather_data(
         self,
         destination: str,
         dates: list[str] | None = None,  # pylint: disable=unused-argument
+        state: str | None = None,
+        country: str | None = None,
     ) -> dict[str, Any] | None:
         """Get comprehensive weather data for destination.
 
@@ -44,9 +69,14 @@ class WeatherService:
             return cached_data
 
         try:
+            lat, lon = await self.get_lat_lon_for_city(destination, state, country)
+            if lat is None or lon is None:
+                logger.error("Could not geocode destination: %s", destination)
+                return None
+
             # Get current weather and forecast
-            current_weather = await self._get_current_weather(destination)
-            forecast_data = await self._get_forecast(destination)
+            current_weather = await self._get_current_weather(lat, lon)
+            forecast_data = await self._get_forecast(lat, lon)
 
             if not current_weather:
                 return None
@@ -70,7 +100,7 @@ class WeatherService:
             logger.error("Weather service error: %s", type(e).__name__)
             return None
 
-    async def _get_current_weather(self, destination: str) -> dict[str, Any] | None:
+    async def _get_current_weather(self, lat: float, lon: float) -> dict[str, Any] | None:
         """Get current weather conditions.
 
         Args:
@@ -80,11 +110,10 @@ class WeatherService:
             Current weather data or None if error.
         """
         try:
+            url = f"{self.base_url}/data/2.5/weather"
+            params = {"lat": lat, "lon": lon, "appid": self.api_key, "units": "imperial"}
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    f"{self.base_url}/weather",
-                    params={"q": destination, "appid": self.api_key, "units": "metric"},
-                )
+                response = await client.get(url, params=params)
                 response.raise_for_status()
 
                 data = response.json()
@@ -102,7 +131,7 @@ class WeatherService:
             logger.error("Current weather error: %s", type(e).__name__)
             return None
 
-    async def _get_forecast(self, destination: str) -> dict[str, Any] | None:
+    async def _get_forecast(self, lat: float, lon: float) -> dict[str, Any] | None:
         """Get 5-day weather forecast.
 
         Args:
@@ -113,11 +142,10 @@ class WeatherService:
         """
         # pylint: disable=too-many-locals
         try:
+            url = f"{self.base_url}/data/2.5/forecast"
+            params = {"lat": lat, "lon": lon, "appid": self.api_key, "units": "imperial"}
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    f"{self.base_url}/forecast",
-                    params={"q": destination, "appid": self.api_key, "units": "metric"},
-                )
+                response = await client.get(url, params=params)
                 response.raise_for_status()
 
                 data = response.json()
@@ -187,7 +215,7 @@ class WeatherService:
         return int((rain_count / len(conditions)) * 100) if conditions else 0
 
     def _generate_clothing_recommendations(
-        self, current: dict[str, Any], forecast: dict[str, Any] | None
+        self, current: dict[str, Any] | None, forecast: dict[str, Any] | None
     ) -> dict[str, Any]:
         """Generate clothing recommendations based on weather.
 

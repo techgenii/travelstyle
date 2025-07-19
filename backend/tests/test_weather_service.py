@@ -4,6 +4,15 @@ import pytest
 from app.services.weather_service import WeatherService
 
 
+class MockAsyncResponse:
+    def __init__(self, data):
+        self._data = data
+        self.raise_for_status = MagicMock(return_value=None)  # Make this a mock
+
+    def json(self):
+        return self._data
+
+
 @pytest.fixture
 def weather_service():
     return WeatherService()
@@ -27,6 +36,11 @@ async def test_get_weather_data_cache_miss_success(weather_service):
         patch(
             "app.services.supabase_cache.supabase_cache.get_weather_cache",
             new=AsyncMock(return_value=None),
+        ),
+        patch.object(
+            weather_service,
+            "get_lat_lon_for_city",
+            new=AsyncMock(return_value=(48.8566, 2.3522)),  # Paris lat/lon
         ),
         patch.object(
             weather_service,
@@ -89,7 +103,7 @@ async def test__get_current_weather_success(weather_service):
     }
     mock_response.raise_for_status = MagicMock()
     with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=mock_response)):
-        result = await weather_service._get_current_weather("London")
+        result = await weather_service._get_current_weather(51.5074, -0.1278)  # London lat/lon
         assert result["temperature"] == 20
         assert result["description"] == "light rain"
         assert result["wind_speed"] == 7
@@ -100,38 +114,64 @@ async def test__get_current_weather_success(weather_service):
 @pytest.mark.asyncio
 async def test__get_current_weather_error(weather_service):
     with patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=Exception("fail"))):
-        result = await weather_service._get_current_weather("London")
+        result = await weather_service._get_current_weather(51.5074, -0.1278)  # London lat/lon
         assert result is None
 
 
 @pytest.mark.asyncio
-async def test__get_forecast_success(weather_service):
-    # Simulate OpenWeather forecast API response
+async def test__get_forecast_api_error(weather_service):
+    """Test _get_forecast when API raises an error."""
+    with patch(
+        "httpx.AsyncClient.get",
+        new=AsyncMock(side_effect=Exception("API error")),
+    ):
+        result = await weather_service._get_forecast(48.8566, 2.3522)
+        assert result is None
+
+
+@pytest.mark.asyncio
+async def test__get_forecast_empty_data(weather_service):
+    """Test _get_forecast with empty forecast data."""
+    with patch(
+        "httpx.AsyncClient.get",
+        new=AsyncMock(return_value=MockAsyncResponse({"list": []})),
+    ):
+        result = await weather_service._get_forecast(48.8566, 2.3522)
+        assert result is not None
+        assert result["daily_forecasts"] == []
+        assert result["temp_range"]["min"] == 0
+        assert result["temp_range"]["max"] == 0
+        assert result["precipitation_chance"] == 0
+
+
+@pytest.mark.asyncio
+async def test__get_forecast_success_with_data(weather_service):
+    """Test _get_forecast with successful data processing."""
     from datetime import datetime as dt
 
     now = dt.now()
-    timestamp = int(now.timestamp())
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "list": [
-            {"dt": timestamp, "main": {"temp": 10}, "weather": [{"main": "Rain"}]},
-            {"dt": timestamp + 3600, "main": {"temp": 12}, "weather": [{"main": "Clear"}]},
-            {"dt": timestamp + 7200, "main": {"temp": 8}, "weather": [{"main": "Rain"}]},
-        ]
-    }
-    mock_response.raise_for_status = MagicMock()
-    with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=mock_response)):
-        result = await weather_service._get_forecast("London")
+    # Create timestamps for different days
+    day1 = int(now.timestamp())
+    day2 = day1 + 86400  # Next day
+
+    with patch(
+        "httpx.AsyncClient.get",
+        new=AsyncMock(
+            return_value=MockAsyncResponse(
+                {
+                    "list": [
+                        {"dt": day1, "main": {"temp": 15}, "weather": [{"main": "Clear"}]},
+                        {"dt": day2, "main": {"temp": 20}, "weather": [{"main": "Sunny"}]},
+                    ]
+                }
+            )
+        ),
+    ):
+        result = await weather_service._get_forecast(48.8566, 2.3522)
+        assert result is not None
         assert "daily_forecasts" in result
         assert "temp_range" in result
         assert "precipitation_chance" in result
-
-
-@pytest.mark.asyncio
-async def test__get_forecast_error(weather_service):
-    with patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=Exception("fail"))):
-        result = await weather_service._get_forecast("London")
-        assert result is None
 
 
 def test__calculate_precipitation_chance():
@@ -211,3 +251,186 @@ def test__generate_clothing_recommendations_no_current():
         "materials": [],
         "special_considerations": [],
     }
+
+
+@pytest.mark.asyncio
+async def test_get_lat_lon_for_city_success(weather_service):
+    """Test successful geocoding with city only."""
+    with patch(
+        "httpx.AsyncClient.get",
+        new=AsyncMock(return_value=MockAsyncResponse([{"lat": 48.8566, "lon": 2.3522}])),
+    ):
+        lat, lon = await weather_service.get_lat_lon_for_city("Paris")
+        assert lat == 48.8566
+        assert lon == 2.3522
+
+
+@pytest.mark.asyncio
+async def test_get_lat_lon_for_city_with_state_country(weather_service):
+    """Test successful geocoding with city, state, and country."""
+    with patch(
+        "httpx.AsyncClient.get",
+        new=AsyncMock(return_value=MockAsyncResponse([{"lat": 40.7128, "lon": -74.0060}])),
+    ):
+        lat, lon = await weather_service.get_lat_lon_for_city("New York", "NY", "US")
+        assert lat == 40.7128
+        assert lon == -74.0060
+
+
+@pytest.mark.asyncio
+async def test_get_lat_lon_for_city_empty_response(weather_service):
+    """Test geocoding when API returns empty response."""
+    with patch(
+        "httpx.AsyncClient.get",
+        new=AsyncMock(return_value=MockAsyncResponse([])),
+    ):
+        lat, lon = await weather_service.get_lat_lon_for_city("NonexistentCity")
+        assert lat is None
+        assert lon is None
+
+
+@pytest.mark.asyncio
+async def test_get_lat_lon_for_city_api_error(weather_service):
+    """Test geocoding when API raises an error."""
+    with patch(
+        "httpx.AsyncClient.get",
+        new=AsyncMock(side_effect=Exception("API error")),
+    ):
+        lat, lon = await weather_service.get_lat_lon_for_city("Paris")
+        assert lat is None
+        assert lon is None
+
+
+@pytest.mark.asyncio
+async def test_get_weather_data_geocoding_failure(weather_service):
+    """Test get_weather_data when geocoding fails."""
+    with (
+        patch(
+            "app.services.supabase_cache.supabase_cache.get_weather_cache",
+            new=AsyncMock(return_value=None),
+        ),
+        patch.object(
+            weather_service,
+            "get_lat_lon_for_city",
+            new=AsyncMock(return_value=(None, None)),
+        ),
+    ):
+        result = await weather_service.get_weather_data("InvalidCity")
+        assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_weather_data_current_weather_failure(weather_service):
+    """Test get_weather_data when current weather API fails."""
+    with (
+        patch(
+            "app.services.supabase_cache.supabase_cache.get_weather_cache",
+            new=AsyncMock(return_value=None),
+        ),
+        patch.object(
+            weather_service,
+            "get_lat_lon_for_city",
+            new=AsyncMock(return_value=(48.8566, 2.3522)),
+        ),
+        patch.object(
+            weather_service,
+            "_get_current_weather",
+            new=AsyncMock(return_value=None),
+        ),
+    ):
+        result = await weather_service.get_weather_data("Paris")
+        assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_weather_data_service_exception(weather_service):
+    """Test get_weather_data when service raises exception."""
+    with (
+        patch(
+            "app.services.supabase_cache.supabase_cache.get_weather_cache",
+            new=AsyncMock(return_value=None),
+        ),
+        patch.object(
+            weather_service,
+            "get_lat_lon_for_city",
+            new=AsyncMock(side_effect=Exception("Service error")),
+        ),
+    ):
+        result = await weather_service.get_weather_data("Paris")
+        assert result is None
+
+
+@pytest.mark.asyncio
+async def test__get_current_weather_api_error(weather_service):
+    """Test _get_current_weather when API raises an error."""
+    with patch(
+        "httpx.AsyncClient.get",
+        new=AsyncMock(side_effect=Exception("API error")),
+    ):
+        result = await weather_service._get_current_weather(48.8566, 2.3522)
+        assert result is None
+
+
+@pytest.mark.asyncio
+async def test__get_current_weather_missing_visibility(weather_service):
+    """Test _get_current_weather when visibility is missing from response."""
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "main": {"temp": 20, "feels_like": 19, "humidity": 50, "pressure": 1000},
+        "weather": [{"description": "clear sky"}],
+        "wind": {"speed": 5},
+        # visibility is missing
+    }
+    mock_response.raise_for_status = MagicMock()
+
+    with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=mock_response)):
+        result = await weather_service._get_current_weather(48.8566, 2.3522)
+        assert result is not None
+        assert result["visibility"] == 0  # Should default to 0 when missing
+
+
+@pytest.mark.asyncio
+async def test_get_weather_data_with_state_country(weather_service):
+    """Test get_weather_data with state and country parameters."""
+    with (
+        patch(
+            "app.services.supabase_cache.supabase_cache.get_weather_cache",
+            new=AsyncMock(return_value=None),
+        ),
+        patch.object(
+            weather_service,
+            "get_lat_lon_for_city",
+            new=AsyncMock(return_value=(40.7128, -74.0060)),
+        ),
+        patch.object(
+            weather_service,
+            "_get_current_weather",
+            new=AsyncMock(
+                return_value={
+                    "temperature": 20,
+                    "feels_like": 19,
+                    "humidity": 50,
+                    "description": "clear sky",
+                    "wind_speed": 5,
+                    "visibility": 10,
+                    "pressure": 1000,
+                }
+            ),
+        ),
+        patch.object(
+            weather_service,
+            "_get_forecast",
+            new=AsyncMock(
+                return_value={
+                    "daily_forecasts": [],
+                    "temp_range": {"min": 15, "max": 25},
+                    "precipitation_chance": 0,
+                }
+            ),
+        ),
+        patch("app.services.supabase_cache.supabase_cache.set_weather_cache", new=AsyncMock()),
+    ):
+        result = await weather_service.get_weather_data("New York", state="NY", country="US")
+        assert result is not None
+        assert result["destination"] == "New York"
+        assert "clothing_recommendations" in result
