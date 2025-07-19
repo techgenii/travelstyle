@@ -287,17 +287,6 @@ tests/test_weather_service.py::test__get_current_weather_api_error PASSED [ 99%]
 tests/test_weather_service.py::test__get_current_weather_missing_visibility PASSED [ 99%]
 tests/test_weather_service.py::test_get_weather_data_with_state_country PASSED [100%]
 
-=============================== warnings summary ===============================
-../../../../../../opt/hostedtoolcache/Python/3.13.5/x64/lib/python3.13/site-packages/pydantic/_internal/_config.py:323
-  /opt/hostedtoolcache/Python/3.13.5/x64/lib/python3.13/site-packages/pydantic/_internal/_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
-    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
-
-tests/test_chat.py: 4 warnings
-tests/test_recommendations.py: 9 warnings
-  /opt/hostedtoolcache/Python/3.13.5/x64/lib/python3.13/site-packages/pydantic/main.py:253: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 - generated xml file: /home/runner/work/travelstyle/travelstyle/backend/reports/pytest-results.xml -
 ================================ tests coverage ================================
 _______________ coverage: platform linux, python 3.13.5-final-0 ________________
@@ -327,14 +316,14 @@ app/services/currency_service.py      69      0   100%
 app/services/openai_service.py        55      1    98%
 app/services/orchestrator.py          73      2    97%
 app/services/qloo_service.py          55      3    95%
-app/services/supabase_cache.py        72      0   100%
-app/services/weather_service.py      135      0   100%
+app/services/supabase_cache.py        72      3    96%
+app/services/weather_service.py      139      0   100%
 app/utils/__init__.py                  0      0   100%
 app/utils/error_handlers.py            9      1    89%
 app/utils/rate_limiter.py             51      0   100%
 app/utils/user_utils.py               12      0   100%
 ------------------------------------------------------
-TOTAL                               1322     21    98%
+TOTAL                               1326     24    98%
 Coverage XML written to file reports/pytest-coverage.xml
 Coverage JSON written to file reports/pytest-coverage.json
-====================== 279 passed, 14 warnings in 17.71s =======================
+============================= 279 passed in 18.51s =============================
