@@ -337,4 +337,4 @@ app/utils/user_utils.py               12      0   100%
 TOTAL                               1322     21    98%
 Coverage XML written to file reports/pytest-coverage.xml
 Coverage JSON written to file reports/pytest-coverage.json
-====================== 279 passed, 14 warnings in 19.25s =======================
+====================== 279 passed, 14 warnings in 17.71s =======================

@@ -317,4 +317,4 @@ app/utils/error_handlers.py          9      1    89%   16
 TOTAL                             1322     21    98%
 
 20 files skipped due to complete coverage.
-====================== 279 passed, 14 warnings in 39.01s =======================
+====================== 279 passed, 14 warnings in 18.58s =======================
