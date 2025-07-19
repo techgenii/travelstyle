@@ -36,7 +36,6 @@ class SupabaseCacheService:
                 self.client.table("weather_cache")
                 .select("*")
                 .eq("destination", destination)
-                .eq("is_active", True)
                 .single()
                 .execute()
             )
@@ -63,14 +62,14 @@ class SupabaseCacheService:
             expires_at = datetime.now(UTC) + timedelta(hours=ttl_hours)
             cache_data = {
                 "destination": destination,
-                "data": data,
+                "destination_normalized": destination.lower(),  # or your normalization logic
+                "weather_data": data,
                 "expires_at": expires_at.isoformat(),
-                "is_active": True,
                 "created_at": datetime.now(UTC).isoformat(),
             }
             self.client.table("weather_cache").upsert(cache_data).execute()
             return True
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as e:
             logger.error("Weather cache set error: %s", type(e).__name__)
             return False
 

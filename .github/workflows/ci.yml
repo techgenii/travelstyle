@@ -67,7 +67,7 @@ jobs:
 
           # Mask secrets
           echo "::add-mask::$OPENAI_API_KEY"
-          echo "::add-mask::$OPENAI_API_ORG"
+          echo "::add-mask::$OPENAI_ORG_ID"
           echo "::add-mask::$QLOO_API_KEY"
           echo "::add-mask::$OPENWEATHER_API_KEY"
           echo "::add-mask::$EXCHANGE_API_KEY"
@@ -76,7 +76,7 @@ jobs:
           echo "✅ Secrets validated and masked"
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_API_ORG: ${{ secrets.OPENAI_API_ORG }}
+          OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
           QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
           EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
@@ -87,7 +87,7 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_API_ORG: ${{ secrets.OPENAI_API_ORG }}
+          OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
           QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
           EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
@@ -266,7 +266,7 @@ jobs:
 
           # Mask secrets
           echo "::add-mask::$OPENAI_API_KEY"
-          echo "::add-mask::$OPENAI_API_ORG"
+          echo "::add-mask::$OPENAI_ORG_ID"
           echo "::add-mask::$QLOO_API_KEY"
           echo "::add-mask::$OPENWEATHER_API_KEY"
           echo "::add-mask::$EXCHANGE_API_KEY"
@@ -275,7 +275,7 @@ jobs:
           echo "✅ Secrets validated and masked"
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_API_ORG: ${{ secrets.OPENAI_API_ORG }}
+          OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
           QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
           EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
@@ -287,7 +287,7 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_API_ORG: ${{ secrets.OPENAI_API_ORG }}
+          OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
           QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
           EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}

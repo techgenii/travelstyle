@@ -3,7 +3,7 @@ Response models for TravelStyle AI application.
 Defines Pydantic models for API requests and responses.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -23,7 +23,7 @@ class ChatResponse(BaseModel):
     quick_replies: list[QuickReply] = []
     suggestions: list[str] = []
     confidence_score: float = Field(default=0.8, ge=0.0, le=1.0)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ConversationContext(BaseModel):

@@ -21,23 +21,23 @@ def cache_service(mock_supabase_client):
 
 @pytest.mark.asyncio
 async def test_get_weather_cache_success(cache_service, mock_supabase_client):
-    # Mock the chain: table().select().eq().eq().single().execute()
+    # Mock the chain: table().select().eq().single().execute()
     mock_table = Mock()
     mock_select = Mock()
-    mock_eq1 = Mock()
-    mock_eq2 = Mock()
+    mock_eq = Mock()
     mock_single = Mock()
-    mock_execute = Mock()
 
     mock_supabase_client.table.return_value = mock_table
     mock_table.select.return_value = mock_select
-    mock_select.eq.return_value = mock_eq1
-    mock_eq1.eq.return_value = mock_eq2
-    mock_eq2.single.return_value = mock_single
+    mock_select.eq.return_value = mock_eq
+    mock_eq.single.return_value = mock_single
     mock_single.execute.return_value = Mock(
         data={
             "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
-            "data": {"temperature": 20, "description": "sunny"},
+            "data": {
+                "temperature": 20,
+                "description": "sunny",
+            },  # Changed from "weather_data" to "data"
         }
     )
 
@@ -52,7 +52,6 @@ async def test_get_weather_cache_expired(cache_service, mock_supabase_client):
     mock_eq1 = Mock()
     mock_eq2 = Mock()
     mock_single = Mock()
-    mock_execute = Mock()
 
     mock_supabase_client.table.return_value = mock_table
     mock_table.select.return_value = mock_select

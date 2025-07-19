@@ -27,23 +27,35 @@ class WeatherService:
     async def get_lat_lon_for_city(
         self, city: str, state: str | None = None, country: str | None = None, limit: int = 1
     ):
-        """Get latitude and longitude for a city using OpenWeatherMap Geocoding API."""
+        """Get latitude and longitude for a city using OpenStreetMap Nominatim API."""
         try:
-            q = city
+            # Build the query string
+            q_parts = [city]
             if state:
-                q += f",{state}"
+                q_parts.append(state)
             if country:
-                q += f",{country}"
-            url = f"{self.base_url}/geo/1.0/direct"
-            params = {"q": q, "limit": limit, "appid": self.api_key}
+                q_parts.append(country)
+            q = ", ".join(q_parts)
+
+            url = "https://nominatim.openstreetmap.org/search"
+            params = {"q": q, "format": "json", "limit": limit}
+
+            # Add User-Agent header (required by Nominatim usage policy)
+            headers = {
+                "User-Agent": "TravelStyle/1.0"  # Replace with your actual app name
+            }
+
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.get(url, params=params)
+                resp = await client.get(url, params=params, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()
+
                 if not data:
                     return None, None
-                return data[0]["lat"], data[0]["lon"]
-        except Exception as e:  # pylint: disable=broad-except
+
+                # OpenStreetMap returns lat/lon as strings, convert to float
+                return float(data[0]["lat"]), float(data[0]["lon"])
+        except Exception as e:
             logger.error("Geocoding error: %s", type(e).__name__)
             return None, None
 
@@ -104,13 +116,15 @@ class WeatherService:
         """Get current weather conditions.
 
         Args:
-            destination: The destination location.
+            lat: Latitude coordinate.
+            lon: Longitude coordinate.
 
         Returns:
             Current weather data or None if error.
         """
         try:
-            url = f"{self.base_url}/data/2.5/weather"
+            # Fix: Use correct URL construction
+            url = f"{self.base_url}data/2.5/weather"
             params = {"lat": lat, "lon": lon, "appid": self.api_key, "units": "imperial"}
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(url, params=params)
@@ -135,14 +149,16 @@ class WeatherService:
         """Get 5-day weather forecast.
 
         Args:
-            destination: The destination location.
+            lat: Latitude coordinate.
+            lon: Longitude coordinate.
 
         Returns:
             Forecast data or None if error.
         """
         # pylint: disable=too-many-locals
         try:
-            url = f"{self.base_url}/data/2.5/forecast"
+            # Fix: Use correct URL construction
+            url = f"{self.base_url}data/2.5/forecast"
             params = {"lat": lat, "lon": lon, "appid": self.api_key, "units": "imperial"}
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(url, params=params)
@@ -182,6 +198,20 @@ class WeatherService:
 
                     daily_temps.append(item["main"]["temp"])
                     daily_conditions.append(item["weather"][0]["main"])
+
+                # Add the last day if exists
+                if current_date is not None:
+                    daily_forecasts.append(
+                        {
+                            "date": current_date,
+                            "temp_min": min(daily_temps),
+                            "temp_max": max(daily_temps),
+                            "conditions": max(set(daily_conditions), key=daily_conditions.count),
+                            "precipitation_chance": self._calculate_precipitation_chance(
+                                daily_conditions
+                            ),
+                        }
+                    )
 
                 # Use generators for better performance
                 temp_mins = (f["temp_min"] for f in daily_forecasts[:7])
