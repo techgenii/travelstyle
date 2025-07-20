@@ -121,3 +121,8 @@ redis_data/
 
 #backend reports
 backend/reports/
+artifacts/
+.ruff_cache/
+backend/.ruff_cache
+backend/pytest-coverage.txt
+backend/pytst.xml
