@@ -183,11 +183,16 @@ async def test_register_no_session(auth_service):
 )
 @pytest.mark.asyncio
 async def test_get_user_profile_success(mock_extract, auth_service):
-    mock_admin = Mock()
-    mock_admin.get_user_by_id.return_value = Mock(user=Mock())
-    auth_service.client.auth.admin = mock_admin
-    result = await auth_service.get_user_profile("user-1")
-    assert result["id"] == "user-1"
+    """Test get_user_profile success with view-based approach."""
+    mock_response = MagicMock()
+    mock_response.data = [{"id": "user-1", "email": "test@example.com"}]
+
+    mock_table = MagicMock()
+    mock_table.select.return_value.eq.return_value.execute.return_value = mock_response
+
+    with patch.object(auth_service.client, "table", return_value=mock_table):
+        result = await auth_service.get_user_profile("user-1")
+        assert result["id"] == "user-1"
 
 
 @patch(
@@ -203,22 +208,27 @@ async def test_update_user_profile_success(mock_extract, auth_service):
     assert result["id"] == "user-1"
 
 
-@patch(
-    "app.services.auth_service.extract_user_profile",
-    return_value={"id": "user-1", "email": "test@example.com"},
-)
 @pytest.mark.asyncio
-async def test_update_user_profile_sync_success(mock_extract, auth_service):
+async def test_update_user_profile_sync_success(auth_service):
     mock_admin = Mock()
     mock_admin.update_user_by_id.return_value = Mock(
         user=Mock(), user_metadata={"first_name": "Jane", "last_name": "Doe"}
     )
+
+    # Mock the view update response
+    mock_view_response = Mock()
+    mock_view_response.data = [
+        {"id": "user-1", "email": "test@example.com", "first_name": "Jane", "last_name": "Doe"}
+    ]
+
     mock_table = Mock()
     mock_table.update.return_value = mock_table
     mock_table.eq.return_value = mock_table
-    mock_table.execute.return_value = None
+    mock_table.execute.return_value = mock_view_response
+
     auth_service.client.auth.admin = mock_admin
     auth_service.client.table = Mock(return_value=mock_table)
+
     result = await auth_service.update_user_profile_sync(
         "user-1", {"first_name": "Jane", "last_name": "Doe"}
     )
@@ -383,9 +393,12 @@ async def test_register_exception(auth_service):
 async def test_get_user_profile_no_user(auth_service):
     """Test get_user_profile when no user is returned."""
     mock_response = MagicMock()
-    mock_response.user = None
+    mock_response.data = []
 
-    with patch.object(auth_service.client.auth.admin, "get_user_by_id", return_value=mock_response):
+    mock_table = MagicMock()
+    mock_table.select.return_value.eq.return_value.execute.return_value = mock_response
+
+    with patch.object(auth_service.client, "table", return_value=mock_table):
         result = await auth_service.get_user_profile("user_id")
         assert result is None
 
@@ -393,9 +406,10 @@ async def test_get_user_profile_no_user(auth_service):
 @pytest.mark.asyncio
 async def test_get_user_profile_exception(auth_service):
     """Test get_user_profile when Supabase raises an exception."""
-    with patch.object(
-        auth_service.client.auth.admin, "get_user_by_id", side_effect=Exception("Profile error")
-    ):
+    mock_table = MagicMock()
+    mock_table.select.return_value.eq.return_value.execute.side_effect = Exception("Profile error")
+
+    with patch.object(auth_service.client, "table", return_value=mock_table):
         result = await auth_service.get_user_profile("user_id")
         assert result is None
 
@@ -443,8 +457,22 @@ async def test_update_user_profile_sync_with_style_preferences(auth_service):
     mock_auth_response.user = MagicMock()
     mock_auth_response.user.user_metadata = {"first_name": "John", "last_name": "Doe"}
 
+    # Mock the view update response
+    mock_view_response = MagicMock()
+    mock_view_response.data = [
+        {
+            "id": "user_id",
+            "email": "test@example.com",
+            "first_name": "John",
+            "last_name": "Doe",
+            "style_preferences": {"color": "blue"},
+        }
+    ]
+
     mock_table = MagicMock()
-    mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
+    mock_table.update.return_value = mock_table
+    mock_table.eq.return_value = mock_table
+    mock_table.execute.return_value = mock_view_response
 
     with (
         patch.object(

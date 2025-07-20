@@ -175,13 +175,16 @@ class AuthService:
 
     # pylint: disable=duplicate-code
     async def get_user_profile(self, user_id: str) -> dict[str, Any] | None:
-        """Get user profile information."""
+        """Get user profile information from user_profile_view."""
         if not self.client:
             raise RuntimeError("Supabase client not initialized")
         try:
-            response = self.client.auth.admin.get_user_by_id(user_id)
-            if response.user:
-                return extract_user_profile(response.user)
+            # Use the user_profile_view instead of auth admin
+            response = (
+                self.client.table("user_profile_view").select("*").eq("id", user_id).execute()
+            )
+            if response.data and len(response.data) > 0:
+                return response.data[0]
             return None
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to get user profile for %s: %s", user_id, type(e).__name__)
@@ -205,7 +208,7 @@ class AuthService:
     async def update_user_profile_sync(
         self, user_id: str, updates: dict[str, Any]
     ) -> dict[str, Any] | None:
-        """Update user profile and sync across all tables."""
+        """Update user profile and sync across all tables using user_profile_view."""
         if not self.client:
             raise RuntimeError("Supabase client not initialized")
         try:
@@ -218,14 +221,7 @@ class AuthService:
                 logger.error("Failed to update auth user for %s", user_id)
                 return None
 
-            # Update public.users table
-            user_updates = {}
-            if "first_name" in updates:
-                user_updates["first_name"] = updates["first_name"]
-            if "last_name" in updates:
-                user_updates["last_name"] = updates["last_name"]
-
-            # Update profile_completed status
+            # Update profile_completed status if name fields are being updated
             if "first_name" in updates or "last_name" in updates:
                 first_name = updates.get("first_name") or auth_response.user.user_metadata.get(
                     "first_name"
@@ -233,23 +229,19 @@ class AuthService:
                 last_name = updates.get("last_name") or auth_response.user.user_metadata.get(
                     "last_name"
                 )
-                user_updates["profile_completed"] = bool(first_name and last_name)
+                updates["profile_completed"] = bool(first_name and last_name)
 
-            if user_updates:
-                user_updates["updated_at"] = "now()"
-                self.client.table("users").update(user_updates).eq("id", user_id).execute()
+            # Update the view directly - triggers will handle updating underlying tables
+            response = (
+                self.client.table("user_profile_view").update(updates).eq("id", user_id).execute()
+            )
 
-            # Update user_preferences if style preferences are included
-            if "style_preferences" in updates:
-                self.client.table("user_preferences").update(
-                    {
-                        "style_preferences": updates["style_preferences"],
-                        "updated_at": "now()",
-                    }
-                ).eq("user_id", user_id).execute()
+            if not response.data or len(response.data) == 0:
+                logger.error("Failed to update user profile for %s: no data returned", user_id)
+                return None
 
-            # Return updated profile
-            return extract_user_profile(auth_response.user)
+            logger.info("User profile updated successfully for %s via view", user_id)
+            return response.data[0]
 
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to update user profile for %s: %s", user_id, type(e).__name__)

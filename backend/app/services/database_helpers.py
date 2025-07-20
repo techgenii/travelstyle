@@ -58,78 +58,50 @@ class DatabaseHelpers:
             return []
 
     async def get_user_profile(self, user_id: str) -> dict:
-        """Retrieve user profile from database"""
+        """Retrieve user profile from user_profile_view"""
         try:
-            # Get user basic info
-            user_response = self.client.table("users").select("*").eq("id", user_id).execute()
-
-            if not user_response.data:
+            response = (
+                self.client.table("user_profile_view").select("*").eq("id", user_id).execute()
+            )
+            if not response.data or len(response.data) == 0:
                 return {}
-
-            user_data = user_response.data[0]
-
-            # Get user preferences
-            preferences_response = (
-                self.client.table("user_preferences").select("*").eq("user_id", user_id).execute()
-            )
-
-            # Get saved destinations
-            destinations_response = (
-                self.client.table("saved_destinations")
-                .select("*")
-                .eq("user_id", user_id)
-                .order("last_used", desc=True)
-                .execute()
-            )
-
-            # Get currency favorites
-            currency_favorites_response = (
-                self.client.table("currency_favorites")
-                .select("*")
-                .eq("user_id", user_id)
-                .order("last_used", desc=True)
-                .execute()
-            )
-
-            # Combine all data into user profile
-            profile = {
-                "id": user_data["id"],
-                "email": user_data["email"],
-                "first_name": user_data.get("first_name"),
-                "last_name": user_data.get("last_name"),
-                "profile_completed": user_data.get("profile_completed", False),
-                "last_login": user_data.get("last_login"),
-                "preferences": user_data.get("preferences", {}),
-                "ui_preferences": user_data.get("ui_preferences", {}),
-                "created_at": user_data["created_at"],
-                "updated_at": user_data["updated_at"],
-            }
-
-            # Add detailed preferences if available
-            if preferences_response.data:
-                pref_data = preferences_response.data[0]
-                profile["detailed_preferences"] = {
-                    "style_preferences": pref_data.get("style_preferences", {}),
-                    "size_info": pref_data.get("size_info", {}),
-                    "travel_patterns": pref_data.get("travel_patterns", {}),
-                    "quick_reply_preferences": pref_data.get("quick_reply_preferences", {}),
-                    "packing_methods": pref_data.get("packing_methods", {}),
-                    "currency_preferences": pref_data.get("currency_preferences", {}),
-                }
-
-            # Add saved destinations
-            if destinations_response.data:
-                profile["saved_destinations"] = destinations_response.data
-
-            # Add currency favorites
-            if currency_favorites_response.data:
-                profile["currency_favorites"] = currency_favorites_response.data
-
-            return profile
-
+            return response.data[0]
         except Exception as e:
             logger.error(f"Error retrieving user profile: {e}")
             return {}
+
+    async def save_user_profile(self, user_id: str, profile_data: dict) -> dict | None:
+        """Save user profile data via user_profile_view.
+
+        This function updates the user_profile_view directly, which uses database
+        triggers to update the underlying users and user_preferences tables.
+
+        Args:
+            user_id: The user ID to update
+            profile_data: Dictionary containing profile fields to update
+
+        Returns:
+            Updated profile data from the view, or None if update failed
+        """
+        try:
+            # Update the view directly - triggers will handle updating underlying tables
+            response = (
+                self.client.table("user_profile_view")
+                .update(profile_data)
+                .eq("id", user_id)
+                .execute()
+            )
+
+            if not response.data or len(response.data) == 0:
+                logger.error(f"Failed to save user profile for {user_id}: no data returned")
+                return None
+
+            logger.info(f"Successfully saved user profile for {user_id}")
+            return response.data[0]
+
+        except Exception as e:
+            logger.error(f"Error saving user profile for {user_id}: {e}")
+            return None
 
     async def save_conversation_message(
         self,
@@ -442,3 +414,8 @@ async def save_recommendation_feedback(
     return await db_helpers.save_recommendation_feedback(
         user_id, conversation_id, message_id, feedback_type, feedback_text, ai_response_content
     )
+
+
+async def save_user_profile(user_id: str, profile_data: dict) -> dict | None:
+    """Save user profile data via user_profile_view"""
+    return await db_helpers.save_user_profile(user_id, profile_data)

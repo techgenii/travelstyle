@@ -145,8 +145,15 @@ class SupabaseCacheService:
             )
             # response.data is a list of rows
             if response.data and len(response.data) > 0:
+                cache_entry = response.data[0]
+                expires_at = cache_entry.get("expires_at")
+
+                # Check if cache is expired
+                if expires_at and self._is_expired(expires_at):
+                    return None
+
                 # Return the rates_data field from the first row
-                return response.data[0]["rates_data"]
+                return cache_entry["rates_data"]
             return None
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Currency cache get error: %s - %s", type(e).__name__, str(e))

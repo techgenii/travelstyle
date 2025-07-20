@@ -6,12 +6,14 @@ Handles user profiles, preferences, and saved destinations.
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_current_user
+from app.models.user import UserProfileBase, UserProfileResponse
 from app.services.database_helpers import (
     db_helpers,  # For accessing the class instance directly
     get_user_profile,
+    save_user_profile,
     update_user_preferences,  # Import the function you're using
 )
 
@@ -22,16 +24,37 @@ logger = logging.getLogger(__name__)
 current_user_dependency = Depends(get_current_user)
 
 
-@router.get("/me")
+@router.get("/me", response_model=UserProfileResponse)
 async def get_current_user_profile(current_user: dict = current_user_dependency):
     """Get current user profile"""
     try:
         # In a real implementation, you'd fetch from Supabase
         profile = await get_user_profile(current_user["id"])
+        if not profile:
+            raise HTTPException(status_code=404, detail="User profile not found")
         return profile
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Get user profile error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to retrieve user profile") from e
+
+
+@router.put("/me", response_model=UserProfileResponse)
+async def update_current_user_profile(
+    profile_update: UserProfileBase, current_user: dict = current_user_dependency
+):
+    """
+    Update the current user's profile using the user_profile_view.
+    """
+    user_id = current_user["id"]
+    update_data = profile_update.model_dump(exclude_unset=True)
+    result = await save_user_profile(user_id, update_data)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found or update failed"
+        )
+    return result
 
 
 @router.get("/preferences")

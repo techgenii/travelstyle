@@ -13,13 +13,22 @@ class TestUserEndpoints:
     @patch("app.api.v1.user.get_user_profile")
     def test_get_current_user_profile_success(self, mock_get_profile, authenticated_client):
         """Test successful user profile retrieval."""
-        # Mock the database call to return a valid profile
+        # Mock the database call to return a valid profile matching the view structure
         mock_get_profile.return_value = {
             "id": "test-user-123",
             "email": "test@example.com",
-            "is_active": True,
             "first_name": "Test",
             "last_name": "User",
+            "profile_completed": True,
+            "created_at": "2023-01-01T00:00:00Z",
+            "updated_at": "2023-01-01T00:00:00Z",
+            "last_login": "2023-01-01T00:00:00Z",
+            "style_preferences": None,
+            "size_info": None,
+            "travel_patterns": None,
+            "quick_reply_preferences": None,
+            "packing_methods": None,
+            "currency_preferences": None,
         }
 
         response = authenticated_client.get("/api/v1/users/me")
@@ -27,7 +36,8 @@ class TestUserEndpoints:
         data = response.json()
         assert "id" in data
         assert "email" in data
-        assert "is_active" in data
+        assert "first_name" in data
+        assert "last_name" in data
         assert data["id"] == "test-user-123"
         assert data["email"] == "test@example.com"
 
@@ -163,3 +173,39 @@ class TestUserEndpoints:
         """Test destination saving with invalid data."""
         response = authenticated_client.post("/api/v1/users/destinations/save", json={})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @patch("app.api.v1.user.save_user_profile")
+    def test_update_current_user_profile_success(self, mock_save_profile, authenticated_client):
+        """Test successful user profile update."""
+        mock_save_profile.return_value = {
+            "id": "test-user-123",
+            "email": "test@example.com",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "profile_completed": True,
+            "profile_picture_url": "https://example.com/avatar.jpg",
+        }
+        response = authenticated_client.put(
+            "/api/v1/users/me",
+            json={"first_name": "Jane", "last_name": "Doe"},
+        )
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["first_name"] == "Jane"
+        assert data["last_name"] == "Doe"
+        assert data["profile_picture_url"] == "https://example.com/avatar.jpg"
+
+    @patch("app.api.v1.user.save_user_profile")
+    def test_update_current_user_profile_not_found(self, mock_save_profile, authenticated_client):
+        """Test user profile update when not found or update fails."""
+        mock_save_profile.return_value = None
+        response = authenticated_client.put(
+            "/api/v1/users/me",
+            json={"first_name": "Jane"},
+        )
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_update_current_user_profile_unauthenticated(self, client):
+        """Test user profile update without authentication."""
+        response = client.put("/api/v1/users/me", json={"first_name": "Jane"})
+        assert response.status_code in (401, 403)

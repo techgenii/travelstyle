@@ -23,6 +23,7 @@ from app.models.auth import (
     ResetPasswordRequest,
     ResetPasswordResponse,
 )
+from app.models.user import UserProfileResponse
 from app.services.auth_service import auth_service
 
 logger = logging.getLogger(__name__)
@@ -166,7 +167,7 @@ async def register(register_data: RegisterRequest):
         ) from e
 
 
-@router.get("/me", status_code=status.HTTP_200_OK)
+@router.get("/me", status_code=status.HTTP_200_OK, response_model=UserProfileResponse)
 async def get_current_user_profile(current_user: dict = current_user_dependency):
     """
     Get current user profile information.

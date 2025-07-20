@@ -100,33 +100,25 @@ class TestDatabaseHelpersComprehensive:
 
     @pytest.mark.asyncio
     async def test_get_user_profile_with_preferences_and_destinations(self):
-        """Test get_user_profile with preferences and destinations data"""
+        """Test get_user_profile with view-based approach"""
         mock_client = MagicMock()
         from app.services.database_helpers import DatabaseHelpers
 
         db = DatabaseHelpers(supabase_client=mock_client)
 
-        # Mock user data
-        user_response = MagicMock()
-        user_response.data = [
+        # Mock user_profile_view data
+        view_response = MagicMock()
+        view_response.data = [
             {
                 "id": "test-user",
                 "email": "test@example.com",
                 "first_name": "John",
                 "last_name": "Doe",
                 "profile_completed": True,
+                "profile_picture_url": "https://example.com/avatar.jpg",
                 "last_login": "2023-01-01T00:00:00Z",
-                "preferences": {"theme": "dark"},
-                "ui_preferences": {"language": "en"},
                 "created_at": "2023-01-01T00:00:00Z",
                 "updated_at": "2023-01-01T00:00:00Z",
-            }
-        ]
-
-        # Mock preferences data
-        prefs_response = MagicMock()
-        prefs_response.data = [
-            {
                 "style_preferences": {"colors": ["blue", "black"]},
                 "size_info": {"height": "5'8\"", "weight": "150 lbs"},
                 "travel_patterns": {"frequent_destinations": ["Europe"]},
@@ -136,37 +128,10 @@ class TestDatabaseHelpersComprehensive:
             }
         ]
 
-        # Mock destinations data
-        dest_response = MagicMock()
-        dest_response.data = [
-            {
-                "id": "dest-1",
-                "destination_name": "Paris",
-                "visit_count": 3,
-                "last_used": "2023-01-01T00:00:00Z",
-            }
-        ]
-
-        # Mock currency favorites data
-        currency_response = MagicMock()
-        currency_response.data = [
-            {"id": "curr-1", "currency_code": "EUR", "last_used": "2023-01-01T00:00:00Z"}
-        ]
-
-        # Setup table side effect to return different responses based on table name
-        def table_side_effect(table_name):
-            mock_table = MagicMock()
-            if table_name == "users":
-                mock_table.select.return_value.eq.return_value.execute.return_value = user_response
-            elif table_name == "user_preferences":
-                mock_table.select.return_value.eq.return_value.execute.return_value = prefs_response
-            elif table_name == "saved_destinations":
-                mock_table.select.return_value.eq.return_value.order.return_value.execute.return_value = dest_response
-            elif table_name == "currency_favorites":
-                mock_table.select.return_value.eq.return_value.order.return_value.execute.return_value = currency_response
-            return mock_table
-
-        mock_client.table.side_effect = table_side_effect
+        # Setup table mock to return view data
+        mock_table = MagicMock()
+        mock_table.select.return_value.eq.return_value.execute.return_value = view_response
+        mock_client.table.return_value = mock_table
 
         result = await db.get_user_profile("test-user")
 
@@ -175,10 +140,10 @@ class TestDatabaseHelpersComprehensive:
         assert result["first_name"] == "John"
         assert result["last_name"] == "Doe"
         assert result["profile_completed"] is True
-        assert "detailed_preferences" in result
-        assert "saved_destinations" in result
-        assert "currency_favorites" in result
-        assert result["detailed_preferences"]["style_preferences"]["colors"] == ["blue", "black"]
+        assert result["profile_picture_url"] == "https://example.com/avatar.jpg"
+        assert result["style_preferences"]["colors"] == ["blue", "black"]
+        assert result["size_info"]["height"] == "5'8\""
+        assert result["travel_patterns"]["frequent_destinations"] == ["Europe"]
 
     @pytest.mark.asyncio
     async def test_save_conversation_message_with_existing_conversation(self):
@@ -547,6 +512,7 @@ class TestDatabaseHelpersComprehensive:
             get_user_profile,
             save_conversation_message,
             save_recommendation_feedback,
+            save_user_profile,
             update_user_preferences,
         )
 
@@ -558,6 +524,9 @@ class TestDatabaseHelpersComprehensive:
             mock_db_helpers.save_conversation_message = AsyncMock(return_value={"success": True})
             mock_db_helpers.update_user_preferences = AsyncMock(return_value=True)
             mock_db_helpers.save_recommendation_feedback = AsyncMock(return_value=True)
+            mock_db_helpers.save_user_profile = AsyncMock(
+                return_value={"id": "test-user", "first_name": "John"}
+            )
 
             # Test get_conversation_history
             result = await get_conversation_history("test-user", "conv-1")
@@ -578,3 +547,90 @@ class TestDatabaseHelpersComprehensive:
             # Test save_recommendation_feedback
             result = await save_recommendation_feedback("test-user", "conv-1", "msg-1", "like")
             assert result is True
+
+            # Test save_user_profile
+            result = await save_user_profile("test-user", {"first_name": "John"})
+            assert result == {"id": "test-user", "first_name": "John"}
+
+    @pytest.mark.asyncio
+    async def test_save_user_profile_success(self):
+        """Test save_user_profile success case"""
+        mock_client = MagicMock()
+        from app.services.database_helpers import DatabaseHelpers
+
+        db = DatabaseHelpers(supabase_client=mock_client)
+
+        # Mock successful view update response
+        mock_response = MagicMock()
+        mock_response.data = [
+            {
+                "id": "test-user",
+                "email": "test@example.com",
+                "first_name": "John",
+                "last_name": "Doe",
+                "profile_completed": True,
+                "profile_picture_url": "https://example.com/avatar.jpg",
+                "style_preferences": {"colors": ["blue", "black"]},
+                "size_info": {"height": "5'8\"", "weight": "150 lbs"},
+            }
+        ]
+
+        # Setup table mock to return view update response
+        mock_table = MagicMock()
+        mock_table.update.return_value.eq.return_value.execute.return_value = mock_response
+        mock_client.table.return_value = mock_table
+
+        profile_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "profile_completed": True,
+            "style_preferences": {"colors": ["blue", "black"]},
+        }
+
+        result = await db.save_user_profile("test-user", profile_data)
+
+        assert result is not None
+        assert result["id"] == "test-user"
+        assert result["first_name"] == "John"
+        assert result["last_name"] == "Doe"
+        assert result["profile_completed"] is True
+        assert result["profile_picture_url"] == "https://example.com/avatar.jpg"
+
+    @pytest.mark.asyncio
+    async def test_save_user_profile_no_data_returned(self):
+        """Test save_user_profile when no data is returned"""
+        mock_client = MagicMock()
+        from app.services.database_helpers import DatabaseHelpers
+
+        db = DatabaseHelpers(supabase_client=mock_client)
+
+        # Mock empty response
+        mock_response = MagicMock()
+        mock_response.data = []
+
+        # Setup table mock to return empty response
+        mock_table = MagicMock()
+        mock_table.update.return_value.eq.return_value.execute.return_value = mock_response
+        mock_client.table.return_value = mock_table
+
+        profile_data = {"first_name": "John", "last_name": "Doe"}
+
+        result = await db.save_user_profile("test-user", profile_data)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_save_user_profile_exception(self):
+        """Test save_user_profile error handling"""
+        mock_client = MagicMock()
+        mock_client.table.side_effect = Exception("Database error")
+
+        from app.services.database_helpers import DatabaseHelpers
+
+        db = DatabaseHelpers(supabase_client=mock_client)
+
+        profile_data = {"first_name": "John", "last_name": "Doe"}
+
+        result = await db.save_user_profile("test-user", profile_data)
+
+        assert result is None

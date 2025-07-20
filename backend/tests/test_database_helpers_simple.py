@@ -13,53 +13,20 @@ class TestDatabaseHelpersSimple:
 
     @pytest.mark.asyncio
     async def test_database_helpers_class_basic(self):
-        """Test DatabaseHelpers class with minimal mocking"""
+        """Test basic DatabaseHelpers class functionality"""
 
-        # Create completely isolated mock
         mock_client = MagicMock()
-
-        # Import the class
         from app.services.database_helpers import DatabaseHelpers
 
-        # Create instance with our mock
         db = DatabaseHelpers(supabase_client=mock_client)
 
-        # Verify it was created correctly
-        assert db.client == mock_client
-
-        # Test get_user_profile with simple mock setup
+        # Test get_user_profile with view-based approach
         mock_response = MagicMock()
-        mock_response.data = [
-            {
-                "id": "test-user",
-                "email": "test@example.com",
-                "created_at": "2023-01-01",
-                "updated_at": "2023-01-01",
-            }
-        ]
+        mock_response.data = [{"id": "test-user", "email": "test@example.com"}]
 
-        # Mock the complete chain
-        mock_client.table.return_value.select.return_value.eq.return_value.execute.return_value = (
-            mock_response
-        )
-
-        # Test multiple table calls for get_user_profile
-        def table_side_effect(table_name):
-            mock_table = MagicMock()
-            if table_name == "users":
-                mock_table.select.return_value.eq.return_value.execute.return_value = mock_response
-            else:
-                empty_response = MagicMock()
-                empty_response.data = []
-                if table_name in ["saved_destinations", "currency_favorites"]:
-                    mock_table.select.return_value.eq.return_value.order.return_value.execute.return_value = empty_response
-                else:
-                    mock_table.select.return_value.eq.return_value.execute.return_value = (
-                        empty_response
-                    )
-            return mock_table
-
-        mock_client.table.side_effect = table_side_effect
+        mock_table = MagicMock()
+        mock_table.select.return_value.eq.return_value.execute.return_value = mock_response
+        mock_client.table.return_value = mock_table
 
         # Test the method
         result = await db.get_user_profile("test-user")
