@@ -17,3 +17,15 @@ ignore = []
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore::function ham\\(\\) is deprecated:DeprecationWarning",
+    "ignore:Support for class-based `config` is deprecated",
+    "ignore:datetime\\.datetime\\.utcnow\\(\\) is deprecated",
+    "ignore::DeprecationWarning:supabase.*",
+    "ignore:The 'timeout' parameter is deprecated.*:DeprecationWarning",
+    "ignore:The 'verify' parameter is deprecated.*:DeprecationWarning"
+]
