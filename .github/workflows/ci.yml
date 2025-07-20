@@ -255,57 +255,13 @@ jobs:
         with:
           path: artifacts/
 
-      # Method 3: Most secure approach with validation
-      - name: Validate and mask secrets
-        run: |
-          # Validate secrets exist
-          if [[ -z "$OPENAI_API_KEY" || -z "$QLOO_API_KEY" ]]; then
-            echo "❌ Required secrets are missing"
-            exit 1
-          fi
-
-          # Mask secrets
-          echo "::add-mask::$OPENAI_API_KEY"
-          echo "::add-mask::$OPENAI_ORG_ID"
-          echo "::add-mask::$QLOO_API_KEY"
-          echo "::add-mask::$OPENWEATHER_API_KEY"
-          echo "::add-mask::$EXCHANGE_API_KEY"
-          echo "::add-mask::$SUPABASE_URL"
-          echo "::add-mask::$SUPABASE_KEY"
-          echo "✅ Secrets validated and masked"
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
-          QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
-          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
-          EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-
-      # Run tests with coverage (produces both XML and JSON)
-      - name: Run tests
-        working-directory: ${{ env.WORKING_DIR }}
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
-          QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
-          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
-          EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: |
-          # Run your existing test command
-          make install-dev
-          pytest -v --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=app tests/ | tee pytest-coverage.txt
-        continue-on-error: true
-
       - name: Pytest coverage comment
         id: coverageComment
         uses: MishaKav/pytest-coverage-comment@main
         with:
-          pytest-coverage-path: ./${{ env.WORKING_DIR }}/pytest-coverage.txt
+          pytest-coverage-path: artifacts/quality-reports/pytest-coverage.txt
           title: Code Coverage Report
-          junitxml-path: ./${{ env.WORKING_DIR }}/pytest.xml
+          junitxml-path: artifacts/quality-reports/pytest-results.xml
           junitxml-title: Code Unit Test Report
 
       - name: Update Readme with Coverage Html

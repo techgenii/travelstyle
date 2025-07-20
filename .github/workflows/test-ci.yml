@@ -5,8 +5,8 @@ on:
   push:
     branches: [ test-ci ]
     paths:
-      - 'backend/**'
       - '.github/workflows/test-ci.yml'
+
 
 env:
   PYTHON_VERSION: '3.13'
