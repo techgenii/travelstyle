@@ -50,6 +50,58 @@ Database Layer (Supabase/PostgreSQL)
     └── Preferences
 ```
 
+## Project Structure
+```plaintext
+travelstyle-ai
+├── backend
+│   ├── app
+│   │   ├── __init__.py
+│   │   ├── api
+│   │   ├── core
+│   │   ├── main.py
+│   │   ├── models
+│   │   ├── services
+│   │   └── utils
+│   ├── env.example
+│   ├── Makefile
+│   ├── pytest.ini
+│   ├── pytest.xml
+│   ├── requirements-test.txt
+│   ├── requirements.txt
+│   └── tests
+│       ├── __init__.py
+│       ├── conftest.py
+│       ├── test_auth_service.py
+│       ├── test_auth.py
+│       ├── test_chat_convs.py
+│       ├── test_chat_feedback.py
+│       ├── test_chat_sessions.py
+│       ├── test_chat.py
+│       ├── test_currency_service.py
+│       ├── test_database_helpers_comprehensive.py
+│       ├── test_database_helpers_simple.py
+│       ├── test_deps.py
+│       ├── test_main.py
+│       ├── test_rate_limiter.py
+│       ├── test_recommendations.py
+│       ├── test_security.py
+│       ├── test_supabase_cache.py
+│       ├── test_user_api.py
+│       ├── test_user_models.py
+│       ├── test_user_session_management.py
+│       ├── test_user_utils.py
+│       └── test_weather_service.py
+├── LICENSE
+├── pyproject.toml
+├── README.md
+└── supabase
+    └── migrations
+        ├── travelstyle_index.sql
+        ├── travelstyle_schema.sql
+        └── travelstyle_triggers.sql
+```
+
+
 ## Getting Started
 
 ### Prerequisites
