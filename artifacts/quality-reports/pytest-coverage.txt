@@ -98,23 +98,23 @@ tests/test_chat.py::test_generate_response_error PASSED                  [ 26%]
 tests/test_chat.py::test_build_system_prompt PASSED                      [ 26%]
 tests/test_chat.py::test_build_context_prompt PASSED                     [ 26%]
 tests/test_chat.py::test_process_response PASSED                         [ 26%]
-tests/test_chat_conversation_management.py::test_get_user_conversations_success PASSED [ 27%]
-tests/test_chat_conversation_management.py::test_get_user_conversations_no_auth PASSED [ 27%]
-tests/test_chat_conversation_management.py::test_get_user_conversations_error PASSED [ 27%]
-tests/test_chat_conversation_management.py::test_delete_conversation_success PASSED [ 28%]
-tests/test_chat_conversation_management.py::test_delete_conversation_no_auth PASSED [ 28%]
-tests/test_chat_conversation_management.py::test_delete_conversation_error PASSED [ 28%]
-tests/test_chat_conversation_management.py::test_archive_conversation_success PASSED [ 28%]
-tests/test_chat_conversation_management.py::test_archive_conversation_no_auth PASSED [ 29%]
-tests/test_chat_conversation_management.py::test_archive_conversation_error PASSED [ 29%]
-tests/test_chat_conversations.py::test_create_session_success PASSED     [ 29%]
-tests/test_chat_conversations.py::test_create_session_no_auth PASSED     [ 30%]
-tests/test_chat_conversations.py::test_create_session_error PASSED       [ 30%]
-tests/test_chat_conversations.py::test_create_session_invalid PASSED     [ 30%]
-tests/test_chat_feedback.py::test_save_feedback_success PASSED           [ 31%]
-tests/test_chat_feedback.py::test_save_feedback_no_auth PASSED           [ 31%]
-tests/test_chat_feedback.py::test_save_feedback_error PASSED             [ 31%]
-tests/test_chat_feedback.py::test_save_feedback_invalid PASSED           [ 31%]
+tests/test_chat_convs.py::test_get_user_conversations_success PASSED     [ 27%]
+tests/test_chat_convs.py::test_get_user_conversations_no_auth PASSED     [ 27%]
+tests/test_chat_convs.py::test_get_user_conversations_error PASSED       [ 27%]
+tests/test_chat_convs.py::test_delete_conversation_success PASSED        [ 28%]
+tests/test_chat_convs.py::test_delete_conversation_no_auth PASSED        [ 28%]
+tests/test_chat_convs.py::test_delete_conversation_error PASSED          [ 28%]
+tests/test_chat_convs.py::test_archive_conversation_success PASSED       [ 28%]
+tests/test_chat_convs.py::test_archive_conversation_no_auth PASSED       [ 29%]
+tests/test_chat_convs.py::test_archive_conversation_error PASSED         [ 29%]
+tests/test_chat_feedback.py::test_save_feedback_success PASSED           [ 29%]
+tests/test_chat_feedback.py::test_save_feedback_no_auth PASSED           [ 30%]
+tests/test_chat_feedback.py::test_save_feedback_error PASSED             [ 30%]
+tests/test_chat_feedback.py::test_save_feedback_invalid PASSED           [ 30%]
+tests/test_chat_sessions.py::test_create_session_success PASSED          [ 31%]
+tests/test_chat_sessions.py::test_create_session_no_auth PASSED          [ 31%]
+tests/test_chat_sessions.py::test_create_session_error PASSED            [ 31%]
+tests/test_chat_sessions.py::test_create_session_invalid PASSED          [ 31%]
 tests/test_currency_service.py::test_get_exchange_rates_json_parse_error PASSED [ 32%]
 tests/test_currency_service.py::test_get_exchange_rates_json_parse_exception PASSED [ 32%]
 tests/test_currency_service.py::test_get_exchange_rates_non_dict_response PASSED [ 32%]
@@ -378,12 +378,12 @@ app/models/__init__.py                 0      0   100%
 app/models/auth.py                    46      0   100%
 app/models/responses.py               23      0   100%
 app/models/travel.py                 113      0   100%
-app/models/user.py                    95      0   100%
+app/models/user.py                    96      0   100%
 app/services/__init__.py               0      0   100%
 app/services/auth_service.py         145      3    98%
 app/services/currency_service.py      69      0   100%
 app/services/database_helpers.py     138      0   100%
-app/services/openai_service.py        55      1    98%
+app/services/openai_service.py        67      3    96%
 app/services/orchestrator.py          73      2    97%
 app/services/qloo_service.py          55      3    95%
 app/services/supabase_cache.py        76      4    95%
@@ -391,9 +391,9 @@ app/services/weather_service.py      139      0   100%
 app/utils/__init__.py                  0      0   100%
 app/utils/error_handlers.py            9      1    89%
 app/utils/rate_limiter.py             51      0   100%
-app/utils/user_utils.py               12      0   100%
+app/utils/user_utils.py               18      0   100%
 ------------------------------------------------------
-TOTAL                               1575     31    98%
+TOTAL                               1594     33    98%
 Coverage XML written to file reports/pytest-coverage.xml
 Coverage JSON written to file reports/pytest-coverage.json
-======================= 338 passed, 2 warnings in 20.58s =======================
+======================= 338 passed, 2 warnings in 20.92s =======================

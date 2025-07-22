@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="ruff" tests="1" failures="0" errors="0">
-    <testsuite name="ruff" tests="1" disabled="0" errors="0" failures="0" package="org.ruff">
-        <testcase name="No errors found" classname="ruff">
+<testsuites name="ruff" tests="3" failures="3" errors="0">
+    <testsuite name="/home/runner/work/travelstyle/travelstyle/backend/app/services/openai_service.py" tests="3" disabled="0" errors="0" failures="3" package="org.ruff">
+        <testcase name="org.ruff.E501" classname="/home/runner/work/travelstyle/travelstyle/backend/app/services/openai_service" line="39" column="101">
+            <failure message="Line too long (101 &gt; 100)">line 39, col 101, Line too long (101 &gt; 100)</failure>
+        </testcase>
+        <testcase name="org.ruff.E501" classname="/home/runner/work/travelstyle/travelstyle/backend/app/services/openai_service" line="79" column="101">
+            <failure message="Line too long (115 &gt; 100)">line 79, col 101, Line too long (115 &gt; 100)</failure>
+        </testcase>
+        <testcase name="org.ruff.E501" classname="/home/runner/work/travelstyle/travelstyle/backend/app/services/openai_service" line="117" column="101">
+            <failure message="Line too long (127 &gt; 100)">line 117, col 101, Line too long (127 &gt; 100)</failure>
         </testcase>
     </testsuite>
 </testsuites>
