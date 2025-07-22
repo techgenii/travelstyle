@@ -1,3 +1,4 @@
+from collections import namedtuple
 from types import SimpleNamespace
 
 from app.utils.user_utils import extract_user_profile
@@ -24,10 +25,26 @@ class DummyUser:
 
 
 def test_extract_user_profile_with_dict_metadata():
+    DummyUser = namedtuple(
+        "DummyUser",
+        [
+            "id",
+            "email",
+            "user_metadata",
+            "created_at",
+            "updated_at",
+            "email_confirmed_at",
+            "last_sign_in_at",
+        ],
+    )
     user = DummyUser(
         id="u1",
         email="test@example.com",
-        user_metadata={"first_name": "Alice", "last_name": "Smith"},
+        user_metadata={
+            "first_name": "Alice",
+            "last_name": "Smith",
+            "selected_style_names": ["Bohemian", "Minimalist"],
+        },
         created_at="2023-01-01T00:00:00Z",
         updated_at="2023-01-02T00:00:00Z",
         email_confirmed_at="2023-01-01T01:00:00Z",
@@ -43,6 +60,7 @@ def test_extract_user_profile_with_dict_metadata():
     assert profile["updated_at"] == "2023-01-02T00:00:00Z"
     assert profile["email_confirmed_at"] == "2023-01-01T01:00:00Z"
     assert profile["last_sign_in_at"] == "2023-01-03T00:00:00Z"
+    assert profile["selected_style_names"] == ["Bohemian", "Minimalist"]
 
 
 def test_extract_user_profile_with_object_metadata():

@@ -46,7 +46,7 @@ class QlooService:
                 response = await client.post(
                     f"{self.base_url}/cultural-insights",
                     headers={
-                        "Authorization": f"Bearer {self.api_key}",
+                        "X-Api-Key": "{self.api_key}",
                         "Content-Type": "application/json",
                     },
                     json={"location": destination, "context": context, "categories": categories},
@@ -110,7 +110,7 @@ class QlooService:
                 response = await client.post(
                     f"{self.base_url}/style-recommendations",
                     headers={
-                        "Authorization": f"Bearer {self.api_key}",
+                        "X-Api-Key": "{self.api_key}",
                         "Content-Type": "application/json",
                     },
                     json=payload,

@@ -118,28 +118,27 @@ async def test_set_weather_cache_error(cache_service, mock_supabase_client):
 
 @pytest.mark.asyncio
 async def test_get_cultural_cache_success(cache_service, mock_supabase_client):
-    mock_table = Mock()
-    mock_select = Mock()
-    mock_eq1 = Mock()
-    mock_eq2 = Mock()
-    mock_eq3 = Mock()
-    mock_single = Mock()
+    mock_execute = Mock()
+    mock_execute.data = {
+        "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+        "data": {
+            "customs": "formal",
+            "dress_code": "business",
+            "_context": "business",
+        },
+    }
 
-    mock_supabase_client.table.return_value = mock_table
-    mock_table.select.return_value = mock_select
-    mock_select.eq.return_value = mock_eq1
-    mock_eq1.eq.return_value = mock_eq2
-    mock_eq2.eq.return_value = mock_eq3
-    mock_eq3.single.return_value = mock_single
-    mock_single.execute.return_value = Mock(
-        data={
-            "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
-            "data": {"customs": "formal", "dress_code": "business"},
-        }
-    )
+    # Chain mocks for: .table().select().eq().eq().eq().single().execute()
+    mock_table = mock_supabase_client.table.return_value
+    mock_select = mock_table.select.return_value
+    mock_eq1 = mock_select.eq.return_value
+    mock_eq2 = mock_eq1.eq.return_value
+    mock_eq3 = mock_eq2.eq.return_value
+    mock_single = mock_eq3.single.return_value
+    mock_single.execute.return_value = mock_execute
 
     result = await cache_service.get_cultural_cache("Tokyo", "business")
-    assert result == {"customs": "formal", "dress_code": "business"}
+    assert result == {"customs": "formal", "dress_code": "business", "_context": "business"}
 
 
 @pytest.mark.asyncio

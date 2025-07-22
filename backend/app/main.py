@@ -60,7 +60,7 @@ app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["aut
 app.include_router(chat.router, prefix=f"{settings.API_V1_STR}/chat", tags=["chat"])
 app.include_router(
     recommendations.router,
-    prefix=f"{settings.API_V1_STR}/recommendations",
+    prefix=f"{settings.API_V1_STR}/recs",
     tags=["recommendations"],
 )
 app.include_router(user.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])

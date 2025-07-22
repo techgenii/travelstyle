@@ -29,26 +29,43 @@ class UserStatus(str, Enum):
 
 # Pydantic models
 class UserProfileBase(BaseModel):
-    first_name: str | None = None
-    last_name: str | None = None
-    profile_completed: bool | None = None
-    style_preferences: dict[str, Any] | None = None
-    size_info: dict[str, Any] | None = None
-    travel_patterns: dict[str, Any] | None = None
-    quick_reply_preferences: dict[str, Any] | None = None
-    packing_methods: dict[str, Any] | None = None
-    currency_preferences: dict[str, Any] | None = None
+    first_name: str | None = Field(None, description="User's first name")
+    last_name: str | None = Field(None, description="User's last name")
+    profile_completed: bool | None = Field(
+        None, description="Whether the user's profile is complete"
+    )
+    style_preferences: dict[str, Any] | None = Field(
+        None, description="User's style preferences (e.g., colors, brands, etc.)"
+    )
+    size_info: dict[str, Any] | None = Field(
+        None, description="User's size information (e.g., height, weight, measurements)"
+    )
+    travel_patterns: dict[str, Any] | None = Field(
+        None, description="User's travel patterns (e.g., frequent destinations)"
+    )
+    quick_reply_preferences: dict[str, Any] | None = Field(
+        None, description="User's quick reply preferences for chat"
+    )
+    packing_methods: dict[str, Any] | None = Field(
+        None, description="User's preferred packing methods"
+    )
+    currency_preferences: dict[str, Any] | None = Field(
+        None, description="User's currency preferences"
+    )
+    selected_style_names: list[str] | None = Field(
+        None, description="List of selected style names for the user"
+    )
 
 
 class UserProfileResponse(UserProfileBase):
     """User profile response matching user_profile_view structure"""
 
-    id: str
-    email: str
-    profile_picture_url: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
-    last_login: str | None = None
+    id: str = Field(..., description="User's unique identifier")
+    email: str = Field(..., description="User's email address")
+    profile_picture_url: str | None = Field(None, description="URL to the user's profile picture")
+    created_at: str | None = Field(None, description="Timestamp when the user was created")
+    updated_at: str | None = Field(None, description="Timestamp when the user was last updated")
+    last_login: str | None = Field(None, description="Timestamp of the user's last login")
 
 
 class UserProfile(BaseModel):

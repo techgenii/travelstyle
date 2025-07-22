@@ -41,9 +41,7 @@ class TestRecommendationsEndpoints:
                 "style_norms": ["Conservative", "Professional"],
                 "formality_level": "moderate",
             }
-            response = authenticated_client.get(
-                "/api/v1/recommendations/cultural/Paris?context=business"
-            )
+            response = authenticated_client.get("/api/v1/recs/cultural/Paris?context=business")
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
             assert "dress_codes" in data
@@ -56,7 +54,7 @@ class TestRecommendationsEndpoints:
             "app.services.qloo_service.qloo_service.get_cultural_insights"
         ) as mock_get_insights:
             mock_get_insights.return_value = None
-            response = authenticated_client.get("/api/v1/recommendations/cultural/UnknownCity")
+            response = authenticated_client.get("/api/v1/recs/cultural/UnknownCity")
             assert response.status_code == status.HTTP_404_NOT_FOUND
             assert "Cultural insights not available" in response.json()["detail"]
 
@@ -66,7 +64,7 @@ class TestRecommendationsEndpoints:
             "app.services.qloo_service.qloo_service.get_cultural_insights"
         ) as mock_get_insights:
             mock_get_insights.side_effect = Exception("Service error")
-            response = authenticated_client.get("/api/v1/recommendations/cultural/Paris")
+            response = authenticated_client.get("/api/v1/recs/cultural/Paris")
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
             assert "Failed to retrieve cultural insights" in response.json()["detail"]
 
@@ -85,7 +83,7 @@ class TestRecommendationsEndpoints:
                 "clothing_recommendations": ["Light jacket", "Comfortable shoes"],
             }
             response = authenticated_client.post(
-                "/api/v1/recommendations/weather",
+                "/api/v1/recs/weather",
                 json={"destination": "Paris", "dates": ["2024-06-01", "2024-06-02"]},
             )
             assert response.status_code == status.HTTP_200_OK
@@ -101,7 +99,7 @@ class TestRecommendationsEndpoints:
         ) as mock_get_weather:
             mock_get_weather.return_value = None
             response = authenticated_client.post(
-                "/api/v1/recommendations/weather",
+                "/api/v1/recs/weather",
                 json={"destination": "UnknownCity"},
             )
             assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -114,7 +112,7 @@ class TestRecommendationsEndpoints:
         ) as mock_get_weather:
             mock_get_weather.side_effect = Exception("Service error")
             response = authenticated_client.post(
-                "/api/v1/recommendations/weather",
+                "/api/v1/recs/weather",
                 json={"destination": "Paris"},
             )
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -130,7 +128,7 @@ class TestRecommendationsEndpoints:
                 "rates": {"EUR": 0.85, "GBP": 0.73, "JPY": 110.50},
                 "last_updated": "2024-01-01T12:00:00Z",
             }
-            response = authenticated_client.get("/api/v1/recommendations/currency/USD")
+            response = authenticated_client.get("/api/v1/recs/currency/USD")
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
             assert "base_currency" in data
@@ -143,7 +141,7 @@ class TestRecommendationsEndpoints:
             "app.services.currency_service.currency_service.get_exchange_rates"
         ) as mock_get_rates:
             mock_get_rates.return_value = None
-            response = authenticated_client.get("/api/v1/recommendations/currency/INVALID")
+            response = authenticated_client.get("/api/v1/recs/currency/INVALID")
             assert response.status_code == status.HTTP_404_NOT_FOUND
             assert "Exchange rates not available" in response.json()["detail"]
 
@@ -153,7 +151,7 @@ class TestRecommendationsEndpoints:
             "app.services.currency_service.currency_service.get_exchange_rates"
         ) as mock_get_rates:
             mock_get_rates.side_effect = Exception("Service error")
-            response = authenticated_client.get("/api/v1/recommendations/currency/USD")
+            response = authenticated_client.get("/api/v1/recs/currency/USD")
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
             assert "Failed to retrieve exchange rates" in response.json()["detail"]
 
@@ -171,7 +169,7 @@ class TestRecommendationsEndpoints:
                 "last_updated": "2024-01-01T12:00:00Z",
             }
             response = authenticated_client.post(
-                "/api/v1/recommendations/currency/convert",
+                "/api/v1/recs/currency/convert",
                 json={"amount": 100.0, "from_currency": "USD", "to_currency": "EUR"},
             )
             assert response.status_code == status.HTTP_200_OK
@@ -188,7 +186,7 @@ class TestRecommendationsEndpoints:
         ) as mock_convert:
             mock_convert.return_value = None
             response = authenticated_client.post(
-                "/api/v1/recommendations/currency/convert",
+                "/api/v1/recs/currency/convert",
                 json={"amount": 100.0, "from_currency": "INVALID", "to_currency": "EUR"},
             )
             assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -201,7 +199,7 @@ class TestRecommendationsEndpoints:
         ) as mock_convert:
             mock_convert.side_effect = Exception("Service error")
             response = authenticated_client.post(
-                "/api/v1/recommendations/currency/convert",
+                "/api/v1/recs/currency/convert",
                 json={"amount": 100.0, "from_currency": "USD", "to_currency": "EUR"},
             )
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -210,19 +208,19 @@ class TestRecommendationsEndpoints:
     def test_recommendations_no_auth(self, client):
         """Test recommendations endpoints without authentication."""
         # Test cultural insights
-        response = client.get("/api/v1/recommendations/cultural/Paris")
+        response = client.get("/api/v1/recs/cultural/Paris")
         assert response.status_code == status.HTTP_403_FORBIDDEN
         # Test weather forecast
         response = client.post(
-            "/api/v1/recommendations/weather",
+            "/api/v1/recs/weather",
             json={"destination": "Paris"},
         )
         assert response.status_code == status.HTTP_403_FORBIDDEN
         # Test exchange rates
-        response = client.get("/api/v1/recommendations/currency/USD")
+        response = client.get("/api/v1/recs/currency/USD")
         assert response.status_code == status.HTTP_403_FORBIDDEN
         # Test currency conversion
-        response = client.post("/api/v1/recommendations/currency/convert")
+        response = client.post("/api/v1/recs/currency/convert")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
@@ -329,7 +327,7 @@ async def test_get_pair_exchange_rate_endpoint_success(authenticated_client):
             "last_updated": "2024-01-01T12:00:00Z",
         }
         response = authenticated_client.post(
-            "/api/v1/recommendations/currency/pair",
+            "/api/v1/recs/currency/pair",
             json={"base_currency": "USD", "target_currency": "EUR"},
         )
         assert response.status_code == status.HTTP_200_OK
@@ -347,7 +345,7 @@ async def test_get_pair_exchange_rate_endpoint_not_found(authenticated_client):
     ) as mock_get_pair:
         mock_get_pair.return_value = None
         response = authenticated_client.post(
-            "/api/v1/recommendations/currency/pair",
+            "/api/v1/recs/currency/pair",
             json={"base_currency": "USD", "target_currency": "INVALID"},
         )
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -365,7 +363,7 @@ async def test_get_pair_exchange_rate_endpoint_service_exception(authenticated_c
     ) as mock_get_pair:
         mock_get_pair.side_effect = Exception("Service error")
         response = authenticated_client.post(
-            "/api/v1/recommendations/currency/pair",
+            "/api/v1/recs/currency/pair",
             json={"base_currency": "USD", "target_currency": "EUR"},
         )
         assert response.status_code == 500

@@ -57,9 +57,7 @@ class TestChatEndpoints:
 
     def test_get_conversation_history_success(self, authenticated_client):
         """Test successful conversation history retrieval."""
-        response = authenticated_client.get(
-            "/api/v1/chat/conversations/test-conversation-123/history"
-        )
+        response = authenticated_client.get("/api/v1/chat/dialog/test-conversation-123/history")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "conversation_id" in data
@@ -68,7 +66,7 @@ class TestChatEndpoints:
 
     def test_get_conversation_history_no_auth(self, client):
         """Test conversation history without authentication."""
-        response = client.get("/api/v1/chat/conversations/test-conversation-123/history")
+        response = client.get("/api/v1/chat/dialog/test-conversation-123/history")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_get_conversation_history_error(self, authenticated_client):
@@ -77,11 +75,9 @@ class TestChatEndpoints:
             # Mock the function to raise an exception
             mock_get_history.side_effect = Exception("Database connection failed")
 
-            response = authenticated_client.get(
-                "/api/v1/chat/conversations/test-conversation-123/history"
-            )
+            response = authenticated_client.get("/api/v1/chat/dialog/test-conversation-123/history")
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-            assert "Failed to retrieve conversation" in response.json()["detail"]
+            assert "Failed to retrieve dialog" in response.json()["detail"]
 
     def test_chat_endpoint_database_error(self, authenticated_client, mock_chat_request):
         """Test chat request when database operations fail."""
@@ -159,9 +155,9 @@ def test_build_context_prompt():
         weather_context={"weather": "test"},
         user_profile={"user": "test"},
     )
-    assert "Cultural insights" in context
-    assert "Weather conditions" in context
-    assert "User preferences" in context
+    assert "Cultural Insights" in context
+    assert "Weather Summary" in context
+    assert "User Preferences" in context
 
 
 def test_process_response():

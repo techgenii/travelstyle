@@ -132,7 +132,11 @@ class TestDatabaseHelpersSimple:
         """Test standalone functions by patching them directly"""
 
         # Create our own mock values
-        test_profile = {"id": "test-user", "email": "test@example.com"}
+        test_profile = {
+            "id": "test-user",
+            "email": "test@example.com",
+            "selected_style_names": ["Bohemian", "Minimalist"],
+        }
         test_prefs_result = True
         test_feedback_result = True
 
@@ -172,6 +176,7 @@ class TestDatabaseHelpersSimple:
             # Test the functions
             profile = await get_user_profile("test-user")
             assert profile == test_profile
+            assert profile["selected_style_names"] == ["Bohemian", "Minimalist"]
 
             prefs = await update_user_preferences("test-user", {"style": "casual"})
             assert prefs == test_prefs_result

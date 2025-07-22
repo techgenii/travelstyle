@@ -46,6 +46,7 @@ async def update_current_user_profile(
 ):
     """
     Update the current user's profile using the user_profile_view.
+    Supports updating selected_style_names (list of style names).
     """
     user_id = current_user["id"]
     update_data = profile_update.model_dump(exclude_unset=True)

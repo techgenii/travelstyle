@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str = ""
 
     # API URLs
-    QLOO_BASE_URL: str = "https://api.qloo.com/v1"
+    QLOO_BASE_URL: str = "https://hackathon.api.qloo.com/v2/"
     OPENWEATHER_BASE_URL: str = "https://api.openweathermap.org/"
     EXCHANGE_BASE_URL: str = "https://v6.exchangerate-api.com/v6/"
 

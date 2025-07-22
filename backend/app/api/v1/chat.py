@@ -70,7 +70,7 @@ async def chat(
         raise HTTPException(status_code=500, detail="Failed to process chat request") from e
 
 
-@router.get("/conversations/{conversation_id}/history")
+@router.get("/dialog/{conversation_id}/history")
 async def get_conversation(conversation_id: str, current_user: dict = current_user_dependency):
     """Get conversation history"""
 
@@ -83,10 +83,10 @@ async def get_conversation(conversation_id: str, current_user: dict = current_us
 
     except Exception as e:
         logger.error("Get conversation error: %s", type(e).__name__)
-        raise HTTPException(status_code=500, detail="Failed to retrieve conversation") from e
+        raise HTTPException(status_code=500, detail="Failed to retrieve dialog") from e
 
 
-@router.get("/conversations")
+@router.get("/dialog")
 async def get_user_conversations_endpoint(current_user: dict = current_user_dependency):
     """Get all user conversations"""
     try:
@@ -97,7 +97,7 @@ async def get_user_conversations_endpoint(current_user: dict = current_user_depe
         raise HTTPException(status_code=500, detail="Failed to retrieve conversations") from e
 
 
-@router.delete("/conversations/{conversation_id}")
+@router.delete("/dialog/{conversation_id}")
 async def delete_conversation_endpoint(
     conversation_id: str, current_user: dict = current_user_dependency
 ):
@@ -113,7 +113,7 @@ async def delete_conversation_endpoint(
         raise HTTPException(status_code=500, detail="Failed to delete conversation") from e
 
 
-@router.put("/conversations/{conversation_id}/archive")
+@router.put("/dialog/{conversation_id}/archive")
 async def archive_conversation_endpoint(
     conversation_id: str, current_user: dict = current_user_dependency
 ):

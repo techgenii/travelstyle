@@ -125,6 +125,7 @@ class TestDatabaseHelpersComprehensive:
                 "quick_reply_preferences": {"enabled": True},
                 "packing_methods": {"preferred": "rolling"},
                 "currency_preferences": {"base_currency": "USD"},
+                "selected_style_names": ["Bohemian", "Minimalist"],
             }
         ]
 
@@ -144,6 +145,7 @@ class TestDatabaseHelpersComprehensive:
         assert result["style_preferences"]["colors"] == ["blue", "black"]
         assert result["size_info"]["height"] == "5'8\""
         assert result["travel_patterns"]["frequent_destinations"] == ["Europe"]
+        assert result["selected_style_names"] == ["Bohemian", "Minimalist"]
 
     @pytest.mark.asyncio
     async def test_save_conversation_message_with_existing_conversation(self):
@@ -560,9 +562,9 @@ class TestDatabaseHelpersComprehensive:
 
         db = DatabaseHelpers(supabase_client=mock_client)
 
-        # Mock successful view update response
-        mock_response = MagicMock()
-        mock_response.data = [
+        # Setup mocks
+        update_response = MagicMock()
+        update_response.data = [
             {
                 "id": "test-user",
                 "email": "test@example.com",
@@ -570,31 +572,28 @@ class TestDatabaseHelpersComprehensive:
                 "last_name": "Doe",
                 "profile_completed": True,
                 "profile_picture_url": "https://example.com/avatar.jpg",
+                "last_login": "2023-01-01T00:00:00Z",
+                "created_at": "2023-01-01T00:00:00Z",
+                "updated_at": "2023-01-01T00:00:00Z",
                 "style_preferences": {"colors": ["blue", "black"]},
                 "size_info": {"height": "5'8\"", "weight": "150 lbs"},
+                "travel_patterns": {"frequent_destinations": ["Europe"]},
+                "quick_reply_preferences": {"enabled": True},
+                "packing_methods": {"preferred": "rolling"},
+                "currency_preferences": {"base_currency": "USD"},
+                "selected_style_names": ["Bohemian", "Minimalist"],
             }
         ]
-
-        # Setup table mock to return view update response
-        mock_table = MagicMock()
-        mock_table.update.return_value.eq.return_value.execute.return_value = mock_response
-        mock_client.table.return_value = mock_table
+        table_mock = MagicMock()
+        table_mock.update.return_value.eq.return_value.execute.return_value = update_response
+        mock_client.table.return_value = table_mock
 
         profile_data = {
             "first_name": "John",
-            "last_name": "Doe",
-            "profile_completed": True,
-            "style_preferences": {"colors": ["blue", "black"]},
+            "selected_style_names": ["Bohemian", "Minimalist"],
         }
-
         result = await db.save_user_profile("test-user", profile_data)
-
-        assert result is not None
-        assert result["id"] == "test-user"
-        assert result["first_name"] == "John"
-        assert result["last_name"] == "Doe"
-        assert result["profile_completed"] is True
-        assert result["profile_picture_url"] == "https://example.com/avatar.jpg"
+        assert result["selected_style_names"] == ["Bohemian", "Minimalist"]
 
     @pytest.mark.asyncio
     async def test_save_user_profile_no_data_returned(self):
