@@ -24,7 +24,7 @@ class OpenAIService:
         self.client = AsyncOpenAI(
             api_key=settings.OPENAI_API_KEY, organization=settings.OPENAI_ORG_ID
         )
-        self.model = "gpt-4"
+        self.model = "gpt-4o-mini"
         self.temperature = 0.7
         self.max_tokens = 1000
 

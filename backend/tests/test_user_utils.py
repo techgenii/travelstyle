@@ -1,7 +1,10 @@
+import asyncio
 from collections import namedtuple
 from types import SimpleNamespace
 
+from app.utils.error_handlers import custom_http_exception_handler
 from app.utils.user_utils import extract_user_profile
+from fastapi.responses import JSONResponse
 
 
 class DummyUser:
@@ -113,3 +116,17 @@ def test_extract_user_profile_with_missing_attributes():
 
 def test_extract_user_profile_with_none_user():
     assert extract_user_profile(None) is None
+
+
+class DummyRequest:
+    url = "http://testserver/test"
+
+
+def test_custom_http_exception_handler_non_http_exception():
+    request = DummyRequest()
+    exc = ValueError("Some error")
+    response = asyncio.run(custom_http_exception_handler(request, exc))
+    assert isinstance(response, JSONResponse)
+    assert response.status_code == 500
+    assert response.body is not None
+    assert b"Internal server error" in response.body

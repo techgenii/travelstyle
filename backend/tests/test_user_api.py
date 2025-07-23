@@ -50,6 +50,16 @@ class TestUserEndpoints:
         response = authenticated_client.get("/api/v1/users/me")
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
+    @patch("app.api.v1.user.get_user_profile")
+    def test_get_current_user_profile_generic_exception(
+        self, mock_get_profile, authenticated_client
+    ):
+        """Test get_current_user_profile when a generic exception is raised."""
+        mock_get_profile.side_effect = Exception("Unexpected error")
+        response = authenticated_client.get("/api/v1/users/me")
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to retrieve user profile"
+
     def test_get_user_preferences_success(self, authenticated_client):
         """Test successful user preferences retrieval."""
         response = authenticated_client.get("/api/v1/users/preferences")
@@ -67,6 +77,17 @@ class TestUserEndpoints:
         # The exception handling is there for future extensibility when the function
         # might do more complex operations that could fail
         assert True  # Skip this test for now
+
+    def test_get_user_preferences_generic_exception(self, monkeypatch, authenticated_client):
+        """Test get_current_user_preferences when a generic exception is raised."""
+
+        def raise_exc(*args, **kwargs):
+            raise Exception("Unexpected error")
+
+        monkeypatch.setattr("app.api.v1.user.get_preferences_data", raise_exc)
+        response = authenticated_client.get("/api/v1/users/preferences")
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to retrieve user preferences"
 
     @patch("app.api.v1.user.update_user_preferences")
     def test_update_user_preferences_success(self, mock_update_preferences, authenticated_client):
@@ -92,6 +113,19 @@ class TestUserEndpoints:
         assert "user_id" in data
         assert data["message"] == "Preferences updated successfully"
         assert data["user_id"] == "test-user-123"
+
+    @patch("app.api.v1.user.update_user_preferences")
+    def test_update_user_preferences_endpoint_generic_exception(
+        self, mock_update_prefs, authenticated_client
+    ):
+        """Test update_user_preferences_endpoint when a generic exception is raised."""
+        mock_update_prefs.side_effect = Exception("Unexpected error")
+        response = authenticated_client.put(
+            "/api/v1/users/preferences",
+            json={"style_preferences": {"preferred_colors": ["blue"]}},
+        )
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to update user preferences"
 
     @patch("app.api.v1.user.update_user_preferences")
     def test_update_user_preferences_error(self, mock_update_preferences, authenticated_client):
@@ -144,6 +178,17 @@ class TestUserEndpoints:
         """Test destination saving without authentication."""
         response = client.post("/api/v1/users/destinations/save", json={})
         assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @patch("app.api.v1.user.db_helpers.save_destination")
+    def test_save_destination_endpoint_generic_exception(self, mock_save, authenticated_client):
+        """Test save_destination_endpoint when a generic exception is raised."""
+        mock_save.side_effect = Exception("Unexpected error")
+        response = authenticated_client.post(
+            "/api/v1/users/destinations/save",
+            json={"destination_name": "Paris", "destination_data": {"country": "France"}},
+        )
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to save destination"
 
     @patch("app.api.v1.user.db_helpers.save_destination")
     def test_save_destination_error(self, mock_save, authenticated_client):

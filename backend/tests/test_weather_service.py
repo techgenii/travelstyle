@@ -47,13 +47,35 @@ async def test_get_weather_data_cache_miss_success(weather_service):
             "_get_current_weather",
             new=AsyncMock(
                 return_value={
-                    "temperature": 15,
-                    "feels_like": 14,
-                    "humidity": 60,
-                    "description": "clear sky",
-                    "wind_speed": 5,
-                    "visibility": 10,
-                    "pressure": 1012,
+                    "coord": {"lon": 2.3522, "lat": 48.8566},
+                    "weather": [
+                        {"id": 800, "main": "Clear", "description": "clear sky", "icon": "01d"}
+                    ],
+                    "base": "stations",
+                    "main": {
+                        "temp": 15,
+                        "feels_like": 14,
+                        "temp_min": 12,
+                        "temp_max": 18,
+                        "pressure": 1012,
+                        "humidity": 60,
+                        "sea_level": 1012,
+                        "grnd_level": 1000,
+                    },
+                    "visibility": 10000,
+                    "wind": {"speed": 5, "deg": 180},
+                    "clouds": {"all": 20},
+                    "dt": 1753246845,
+                    "sys": {
+                        "type": 2,
+                        "id": 2027281,
+                        "country": "FR",
+                        "sunrise": 1753189040,
+                        "sunset": 1753239672,
+                    },
+                    "timezone": 3600,
+                    "id": 2988507,
+                    "name": "Paris",
                 }
             ),
         ),
@@ -73,9 +95,8 @@ async def test_get_weather_data_cache_miss_success(weather_service):
         ) as mock_set_cache,
     ):
         result = await weather_service.get_weather_data("Paris")
-        assert result["current"]["temperature"] == 15
+        assert result["current"]["main"]["temp"] == 15
         assert result["destination"] == "Paris"
-        assert "clothing_recommendations" in result
         mock_set_cache.assert_awaited_once()
 
 
@@ -96,19 +117,42 @@ async def test_get_weather_data_api_error(weather_service):
 async def test__get_current_weather_success(weather_service):
     mock_response = MagicMock()
     mock_response.json.return_value = {
-        "main": {"temp": 20, "feels_like": 19, "humidity": 50, "pressure": 1000},
-        "weather": [{"description": "light rain"}],
-        "wind": {"speed": 7},
+        "coord": {"lon": -0.1278, "lat": 51.5074},
+        "weather": [{"id": 500, "main": "Rain", "description": "light rain", "icon": "10d"}],
+        "base": "stations",
+        "main": {
+            "temp": 20,
+            "feels_like": 19,
+            "temp_min": 18,
+            "temp_max": 22,
+            "pressure": 1000,
+            "humidity": 50,
+            "sea_level": 1000,
+            "grnd_level": 990,
+        },
         "visibility": 5000,
+        "wind": {"speed": 7, "deg": 180},
+        "clouds": {"all": 75},
+        "dt": 1753246845,
+        "sys": {
+            "type": 2,
+            "id": 2027281,
+            "country": "GB",
+            "sunrise": 1753189040,
+            "sunset": 1753239672,
+        },
+        "timezone": 0,
+        "id": 2643743,
+        "name": "London",
     }
     mock_response.raise_for_status = MagicMock()
     with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=mock_response)):
         result = await weather_service._get_current_weather(51.5074, -0.1278)  # London lat/lon
-        assert result["temperature"] == 20
-        assert result["description"] == "light rain"
-        assert result["wind_speed"] == 7
-        assert result["visibility"] == 5
-        assert result["pressure"] == 1000
+        assert result["main"]["temp"] == 20
+        assert result["weather"][0]["description"] == "light rain"
+        assert result["wind"]["speed"] == 7
+        assert result["visibility"] == 5000
+        assert result["main"]["pressure"] == 1000
 
 
 @pytest.mark.asyncio
@@ -160,8 +204,57 @@ async def test__get_forecast_success_with_data(weather_service):
             return_value=MockAsyncResponse(
                 {
                     "list": [
-                        {"dt": day1, "main": {"temp": 15}, "weather": [{"main": "Clear"}]},
-                        {"dt": day2, "main": {"temp": 20}, "weather": [{"main": "Sunny"}]},
+                        {
+                            "dt": day1,
+                            "main": {
+                                "temp": 15,
+                                "feels_like": 14,
+                                "temp_min": 12,
+                                "temp_max": 18,
+                                "pressure": 1012,
+                                "humidity": 60,
+                                "sea_level": 1012,
+                                "grnd_level": 1000,
+                                "temp_kf": 0,
+                            },
+                            "weather": [
+                                {
+                                    "id": 800,
+                                    "main": "Clear",
+                                    "description": "clear sky",
+                                    "icon": "01d",
+                                }
+                            ],
+                            "clouds": {"all": 20},
+                            "wind": {"speed": 5, "deg": 180, "gust": 0},
+                            "visibility": 10000,
+                            "pop": 0,
+                            "sys": {"pod": "d"},
+                            "dt_txt": "2025-07-23 12:00:00",
+                        },
+                        {
+                            "dt": day2,
+                            "main": {
+                                "temp": 20,
+                                "feels_like": 19,
+                                "temp_min": 18,
+                                "temp_max": 22,
+                                "pressure": 1010,
+                                "humidity": 55,
+                                "sea_level": 1010,
+                                "grnd_level": 998,
+                                "temp_kf": 0,
+                            },
+                            "weather": [
+                                {"id": 800, "main": "Clear", "description": "sunny", "icon": "01d"}
+                            ],
+                            "clouds": {"all": 10},
+                            "wind": {"speed": 6, "deg": 190, "gust": 0},
+                            "visibility": 10000,
+                            "pop": 0,
+                            "sys": {"pod": "d"},
+                            "dt_txt": "2025-07-24 12:00:00",
+                        },
                     ]
                 }
             )
@@ -172,6 +265,17 @@ async def test__get_forecast_success_with_data(weather_service):
         assert "daily_forecasts" in result
         assert "temp_range" in result
         assert "precipitation_chance" in result
+        # Check new fields for both days
+        daily = result["daily_forecasts"]
+        assert len(daily) == 2
+        # Day 1
+        assert daily[0]["humidity_min"] == 60
+        assert daily[0]["humidity_max"] == 60
+        assert "clear sky" in daily[0]["weather_descriptions"]
+        # Day 2
+        assert daily[1]["humidity_min"] == 55
+        assert daily[1]["humidity_max"] == 55
+        assert "sunny" in daily[1]["weather_descriptions"]
 
 
 def test__calculate_precipitation_chance():
@@ -180,77 +284,6 @@ def test__calculate_precipitation_chance():
     assert ws._calculate_precipitation_chance(["Rain", "Clear"]) == 50
     assert ws._calculate_precipitation_chance(["Clear", "Clouds"]) == 0
     assert ws._calculate_precipitation_chance([]) == 0
-
-
-def test__generate_clothing_recommendations_temp_ranges():
-    ws = WeatherService()
-    # <0C
-    rec = ws._generate_clothing_recommendations(
-        {"temperature": -5, "description": "clear sky"}, None
-    )
-    assert "Heavy winter coat" in rec["layers"]
-    # 0-10C
-    rec = ws._generate_clothing_recommendations(
-        {"temperature": 5, "description": "clear sky"}, None
-    )
-    assert "Warm jacket" in rec["layers"]
-    # 10-20C
-    rec = ws._generate_clothing_recommendations(
-        {"temperature": 15, "description": "clear sky"}, None
-    )
-    assert "Light jacket or cardigan" in rec["layers"]
-    # 20-30C
-    rec = ws._generate_clothing_recommendations(
-        {"temperature": 25, "description": "clear sky"}, None
-    )
-    assert "Light clothing" in rec["layers"]
-    # >30C
-    rec = ws._generate_clothing_recommendations(
-        {"temperature": 35, "description": "clear sky"}, None
-    )
-    assert "Very light clothing" in rec["layers"]
-
-
-def test__generate_clothing_recommendations_rain():
-    ws = WeatherService()
-    rec = ws._generate_clothing_recommendations(
-        {"temperature": 15, "description": "rain showers"}, None
-    )
-    assert "Rain jacket" in rec["accessories"]
-    assert "Waterproof shoes" in rec["footwear"]
-    assert "Water-resistant fabrics" in rec["materials"]
-
-
-def test__generate_clothing_recommendations_forecast_precip():
-    ws = WeatherService()
-    rec = ws._generate_clothing_recommendations(
-        {"temperature": 15, "description": "clear sky"}, {"precipitation_chance": 80}
-    )
-    assert "Pack rain gear" in rec["accessories"]
-    assert "High chance of rain during trip" in rec["special_considerations"]
-
-
-def test__generate_clothing_recommendations_wind_humidity():
-    ws = WeatherService()
-    rec = ws._generate_clothing_recommendations(
-        {"temperature": 15, "description": "clear sky", "wind_speed": 12, "humidity": 85}, None
-    )
-    assert "Windbreaker" in rec["accessories"]
-    assert "Windy conditions expected" in rec["special_considerations"]
-    assert "Breathable fabrics" in rec["materials"]
-    assert "High humidity - choose breathable clothing" in rec["special_considerations"]
-
-
-def test__generate_clothing_recommendations_no_current():
-    ws = WeatherService()
-    rec = ws._generate_clothing_recommendations(None, None)
-    assert rec == {
-        "layers": [],
-        "footwear": [],
-        "accessories": [],
-        "materials": [],
-        "special_considerations": [],
-    }
 
 
 @pytest.mark.asyncio
@@ -376,17 +409,40 @@ async def test__get_current_weather_missing_visibility(weather_service):
     """Test _get_current_weather when visibility is missing from response."""
     mock_response = MagicMock()
     mock_response.json.return_value = {
-        "main": {"temp": 20, "feels_like": 19, "humidity": 50, "pressure": 1000},
-        "weather": [{"description": "clear sky"}],
-        "wind": {"speed": 5},
+        "coord": {"lon": 2.3522, "lat": 48.8566},
+        "weather": [{"id": 800, "main": "Clear", "description": "clear sky", "icon": "01d"}],
+        "base": "stations",
+        "main": {
+            "temp": 20,
+            "feels_like": 19,
+            "temp_min": 18,
+            "temp_max": 22,
+            "pressure": 1000,
+            "humidity": 50,
+            "sea_level": 1000,
+            "grnd_level": 990,
+        },
         # visibility is missing
+        "wind": {"speed": 5, "deg": 180},
+        "clouds": {"all": 20},
+        "dt": 1753246845,
+        "sys": {
+            "type": 2,
+            "id": 2027281,
+            "country": "FR",
+            "sunrise": 1753189040,
+            "sunset": 1753239672,
+        },
+        "timezone": 3600,
+        "id": 2988507,
+        "name": "Paris",
     }
     mock_response.raise_for_status = MagicMock()
 
     with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=mock_response)):
         result = await weather_service._get_current_weather(48.8566, 2.3522)
         assert result is not None
-        assert result["visibility"] == 0  # Should default to 0 when missing
+        assert result["visibility"] == 10000  # Should default to 10000 when missing
 
 
 @pytest.mark.asyncio
@@ -407,13 +463,35 @@ async def test_get_weather_data_with_state_country(weather_service):
             "_get_current_weather",
             new=AsyncMock(
                 return_value={
-                    "temperature": 20,
-                    "feels_like": 19,
-                    "humidity": 50,
-                    "description": "clear sky",
-                    "wind_speed": 5,
-                    "visibility": 10,
-                    "pressure": 1000,
+                    "coord": {"lon": -74.0060, "lat": 40.7128},
+                    "weather": [
+                        {"id": 800, "main": "Clear", "description": "clear sky", "icon": "01d"}
+                    ],
+                    "base": "stations",
+                    "main": {
+                        "temp": 20,
+                        "feels_like": 19,
+                        "temp_min": 18,
+                        "temp_max": 22,
+                        "pressure": 1000,
+                        "humidity": 50,
+                        "sea_level": 1000,
+                        "grnd_level": 990,
+                    },
+                    "visibility": 10000,
+                    "wind": {"speed": 5, "deg": 180},
+                    "clouds": {"all": 20},
+                    "dt": 1753246845,
+                    "sys": {
+                        "type": 2,
+                        "id": 2027281,
+                        "country": "US",
+                        "sunrise": 1753189040,
+                        "sunset": 1753239672,
+                    },
+                    "timezone": -18000,
+                    "id": 5128581,
+                    "name": "New York",
                 }
             ),
         ),
@@ -433,4 +511,3 @@ async def test_get_weather_data_with_state_country(weather_service):
         result = await weather_service.get_weather_data("New York", state="NY", country="US")
         assert result is not None
         assert result["destination"] == "New York"
-        assert "clothing_recommendations" in result

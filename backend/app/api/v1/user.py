@@ -37,7 +37,10 @@ async def get_current_user_profile(current_user: dict = current_user_dependency)
         raise
     except Exception as e:
         logger.error("Get user profile error: %s", type(e).__name__)
-        raise HTTPException(status_code=500, detail="Failed to retrieve user profile") from e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user profile",
+        ) from e
 
 
 @router.put("/me", response_model=UserProfileResponse)
@@ -58,15 +61,41 @@ async def update_current_user_profile(
     return result
 
 
+def get_preferences_data(user_id=None):
+    # Try to fetch real preferences if user_id is provided
+    if user_id:
+        try:
+            prefs = db_helpers.get_user_preferences(user_id)
+            if prefs:
+                return prefs
+        except Exception as e:
+            logger.error("Error fetching user preferences for user_id %s: %s", user_id, e)
+    # Fallback/default
+    return {
+        "style_preferences": {},
+        "travel_patterns": {},
+        "size_info": {},
+    }
+
+
 @router.get("/preferences")
 async def get_current_user_preferences(current_user: dict = current_user_dependency):
     """Get user preferences"""
     try:
-        # Return the expected keys for the test
-        return {"style_preferences": {}, "travel_patterns": {}, "size_info": {}}
+        prefs = get_preferences_data(current_user["id"])
+        return {
+            "style_preferences": prefs.get("style_preferences", {}),
+            "travel_patterns": prefs.get("travel_patterns", {}),
+            "size_info": prefs.get("size_info", {}),
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Get user preferences error: %s", type(e).__name__)
-        raise HTTPException(status_code=500, detail="Failed to retrieve user preferences") from e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user preferences",
+        ) from e
 
 
 @router.put("/preferences")
@@ -82,14 +111,23 @@ async def update_user_preferences_endpoint(
 
         success = await update_user_preferences(current_user["id"], preferences)
         if success:
-            return {"message": "Preferences updated successfully", "user_id": current_user["id"]}
+            return {
+                "message": "Preferences updated successfully",
+                "user_id": current_user["id"],
+            }
         else:
-            raise HTTPException(status_code=500, detail="Failed to update preferences")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update preferences",
+            )
     except HTTPException:
         raise
     except Exception as e:
         logger.error("Update user preferences error: %s", type(e).__name__)
-        raise HTTPException(status_code=500, detail="Failed to update user preferences") from e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update user preferences",
+        ) from e
 
 
 @router.post("/destinations/save")
@@ -115,4 +153,7 @@ async def save_destination_endpoint(
         raise
     except Exception as e:
         logger.error("Save destination error: %s", type(e).__name__)
-        raise HTTPException(status_code=500, detail="Failed to save destination") from e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save destination",
+        ) from e
