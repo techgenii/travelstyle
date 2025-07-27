@@ -1,3 +1,20 @@
+# This file is part of TravelSytle AI.
+#
+# Copyright (C) 2025  Trailyn Ventures, LLC
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 Tests for chat API endpoints.
 """
@@ -71,7 +88,7 @@ class TestChatEndpoints:
 
     def test_get_conversation_history_error(self, authenticated_client):
         """Test conversation history when database fails."""
-        with patch("app.api.v1.chat.get_conversation_history") as mock_get_history:
+        with patch("app.api.v1.chat.db_helpers.get_conversation_history") as mock_get_history:
             # Mock the function to raise an exception
             mock_get_history.side_effect = Exception("Database connection failed")
 
@@ -81,7 +98,7 @@ class TestChatEndpoints:
 
     def test_chat_endpoint_database_error(self, authenticated_client, mock_chat_request):
         """Test chat request when database operations fail."""
-        with patch("app.api.v1.chat.get_conversation_history") as mock_get_history:
+        with patch("app.api.v1.chat.db_helpers.get_conversation_history") as mock_get_history:
             # Mock database function to raise an exception
             mock_get_history.side_effect = Exception("Database connection failed")
 
@@ -91,7 +108,7 @@ class TestChatEndpoints:
 
     def test_chat_endpoint_user_profile_error(self, authenticated_client, mock_chat_request):
         """Test chat request when user profile retrieval fails."""
-        with patch("app.api.v1.chat.get_user_profile") as mock_get_profile:
+        with patch("app.api.v1.chat.db_helpers.get_user_profile") as mock_get_profile:
             # Mock user profile function to raise an exception
             mock_get_profile.side_effect = Exception("User profile not found")
 

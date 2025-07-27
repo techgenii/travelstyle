@@ -1,3 +1,20 @@
+# This file is part of TravelSytle AI.
+#
+# Copyright (C) 2025  Trailyn Ventures, LLC
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 User management API endpoints for TravelStyle AI application.
 Handles user profiles, preferences, and saved destinations.
@@ -10,12 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_current_user
 from app.models.user import UserProfileBase, UserProfileResponse
-from app.services.database_helpers import (
-    db_helpers,  # For accessing the class instance directly
-    get_user_profile,
-    save_user_profile,
-    update_user_preferences,  # Import the function you're using
-)
+from app.services.database_helpers import db_helpers
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -29,7 +41,7 @@ async def get_current_user_profile(current_user: dict = current_user_dependency)
     """Get current user profile"""
     try:
         # In a real implementation, you'd fetch from Supabase
-        profile = await get_user_profile(current_user["id"])
+        profile = await db_helpers.get_user_profile(current_user["id"])
         if not profile:
             raise HTTPException(status_code=404, detail="User profile not found")
         return profile
@@ -53,7 +65,7 @@ async def update_current_user_profile(
     """
     user_id = current_user["id"]
     update_data = profile_update.model_dump(exclude_unset=True)
-    result = await save_user_profile(user_id, update_data)
+    result = await db_helpers.save_user_profile(user_id, update_data)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found or update failed"
@@ -109,7 +121,7 @@ async def update_user_preferences_endpoint(
         if not preferences:
             raise HTTPException(status_code=400, detail="Preferences data is required")
 
-        success = await update_user_preferences(current_user["id"], preferences)
+        success = await db_helpers.update_user_preferences(current_user["id"], preferences)
         if success:
             return {
                 "message": "Preferences updated successfully",

@@ -1,3 +1,20 @@
+# This file is part of TravelSytle AI.
+#
+# Copyright (C) 2025  Trailyn Ventures, LLC
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """Orchestration service for TravelStyle AI: coordinates external APIs for travel recommendations.
 This service gathers data from multiple APIs and generates comprehensive travel recommendations.
 """
@@ -8,6 +25,7 @@ import re
 from typing import Any
 
 from app.models.responses import ChatResponse, ConversationContext, QuickReply
+from app.services.currency_conversion_service import currency_conversion_service
 from app.services.currency_service import currency_service
 from app.services.openai_service import openai_service
 from app.services.qloo_service import qloo_service
@@ -33,6 +51,28 @@ class TravelOrchestratorService:
         and generates comprehensive travel recommendations.
         """
         try:
+            # Check if this is a currency request first
+            if currency_conversion_service.is_currency_request(user_message):
+                result = await currency_conversion_service.handle_currency_request(user_message)
+
+                if result["type"] == "currency_rate":
+                    quick_replies = [
+                        QuickReply(text="Convert different amount", action="currency_convert"),
+                        QuickReply(text="Other currencies", action="currency_list"),
+                    ]
+
+                    # Add specific quick reply if amount was provided
+                    if result.get("amount", 0) > 0:
+                        quick_replies.insert(
+                            0, QuickReply(text="Show rate only", action="currency_rate_only")
+                        )
+
+                    return ChatResponse(
+                        message=result["message"], confidence_score=0.9, quick_replies=quick_replies
+                    )
+                else:
+                    return ChatResponse(message=result["message"], confidence_score=0.0)
+
             # Parse context for API calls
             trip_context = self._parse_trip_context(user_message, context)
 

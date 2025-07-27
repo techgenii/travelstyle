@@ -1,3 +1,20 @@
+# This file is part of TravelSytle AI.
+#
+# Copyright (C) 2025  Trailyn Ventures, LLC
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 Chat API endpoints for TravelStyle AI application.
 Handles conversation management and AI-powered travel recommendations.
@@ -9,13 +26,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from app.api.deps import get_current_user
 from app.models.responses import ChatRequest, ChatResponse, ConversationContext
-from app.services.database_helpers import (
-    db_helpers,  # For accessing the class instance directly
-    get_conversation_history,
-    get_user_profile,
-    save_conversation_message,
-    save_recommendation_feedback,
-)
+from app.services.database_helpers import db_helpers
 from app.services.orchestrator import orchestrator_service
 from app.utils.rate_limiter import rate_limit
 
@@ -39,12 +50,12 @@ async def chat(
 
     try:
         # Get conversation history
-        conversation_history = await get_conversation_history(
+        conversation_history = await db_helpers.get_conversation_history(
             user_id=current_user["id"], conversation_id=request.conversation_id
         )
 
         # Get user profile
-        user_profile = await get_user_profile(current_user["id"])
+        user_profile = await db_helpers.get_user_profile(current_user["id"])
 
         # Generate response using orchestrator
         response = await orchestrator_service.generate_travel_recommendations(
@@ -56,7 +67,7 @@ async def chat(
 
         # Save conversation in background
         background_tasks.add_task(
-            save_conversation_message,
+            db_helpers.save_conversation_message,
             user_id=current_user["id"],
             conversation_id=request.conversation_id,
             user_message=request.message,
@@ -75,7 +86,7 @@ async def get_conversation(conversation_id: str, current_user: dict = current_us
     """Get conversation history"""
 
     try:
-        history = await get_conversation_history(
+        history = await db_helpers.get_conversation_history(
             user_id=current_user["id"], conversation_id=conversation_id
         )
 
@@ -169,7 +180,7 @@ async def save_feedback_endpoint(feedback_data: dict, current_user: dict = curre
                 status_code=400, detail=f"Missing required fields: {', '.join(missing_fields)}"
             )
 
-        success = await save_recommendation_feedback(
+        success = await db_helpers.save_recommendation_feedback(
             user_id=current_user["id"],
             conversation_id=feedback_data["conversation_id"],
             message_id=feedback_data["message_id"],

@@ -1,3 +1,20 @@
+# This file is part of TravelSytle AI.
+#
+# Copyright (C) 2025  Trailyn Ventures, LLC
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 TravelStyle AI FastAPI main application entrypoint.
 Initializes the FastAPI app, middleware, routers, and error handlers.
@@ -10,14 +27,17 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from mangum import Mangum
 
-from app.api.v1 import auth, chat, recommendations, user
+from app.api.v1 import auth, chat, currency, recommendations, user
 from app.core.config import settings
 from app.utils.error_handlers import custom_http_exception_handler
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+logger.info("Lambda cold start: app.main.py successfully loaded")
 
 
 @asynccontextmanager
@@ -64,6 +84,7 @@ app.include_router(
     tags=["recommendations"],
 )
 app.include_router(user.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
+app.include_router(currency.router, prefix=f"{settings.API_V1_STR}/currency", tags=["currency"])
 
 
 @app.get("/")
@@ -78,11 +99,20 @@ async def health_check():
     return {"status": "healthy", "cache": "supabase"}
 
 
+# Lambda handler for AWS deployment
+def handler(event, context):
+    logger.info(f"Lambda invoked with event: {event}")
+
+    try:
+        # Use Mangum to handle the FastAPI app
+        mangum_handler = Mangum(app)
+        response = mangum_handler(event, context)
+        logger.info(f"Lambda response: {response}")
+        return response
+    except Exception as e:
+        logger.error(f"Lambda handler error: {str(e)}")
+        raise
+
+
 if __name__ == "__main__":
-    uvicorn.run(
-        "app.main:app",
-        host="127.0.0.1",  # Use localhost for development
-        port=8000,
-        reload=True,
-        log_level="info",
-    )
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

@@ -1,3 +1,20 @@
+# This file is part of TravelSytle AI.
+#
+# Copyright (C) 2025  Trailyn Ventures, LLC
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 Simple isolated tests for database_helpers.py
 This file uses the most basic approach possible to avoid all conflicts
@@ -68,8 +85,7 @@ class TestDatabaseHelpersSimple:
         assert result is True
 
         # Verify methods were called
-        assert table_mock.select.called
-        assert table_mock.insert.called
+        assert table_mock.update.called
 
     @pytest.mark.asyncio
     async def test_save_conversation_message_simple(self):
@@ -99,9 +115,9 @@ class TestDatabaseHelpersSimple:
         )
 
         # Verify result structure
-        assert isinstance(result, dict)
-        assert result.get("success") is True
-        assert "conversation_id" in result
+        assert isinstance(result, str)
+        assert result is not None
+        assert len(result) > 0  # Should be a valid UUID
 
         # Verify calls were made
         assert table_mock.insert.called
@@ -125,7 +141,7 @@ class TestDatabaseHelpersSimple:
         assert prefs_result is False
 
         message_result = await db.save_conversation_message("test-user", "conv-1", "Hello", "Hi")
-        assert message_result.get("success") is False
+        assert message_result is None
 
     @pytest.mark.asyncio
     async def test_standalone_functions_bypass_autouse(self):
@@ -155,33 +171,32 @@ class TestDatabaseHelpersSimple:
         # Apply patches
         with (
             patch(
-                "app.services.database_helpers.get_user_profile", side_effect=mock_get_user_profile
+                "app.services.database_helpers.db_helpers.get_user_profile",
+                side_effect=mock_get_user_profile,
             ),
             patch(
-                "app.services.database_helpers.update_user_preferences",
+                "app.services.database_helpers.db_helpers.update_user_preferences",
                 side_effect=mock_update_user_preferences,
             ),
             patch(
-                "app.services.database_helpers.save_recommendation_feedback",
+                "app.services.database_helpers.db_helpers.save_recommendation_feedback",
                 side_effect=mock_save_recommendation_feedback,
             ),
         ):
             # Import after patching
-            from app.services.database_helpers import (
-                get_user_profile,
-                save_recommendation_feedback,
-                update_user_preferences,
-            )
+            from app.services.database_helpers import db_helpers
 
             # Test the functions
-            profile = await get_user_profile("test-user")
+            profile = await db_helpers.get_user_profile("test-user")
             assert profile == test_profile
             assert profile["selected_style_names"] == ["Bohemian", "Minimalist"]
 
-            prefs = await update_user_preferences("test-user", {"style": "casual"})
+            prefs = await db_helpers.update_user_preferences("test-user", {"style": "casual"})
             assert prefs == test_prefs_result
 
-            feedback = await save_recommendation_feedback("test-user", "conv-1", "msg-1", "like")
+            feedback = await db_helpers.save_recommendation_feedback(
+                "test-user", "conv-1", "msg-1", "like"
+            )
             assert feedback == test_feedback_result
 
     def test_imports_and_singleton(self):
@@ -191,9 +206,6 @@ class TestDatabaseHelpersSimple:
         from app.services.database_helpers import (
             DatabaseHelpers,
             db_helpers,
-            get_user_profile,
-            save_recommendation_feedback,
-            update_user_preferences,
         )
 
         # Test singleton exists
@@ -201,10 +213,10 @@ class TestDatabaseHelpersSimple:
         assert isinstance(db_helpers, DatabaseHelpers)
         assert hasattr(db_helpers, "client")
 
-        # Test functions are callable
-        assert callable(get_user_profile)
-        assert callable(update_user_preferences)
-        assert callable(save_recommendation_feedback)
+        # Test methods are callable
+        assert callable(db_helpers.get_user_profile)
+        assert callable(db_helpers.update_user_preferences)
+        assert callable(db_helpers.save_recommendation_feedback)
 
 
 class TestDatabaseHelpersEdgeCases:
@@ -266,14 +278,14 @@ class TestDatabaseHelpersEdgeCases:
             ai_response="Short response",
         )
 
-        assert result.get("success") is True
+        assert result is not None
 
         # Test with empty message
         result = await db.save_conversation_message(
             user_id="test-user", conversation_id=None, user_message="", ai_response=""
         )
 
-        assert result.get("success") is True
+        assert result is not None
 
     @pytest.mark.asyncio
     async def test_create_chat_session_edge_cases(self):

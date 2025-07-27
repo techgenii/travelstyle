@@ -1,3 +1,20 @@
+# This file is part of TravelSytle AI.
+#
+# Copyright (C) 2025  Trailyn Ventures, LLC
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 Tests for user API endpoints.
 """
@@ -10,7 +27,7 @@ from fastapi import status
 class TestUserEndpoints:
     """Test cases for user endpoints."""
 
-    @patch("app.api.v1.user.get_user_profile")
+    @patch("app.api.v1.user.db_helpers.get_user_profile")
     def test_get_current_user_profile_success(self, mock_get_profile, authenticated_client):
         """Test successful user profile retrieval."""
         # Mock the database call to return a valid profile matching the view structure
@@ -41,7 +58,7 @@ class TestUserEndpoints:
         assert data["id"] == "test-user-123"
         assert data["email"] == "test@example.com"
 
-    @patch("app.api.v1.user.get_user_profile")
+    @patch("app.api.v1.user.db_helpers.get_user_profile")
     def test_get_current_user_profile_error(self, mock_get_profile, authenticated_client):
         """Test user profile retrieval when it fails."""
         # Mock the database call to raise an exception
@@ -50,7 +67,7 @@ class TestUserEndpoints:
         response = authenticated_client.get("/api/v1/users/me")
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
-    @patch("app.api.v1.user.get_user_profile")
+    @patch("app.api.v1.user.db_helpers.get_user_profile")
     def test_get_current_user_profile_generic_exception(
         self, mock_get_profile, authenticated_client
     ):
@@ -89,7 +106,7 @@ class TestUserEndpoints:
         assert response.status_code == 500
         assert response.json()["detail"] == "Failed to retrieve user preferences"
 
-    @patch("app.api.v1.user.update_user_preferences")
+    @patch("app.api.v1.user.db_helpers.update_user_preferences")
     def test_update_user_preferences_success(self, mock_update_preferences, authenticated_client):
         """Test successful user preferences update."""
         # Mock the database call to return success
@@ -114,7 +131,7 @@ class TestUserEndpoints:
         assert data["message"] == "Preferences updated successfully"
         assert data["user_id"] == "test-user-123"
 
-    @patch("app.api.v1.user.update_user_preferences")
+    @patch("app.api.v1.user.db_helpers.update_user_preferences")
     def test_update_user_preferences_endpoint_generic_exception(
         self, mock_update_prefs, authenticated_client
     ):
@@ -127,7 +144,7 @@ class TestUserEndpoints:
         assert response.status_code == 500
         assert response.json()["detail"] == "Failed to update user preferences"
 
-    @patch("app.api.v1.user.update_user_preferences")
+    @patch("app.api.v1.user.db_helpers.update_user_preferences")
     def test_update_user_preferences_error(self, mock_update_preferences, authenticated_client):
         """Test user preferences update when it fails."""
         # Mock the database call to return failure
@@ -137,7 +154,7 @@ class TestUserEndpoints:
         response = authenticated_client.put("/api/v1/users/preferences", json=preferences_data)
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
-    @patch("app.api.v1.user.update_user_preferences")
+    @patch("app.api.v1.user.db_helpers.update_user_preferences")
     def test_update_user_preferences_exception(self, mock_update_preferences, authenticated_client):
         """Test user preferences update when an exception occurs."""
         # Mock the database call to raise an exception
@@ -219,7 +236,7 @@ class TestUserEndpoints:
         response = authenticated_client.post("/api/v1/users/destinations/save", json={})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    @patch("app.api.v1.user.save_user_profile")
+    @patch("app.api.v1.user.db_helpers.save_user_profile")
     def test_update_current_user_profile_success(self, mock_save_profile, authenticated_client):
         """Test successful user profile update."""
         mock_save_profile.return_value = {
@@ -240,7 +257,7 @@ class TestUserEndpoints:
         assert data["last_name"] == "Doe"
         assert data["profile_picture_url"] == "https://example.com/avatar.jpg"
 
-    @patch("app.api.v1.user.save_user_profile")
+    @patch("app.api.v1.user.db_helpers.save_user_profile")
     def test_update_current_user_profile_not_found(self, mock_save_profile, authenticated_client):
         """Test user profile update when not found or update fails."""
         mock_save_profile.return_value = None

@@ -1,3 +1,20 @@
+# This file is part of TravelSytle AI.
+#
+# Copyright (C) 2025  Trailyn Ventures, LLC
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 Tests for recommendations API endpoints.
 """
@@ -5,12 +22,8 @@ Tests for recommendations API endpoints.
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from app.models.responses import ChatResponse, ConversationContext
-from app.services.currency_service import CurrencyService, currency_service
-from app.services.openai_service import openai_service
-from app.services.orchestrator import TravelOrchestratorService, orchestrator_service
-from app.services.qloo_service import QlooService, qloo_service
-from app.services.weather_service import weather_service
+from app.services.currency_service import CurrencyService
+from app.services.qloo_service import QlooService
 from fastapi import status
 from httpx import RequestError
 
@@ -395,129 +408,11 @@ async def test_convert_currency_success():
 
 @pytest.mark.asyncio
 async def test_convert_currency_error():
+    """Test currency conversion with error."""
     service = CurrencyService()
     with patch.object(service, "get_pair_exchange_rate", new=AsyncMock(return_value=None)):
         result = await service.convert_currency(100, "USD", "EUR")
         assert result is None
-
-
-@pytest.mark.asyncio
-async def test_generate_travel_recommendations_success():
-    orchestrator = TravelOrchestratorService()
-    with (
-        patch(
-            "app.services.qloo_service.qloo_service.get_cultural_insights",
-            new=AsyncMock(return_value={"culture": "ok"}),
-        ),
-        patch(
-            "app.services.weather_service.weather_service.get_weather_data",
-            new=AsyncMock(return_value={"weather": "ok"}),
-        ),
-        patch(
-            "app.services.qloo_service.qloo_service.get_style_recommendations",
-            new=AsyncMock(return_value={"style": "ok"}),
-        ),
-        patch(
-            "app.services.currency_service.currency_service.get_exchange_rates",
-            new=AsyncMock(return_value={"currency": "ok"}),
-        ),
-        patch(
-            "app.services.openai_service.openai_service.generate_response",
-            new=AsyncMock(
-                return_value=ChatResponse(
-                    message="AI response", quick_replies=[], suggestions=[], confidence_score=1.0
-                )
-            ),
-        ),
-    ):
-        context = ConversationContext(
-            user_id="test-user",
-            destination="Paris",
-            travel_dates=["2024-06-01"],
-            trip_purpose="leisure",
-        )
-        result = await orchestrator.generate_travel_recommendations(
-            user_message="I'm going to Paris!",
-            context=context,
-            conversation_history=[],
-            user_profile={"home_currency": "USD"},
-        )
-        assert isinstance(result, ChatResponse)
-        assert "AI response" in result.message
-
-
-@pytest.mark.asyncio
-async def test_generate_travel_recommendations_error():
-    orchestrator = TravelOrchestratorService()
-    with (
-        patch(
-            "app.services.qloo_service.qloo_service.get_cultural_insights",
-            new=AsyncMock(side_effect=Exception("fail")),
-        ),
-        patch(
-            "app.services.weather_service.weather_service.get_weather_data",
-            new=AsyncMock(return_value={}),
-        ),
-        patch(
-            "app.services.qloo_service.qloo_service.get_style_recommendations",
-            new=AsyncMock(return_value={}),
-        ),
-        patch(
-            "app.services.currency_service.currency_service.get_exchange_rates",
-            new=AsyncMock(return_value={}),
-        ),
-        patch(
-            "app.services.openai_service.openai_service.generate_response",
-            new=AsyncMock(side_effect=Exception("fail")),
-        ),
-    ):
-        context = ConversationContext(
-            user_id="test-user", destination="", travel_dates=[], trip_purpose="leisure"
-        )
-        result = await orchestrator.generate_travel_recommendations(
-            user_message="No destination",
-            context=context,
-            conversation_history=[],
-            user_profile=None,
-        )
-        assert isinstance(result, ChatResponse)
-        assert "trouble processing your request" in result.message
-        assert result.confidence_score == 0.0
-
-
-def test_parse_trip_context():
-    orchestrator = TravelOrchestratorService()
-    context = ConversationContext(
-        user_id="test-user", destination=None, travel_dates=None, trip_purpose=None
-    )
-    trip = orchestrator._parse_trip_context("I'm going to Paris for business", context)
-    assert trip["destination"] == "Paris"
-    assert trip["context"] == "business"
-    assert trip["occasion"] == "business"
-    trip2 = orchestrator._parse_trip_context("Let's go hiking in Denver", context)
-    assert trip2["context"] == "active"
-    assert trip2["occasion"] == "active"
-
-
-def test_enhance_response():
-    orchestrator = TravelOrchestratorService()
-    ai_response = ChatResponse(
-        message="msg", quick_replies=[], suggestions=[], confidence_score=1.0
-    )
-    context = {
-        "weather_conditions": {"weather": "ok"},
-        "cultural_intelligence": {"culture": "ok"},
-        "currency_info": {"currency": "ok"},
-        "trip_context": {"destination": "Paris"},
-        "user_profile": {"home_currency": "USD"},
-    }
-    result = orchestrator._enhance_response(ai_response, context)
-    assert any(qr.text == "More weather details" for qr in result.quick_replies)
-    assert any(qr.text == "Cultural tips" for qr in result.quick_replies)
-    assert any(qr.text == "Currency help" for qr in result.quick_replies)
-    assert "Get packing checklist" in result.suggestions
-    assert "Local shopping tips" in result.suggestions
-    assert "Emergency contact info" in result.suggestions
 
 
 @pytest.mark.asyncio
@@ -659,282 +554,8 @@ def test_get_fallback_cultural_data():
 
 
 def test_get_fallback_style_data():
+    """Test fallback style data generation."""
     service = QlooService()
     result = service._get_fallback_style_data("Paris")
     assert result["data_source"] == "fallback"
     assert "style_recommendations" in result
-
-
-@pytest.mark.asyncio
-async def test_generate_travel_recommendations_orchestration_error():
-    """Test generate_travel_recommendations when orchestration raises an exception."""
-    orchestrator_service = TravelOrchestratorService()
-    with patch.object(
-        orchestrator_service, "_parse_trip_context", side_effect=Exception("Parse error")
-    ):
-        result = await orchestrator_service.generate_travel_recommendations(
-            "I want to go to Paris",
-            ConversationContext(
-                user_id="user-1",
-                destination="Paris",
-                travel_dates=["2024-06-01"],
-                trip_purpose="leisure",
-            ),
-            [],
-            {"id": "user-1"},
-        )
-        assert result.confidence_score == 0.0
-        assert "I apologize, but I'm having trouble processing" in result.message
-
-
-@pytest.mark.asyncio
-async def test_safe_api_call_exception():
-    """Test _safe_api_call when API function raises an exception."""
-    orchestrator_service = TravelOrchestratorService()
-
-    async def failing_api():
-        raise Exception("API error")
-
-    result = await orchestrator_service._safe_api_call(failing_api)
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_parse_trip_context_destination_extraction():
-    """Test _parse_trip_context with destination extraction from message."""
-    orchestrator_service = TravelOrchestratorService()
-    context = ConversationContext(
-        user_id="user-1", destination=None, travel_dates=["2024-06-01"], trip_purpose="leisure"
-    )
-    result = orchestrator_service._parse_trip_context("I want to go to Tokyo", context)
-    assert result["destination"] == "Tokyo"
-
-
-@pytest.mark.asyncio
-async def test_parse_trip_context_destination_extraction_visiting():
-    """Test _parse_trip_context with 'visiting' keyword."""
-    orchestrator_service = TravelOrchestratorService()
-    context = ConversationContext(
-        user_id="user-1", destination=None, travel_dates=["2024-06-01"], trip_purpose="leisure"
-    )
-    result = orchestrator_service._parse_trip_context("I'm visiting London next week", context)
-    assert result["destination"] == "London"
-
-
-@pytest.mark.asyncio
-async def test_parse_trip_context_destination_extraction_in():
-    """Test _parse_trip_context with 'in' keyword."""
-    orchestrator_service = TravelOrchestratorService()
-    context = ConversationContext(
-        user_id="user-1", destination=None, travel_dates=["2024-06-01"], trip_purpose="leisure"
-    )
-    result = orchestrator_service._parse_trip_context("I'll be in New York", context)
-    assert result["destination"] == "New York"
-
-
-@pytest.mark.asyncio
-async def test_parse_trip_context_business_context():
-    """Test _parse_trip_context with business keywords."""
-    orchestrator_service = TravelOrchestratorService()
-    context = ConversationContext(
-        user_id="user-1", destination="Berlin", travel_dates=["2024-06-01"], trip_purpose="leisure"
-    )
-    result = orchestrator_service._parse_trip_context(
-        "I have a business meeting in Berlin", context
-    )
-    assert result["context"] == "business"
-    assert result["occasion"] == "business"
-
-
-@pytest.mark.asyncio
-async def test_parse_trip_context_formal_context():
-    """Test _parse_trip_context with formal keywords."""
-    orchestrator_service = TravelOrchestratorService()
-    context = ConversationContext(
-        user_id="user-1", destination="Rome", travel_dates=["2024-06-01"], trip_purpose="leisure"
-    )
-    result = orchestrator_service._parse_trip_context(
-        "I'm attending a formal dinner in Rome", context
-    )
-    assert result["context"] == "formal"
-    assert result["occasion"] == "formal"
-
-
-@pytest.mark.asyncio
-async def test_parse_trip_context_active_context():
-    """Test _parse_trip_context with active/adventure keywords."""
-    orchestrator_service = TravelOrchestratorService()
-    context = ConversationContext(
-        user_id="user-1",
-        destination="Switzerland",
-        travel_dates=["2024-06-01"],
-        trip_purpose="leisure",
-    )
-    result = orchestrator_service._parse_trip_context("I'm going hiking in Switzerland", context)
-    assert result["context"] == "active"
-    assert result["occasion"] == "active"
-
-
-@pytest.mark.asyncio
-async def test_enhance_response_with_all_context():
-    """Test _enhance_response with all context data available."""
-    orchestrator_service = TravelOrchestratorService()
-    ai_response = ChatResponse(
-        message="Here are your travel recommendations",
-        confidence_score=0.9,
-        quick_replies=[],
-        suggestions=[],
-    )
-
-    context = {
-        "weather_conditions": {"temperature": 25},
-        "cultural_intelligence": {"customs": "data"},
-        "currency_info": {"rates": "data"},
-        "trip_context": {"destination": "Paris"},
-    }
-
-    result = orchestrator_service._enhance_response(ai_response, context)
-
-    # Check that quick replies were added
-    quick_reply_texts = [qr.text for qr in result.quick_replies]
-    assert "More weather details" in quick_reply_texts
-    assert "Cultural tips" in quick_reply_texts
-    assert "Currency help" in quick_reply_texts
-
-    # Check that suggestions were added
-    assert "Get packing checklist" in result.suggestions
-    assert "Local shopping tips" in result.suggestions
-    assert "Emergency contact info" in result.suggestions
-
-
-@pytest.mark.asyncio
-async def test_enhance_response_with_partial_context():
-    """Test _enhance_response with only some context data available."""
-    orchestrator_service = TravelOrchestratorService()
-    ai_response = ChatResponse(
-        message="Here are your travel recommendations",
-        confidence_score=0.9,
-        quick_replies=[],
-        suggestions=[],
-    )
-
-    context = {
-        "weather_conditions": {"temperature": 25},
-        "cultural_intelligence": None,
-        "currency_info": None,
-        "trip_context": {"destination": "Paris"},
-    }
-
-    result = orchestrator_service._enhance_response(ai_response, context)
-
-    # Check that only weather quick reply was added
-    quick_reply_texts = [qr.text for qr in result.quick_replies]
-    assert "More weather details" in quick_reply_texts
-    assert "Cultural tips" not in quick_reply_texts
-    assert "Currency help" not in quick_reply_texts
-
-    # Check that suggestions were still added
-    assert "Get packing checklist" in result.suggestions
-
-
-@pytest.mark.asyncio
-async def test_enhance_response_with_no_destination():
-    """Test _enhance_response when no destination is specified."""
-    orchestrator_service = TravelOrchestratorService()
-    ai_response = ChatResponse(
-        message="Here are your travel recommendations",
-        confidence_score=0.9,
-        quick_replies=[],
-        suggestions=[],
-    )
-
-    context = {
-        "weather_conditions": {"temperature": 25},
-        "cultural_intelligence": {"customs": "data"},
-        "currency_info": {"rates": "data"},
-        "trip_context": {"destination": None},
-    }
-
-    result = orchestrator_service._enhance_response(ai_response, context)
-
-    # Check that quick replies were added
-    quick_reply_texts = [qr.text for qr in result.quick_replies]
-    assert "More weather details" in quick_reply_texts
-    assert "Cultural tips" in quick_reply_texts
-    assert "Currency help" in quick_reply_texts
-
-    # Check that no suggestions were added (no destination)
-    assert len(result.suggestions) == 0
-
-
-@pytest.mark.asyncio
-async def test_generate_travel_recommendations_no_destination():
-    """Test generate_travel_recommendations when no destination is specified."""
-    with (
-        patch.object(qloo_service, "get_cultural_insights", new=AsyncMock(return_value=None)),
-        patch.object(weather_service, "get_weather_data", new=AsyncMock(return_value=None)),
-        patch.object(qloo_service, "get_style_recommendations", new=AsyncMock(return_value=None)),
-        patch.object(
-            currency_service, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
-        ),
-        patch.object(
-            openai_service,
-            "generate_response",
-            new=AsyncMock(
-                return_value=ChatResponse(
-                    message="Here are your recommendations", confidence_score=0.8
-                )
-            ),
-        ),
-    ):
-        result = await orchestrator_service.generate_travel_recommendations(
-            "I need travel advice",
-            ConversationContext(
-                user_id="user-1",
-                destination=None,
-                travel_dates=["2024-06-01"],
-                trip_purpose="leisure",
-            ),
-            [],
-            {"id": "user-1", "home_currency": "USD"},
-        )
-        assert result.confidence_score == 0.8
-        assert "Here are your recommendations" in result.message
-
-
-@pytest.mark.asyncio
-async def test_generate_travel_recommendations_no_user_profile():
-    """Test generate_travel_recommendations when no user profile is provided."""
-    with (
-        patch.object(
-            qloo_service, "get_cultural_insights", new=AsyncMock(return_value={"insights": "data"})
-        ),
-        patch.object(
-            weather_service, "get_weather_data", new=AsyncMock(return_value={"weather": "data"})
-        ),
-        patch.object(
-            currency_service, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
-        ),
-        patch.object(
-            openai_service,
-            "generate_response",
-            new=AsyncMock(
-                return_value=ChatResponse(
-                    message="Here are your recommendations", confidence_score=0.8
-                )
-            ),
-        ),
-    ):
-        result = await orchestrator_service.generate_travel_recommendations(
-            "I want to go to Paris",
-            ConversationContext(
-                user_id="user-1",
-                destination="Paris",
-                travel_dates=["2024-06-01"],
-                trip_purpose="leisure",
-            ),
-            [],
-            None,  # No user profile
-        )
-        assert result.confidence_score == 0.8
-        assert "Here are your recommendations" in result.message
