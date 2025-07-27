@@ -60,13 +60,20 @@ class QlooService:
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    f"{self.base_url}/cultural-insights",
-                    headers={
-                        "X-Api-Key": "{self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={"location": destination, "context": context, "categories": categories},
+                qloo_headers = {
+                    "X-Api-Key": "{self.api_key}",
+                    "Content-Type": "application/json",
+                }
+                qloo_params = {
+                    "filter.type": "urn:entity:brand",
+                    "filter.tag": "urn:tag:genre:brand:fashion",
+                    "signal.location.query": destination,
+                    "signal.weather": "sunny",
+                }
+                response = await client.get(
+                    f"{self.base_url}/insights",
+                    headers=qloo_headers,
+                    params=qloo_params,
                 )
                 response.raise_for_status()
 
