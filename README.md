@@ -4,6 +4,7 @@
 ![Python Version](https://img.shields.io/badge/python-3.13-blue)
 [![TypeScript](https://img.shields.io/badge/typescript-4.0+-blue.svg)](https://www.typescriptlang.org/)
 
+
 ## 📊 Quality & Status
 
 [![CI/CD](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg)](https://github.com/techgenii/travelstyle/actions)
@@ -133,10 +134,13 @@ make test
 
 ## 🚀 Deployment
 
+This project supports multiple deployment options:
+
+### Frontend Deployment (Vercel)
+
 This project includes automated CI/CD deployment to Vercel using GitHub Actions. The deployment pipeline runs tests, linting, and security checks before automatically deploying to production.
 
-### Quick Start
-
+**Quick Start:**
 ```bash
 # Install Vercel CLI and deploy
 npm install -g vercel
@@ -144,7 +148,23 @@ vercel link
 vercel --prod
 ```
 
-For complete deployment instructions, environment setup, and troubleshooting, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+### Backend Deployment (AWS Lambda)
+
+The backend FastAPI application can be deployed to AWS Lambda for serverless execution.
+
+**Quick Start:**
+1. Set up GitHub Secrets (see [Lambda Deployment Guide](backend/LAMBDA_DEPLOYMENT.md))
+2. Push to main branch or manually trigger the workflow
+3. The GitHub Actions workflow handles everything automatically
+
+**Features:**
+- ✅ Automated deployment via GitHub Actions
+- ✅ API Gateway integration
+- ✅ Environment variable management
+- ✅ Health checks and testing
+- ✅ Cost optimization
+
+For complete Lambda deployment instructions, environment setup, and troubleshooting, see **[backend/LAMBDA_DEPLOYMENT.md](backend/LAMBDA_DEPLOYMENT.md)**.
 
 ## 📝 License
 

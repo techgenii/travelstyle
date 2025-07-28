@@ -27,6 +27,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from mangum import Mangum
 
 from app.api.v1 import auth, chat, currency, recommendations, user
 from app.core.config import settings
@@ -103,5 +104,20 @@ if __name__ == "__main__":
     # In production, use proper host configuration
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)  # nosec B104
 
+
 # Expose the FastAPI app as the handler
-handler = app
+# Lambda handler with enhanced logging
+def handler(event, context):
+    logger.info(f"Lambda invoked with event: {event}")
+
+    try:
+        # Use Mangum to handle the FastAPI app
+        mangum_handler = Mangum(app)
+        response = mangum_handler(event, context)
+        logger.info(f"Lambda response: {response}")
+        print(f"Lambda response: {response}")
+        return response
+    except Exception as e:
+        logger.error(f"Lambda handler error: {str(e)}")
+        print(f"Lambda handler error: {str(e)}")
+        raise

@@ -1,0 +1,26 @@
+{
+    "FunctionName": "travelstyle-api",
+    "Runtime": "python3.13",
+    "Handler": "app.main.handler",
+    "Code": {
+        "ZipFile": "lambda-deployment.zip"
+    },
+    "Description": "TravelStyle AI FastAPI application",
+    "Timeout": 30,
+    "MemorySize": 512,
+    "Environment": {
+        "Variables": {
+            "OPENAI_API_KEY": "YOUR_OPENAI_API_KEY",
+            "OPENAI_ORG_ID": "YOUR_OPENAI_ORG_ID",
+            "QLOO_API_KEY": "YOUR_QLOO_API_KEY",
+            "OPENWEATHER_API_KEY": "YOUR_OPENWEATHER_API_KEY",
+            "EXCHANGE_API_KEY": "YOUR_EXCHANGE_API_KEY",
+            "SUPABASE_URL": "YOUR_SUPABASE_URL",
+            "SUPABASE_KEY": "YOUR_SUPABASE_KEY"
+        }
+    },
+    "Tags": {
+        "Project": "TravelStyle",
+        "Environment": "production"
+    }
+}

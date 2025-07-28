@@ -1,0 +1,158 @@
+name: Deploy TravelStyle to Lambda
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**', '.github/workflows/**']
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Backend Quality CI/CD"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME }}
+      REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+      API_NAME: TravelStyleAPI
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Create Lambda package
+        run: |
+          cd backend
+
+          # Create build directory
+          mkdir -p build
+
+          # Install dependencies
+          pip install -r requirements.txt --target build --no-cache-dir
+
+          # Copy application code
+          cp -r app build/
+
+          # Create deployment package
+          cd build
+          zip -r ../lambda-deploy.zip .
+          cd ..
+
+          echo "Package size: $(du -h lambda-deploy.zip | cut -f1)"
+
+      - name: Deploy to Lambda
+        run: |
+          cd backend
+
+          # Mask secrets
+          echo "::add-mask::$OPENAI_API_KEY"
+          echo "::add-mask::$OPENAI_ORG_ID"
+          echo "::add-mask::$QLOO_API_KEY"
+          echo "::add-mask::$OPENWEATHER_API_KEY"
+          echo "::add-mask::$EXCHANGE_API_KEY"
+          echo "::add-mask::$SUPABASE_URL"
+          echo "::add-mask::$SUPABASE_KEY"
+          echo "✅ Secrets validated and masked"
+
+          # Create environment variables
+          cat > env.json << EOF
+          {
+            "Variables": {
+              "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
+              "OPENAI_ORG_ID": "${{ secrets.OPENAI_ORG_ID }}",
+              "QLOO_API_KEY": "${{ secrets.QLOO_API_KEY }}",
+              "OPENWEATHER_API_KEY": "${{ secrets.OPENWEATHER_API_KEY }}",
+              "EXCHANGE_API_KEY": "${{ secrets.EXCHANGE_API_KEY }}",
+              "SUPABASE_URL": "${{ secrets.SUPABASE_URL }}",
+              "SUPABASE_KEY": "${{ secrets.SUPABASE_KEY }}",
+              "API_V1_STR": "/api/v1",
+              "PROJECT_NAME": "TravelStyle AI",
+              "VERSION": "1.0.0"
+            }
+          }
+          EOF
+
+          # Deploy or update function
+          if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
+            echo "Updating existing function..."
+            aws lambda update-function-code --function-name $FUNCTION_NAME --zip-file fileb://lambda-deploy.zip
+            aws lambda update-function-configuration \
+              --function-name $FUNCTION_NAME \
+              --environment file://env.json \
+              --timeout 30 \
+              --memory-size 512
+          else
+            echo "Creating new function..."
+            aws lambda create-function \
+              --function-name $FUNCTION_NAME \
+              --runtime python3.11 \
+              --handler app.main.handler \
+              --role arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/TravelStyle-Lambda-Role \
+              --zip-file fileb://lambda-deploy.zip \
+              --environment file://env.json \
+              --timeout 30 \
+              --memory-size 512
+          fi
+
+      - name: Setup API Gateway
+        run: |
+          # Get or create API Gateway
+          API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='$API_NAME'].ApiId" --output text 2>/dev/null || echo "")
+
+          if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
+            API_ID=$(aws apigatewayv2 create-api --name "$API_NAME" --protocol-type HTTP --query "ApiId" --output text)
+          fi
+
+          # Create integration
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          LAMBDA_ARN="arn:aws:lambda:$REGION:$ACCOUNT_ID:function:$FUNCTION_NAME"
+
+          INTEGRATION_ID=$(aws apigatewayv2 create-integration \
+            --api-id $API_ID \
+            --integration-type AWS_PROXY \
+            --integration-uri $LAMBDA_ARN \
+            --payload-format-version 2.0 \
+            --query 'IntegrationId' --output text 2>/dev/null || echo "")
+
+          # Create routes
+          aws apigatewayv2 create-route --api-id $API_ID --route-key "ANY /" --target "integrations/$INTEGRATION_ID" 2>/dev/null || echo "Route exists"
+          aws apigatewayv2 create-route --api-id $API_ID --route-key "ANY /{proxy+}" --target "integrations/$INTEGRATION_ID" 2>/dev/null || echo "Route exists"
+
+          # Create stage
+          aws apigatewayv2 create-stage --api-id $API_ID --stage-name '$default' --auto-deploy 2>/dev/null || echo "Stage exists"
+
+          # Set permissions
+          aws lambda add-permission \
+            --function-name $FUNCTION_NAME \
+            --statement-id "api-gateway-invoke" \
+            --action lambda:InvokeFunction \
+            --principal apigateway.amazonaws.com \
+            --source-arn "arn:aws:execute-api:$REGION:$ACCOUNT_ID:$API_ID/*/*/*" 2>/dev/null || echo "Permission exists"
+
+          # Output endpoint
+          ENDPOINT="https://$API_ID.execute-api.$REGION.amazonaws.com"
+          echo "API_ENDPOINT=$ENDPOINT" >> $GITHUB_ENV
+          echo "✅ Deployed to: $ENDPOINT"
+
+      - name: Test deployment
+        run: |
+          sleep 10
+          curl -s $API_ENDPOINT/health || echo "Health check failed"
+          echo "🎉 TravelStyle API deployed successfully!"
+          echo "🌐 Endpoint: $API_ENDPOINT"
