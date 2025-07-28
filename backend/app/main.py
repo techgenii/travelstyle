@@ -27,7 +27,6 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from mangum import Mangum
 
 from app.api.v1 import auth, chat, currency, recommendations, user
 from app.core.config import settings
@@ -37,7 +36,7 @@ from app.utils.error_handlers import custom_http_exception_handler
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-logger.info("Lambda cold start: app.main.py successfully loaded")
+logger.info("TravelStyle AI application starting...")
 
 
 @asynccontextmanager
@@ -99,20 +98,10 @@ async def health_check():
     return {"status": "healthy", "cache": "supabase"}
 
 
-# Lambda handler for AWS deployment
-def handler(event, context):
-    logger.info(f"Lambda invoked with event: {event}")
-
-    try:
-        # Use Mangum to handle the FastAPI app
-        mangum_handler = Mangum(app)
-        response = mangum_handler(event, context)
-        logger.info(f"Lambda response: {response}")
-        return response
-    except Exception as e:
-        logger.error(f"Lambda handler error: {str(e)}")
-        raise
-
-
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    # Note: Binding to 0.0.0.0 is necessary for development server
+    # In production, use proper host configuration
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)  # nosec B104
+
+# Expose the FastAPI app as the handler
+handler = app

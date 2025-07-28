@@ -55,52 +55,41 @@ Database Layer (Supabase/PostgreSQL)
 travelstyle-ai
 ├── backend
 │   ├── app
-│   │   ├── __init__.py
-│   │   ├── api
-│   │   ├── core
-│   │   ├── main.py
-│   │   ├── models
-│   │   ├── services
-│   │   └── utils
 │   ├── env.example
 │   ├── Makefile
 │   ├── pytest.ini
-│   ├── pytest.xml
 │   ├── requirements-test.txt
 │   ├── requirements.txt
+│   ├── test.py
 │   └── tests
-│       ├── __init__.py
-│       ├── conftest.py
-│       ├── test_auth_service.py
-│       ├── test_auth.py
-│       ├── test_chat_convs.py
-│       ├── test_chat_feedback.py
-│       ├── test_chat_sessions.py
-│       ├── test_chat.py
-│       ├── test_currency_service.py
-│       ├── test_database_helpers_comprehensive.py
-│       ├── test_database_helpers_simple.py
-│       ├── test_deps.py
-│       ├── test_main.py
-│       ├── test_rate_limiter.py
-│       ├── test_recommendations.py
-│       ├── test_security.py
-│       ├── test_supabase_cache.py
-│       ├── test_user_api.py
-│       ├── test_user_models.py
-│       ├── test_user_session_management.py
-│       ├── test_user_utils.py
-│       └── test_weather_service.py
+├── DEPLOYMENT.md
+├── frontend
+│   ├── actions
+│   ├── app
+│   ├── components.json
+│   ├── next-env.d.ts
+│   ├── next.config.ts
+│   ├── node_modules
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.mjs
+│   ├── public
+│   ├── README.md
+│   ├── src
+│   └── tsconfig.json
 ├── LICENSE
+├── myenv
+│   ├── bin
+│   ├── include
+│   ├── lib
+│   └── share
 ├── pyproject.toml
 ├── README.md
-└── supabase
-    └── migrations
-        ├── travelstyle_index.sql
-        ├── travelstyle_schema.sql
-        └── travelstyle_triggers.sql
+├── requirements.txt
+├── supabase
+│   └── migrations
+└── vercel.json
 ```
-
 
 ## Getting Started
 
@@ -141,6 +130,21 @@ travelstyle-ai
 cd backend
 make test
 ```
+
+## 🚀 Deployment
+
+This project includes automated CI/CD deployment to Vercel using GitHub Actions. The deployment pipeline runs tests, linting, and security checks before automatically deploying to production.
+
+### Quick Start
+
+```bash
+# Install Vercel CLI and deploy
+npm install -g vercel
+vercel link
+vercel --prod
+```
+
+For complete deployment instructions, environment setup, and troubleshooting, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
 ## 📝 License
 
