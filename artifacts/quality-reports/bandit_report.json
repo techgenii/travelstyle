@@ -1,19 +1,19 @@
 {
   "errors": [],
-  "generated_at": "2025-07-27T22:19:39Z",
+  "generated_at": "2025-07-28T04:46:32Z",
   "metrics": {
     "_totals": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
-      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.MEDIUM": 0,
       "CONFIDENCE.UNDEFINED": 0,
       "SEVERITY.HIGH": 0,
       "SEVERITY.LOW": 0,
-      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 3360,
+      "loc": 3362,
       "nosec": 3,
-      "skipped_tests": 0
+      "skipped_tests": 1
     },
     "app/__init__.py": {
       "CONFIDENCE.HIGH": 0,
@@ -174,15 +174,15 @@
     "app/main.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
-      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.MEDIUM": 0,
       "CONFIDENCE.UNDEFINED": 0,
       "SEVERITY.HIGH": 0,
       "SEVERITY.LOW": 0,
-      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 70,
+      "loc": 72,
       "nosec": 0,
-      "skipped_tests": 0
+      "skipped_tests": 1
     },
     "app/models/__init__.py": {
       "CONFIDENCE.HIGH": 0,
@@ -432,26 +432,5 @@
       "skipped_tests": 0
     }
   },
-  "results": [
-    {
-      "code": "117 if __name__ == \"__main__\":\n118     uvicorn.run(\"app.main:app\", host=\"0.0.0.0\", port=8000, reload=True)\n",
-      "col_offset": 37,
-      "end_col_offset": 46,
-      "filename": "app/main.py",
-      "issue_confidence": "MEDIUM",
-      "issue_cwe": {
-        "id": 605,
-        "link": "https://cwe.mitre.org/data/definitions/605.html"
-      },
-      "issue_severity": "MEDIUM",
-      "issue_text": "Possible binding to all interfaces.",
-      "line_number": 118,
-      "line_range": [
-        118
-      ],
-      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b104_hardcoded_bind_all_interfaces.html",
-      "test_id": "B104",
-      "test_name": "hardcoded_bind_all_interfaces"
-    }
-  ]
+  "results": []
 }

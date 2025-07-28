@@ -431,7 +431,7 @@ app/api/v1/user.py                               76      5    93%
 app/core/__init__.py                              0      0   100%
 app/core/config.py                               26      0   100%
 app/core/security.py                             45      3    93%
-app/main.py                                      45     10    78%
+app/main.py                                      47     12    74%
 app/models/__init__.py                            0      0   100%
 app/models/auth.py                               46      0   100%
 app/models/responses.py                          23      0   100%
@@ -452,7 +452,7 @@ app/utils/error_handlers.py                       9      0   100%
 app/utils/rate_limiter.py                        51      0   100%
 app/utils/user_utils.py                          18      0   100%
 -----------------------------------------------------------------
-TOTAL                                          1709     50    97%
+TOTAL                                          1711     52    97%
 Coverage XML written to file reports/pytest-coverage.xml
 Coverage JSON written to file reports/pytest-coverage.json
-======================= 393 passed, 4 warnings in 22.78s =======================
+======================= 393 passed, 4 warnings in 23.53s =======================
