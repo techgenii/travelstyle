@@ -60,16 +60,6 @@ jobs:
         run: |
           cd backend
 
-          # Mask secrets
-          echo "::add-mask::$OPENAI_API_KEY"
-          echo "::add-mask::$OPENAI_ORG_ID"
-          echo "::add-mask::$QLOO_API_KEY"
-          echo "::add-mask::$OPENWEATHER_API_KEY"
-          echo "::add-mask::$EXCHANGE_API_KEY"
-          echo "::add-mask::$SUPABASE_URL"
-          echo "::add-mask::$SUPABASE_KEY"
-          echo "✅ Secrets validated and masked"
-
           # Create environment variables
           cat > env.json << EOF
           {
