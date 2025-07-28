@@ -262,7 +262,7 @@ jobs:
           pytest-coverage-path: artifacts/quality-reports/pytest-coverage.txt
           title: Code Coverage Report
           junitxml-path: artifacts/quality-reports/pytest-results.xml
-          junitxml-title: Code Unit Test Report
+          junitxml-title: Code Test Results Report
 
       - name: Update Readme with Coverage Html
         if: ${{ github.ref == 'refs/heads/main' }}
