@@ -117,6 +117,12 @@ jobs:
           echo "Checking for zip files:"
           ls -la *.zip || echo "No zip files found in backend directory"
 
+          # Function to check Lambda function state
+          check_lambda_state() {
+            local function_name=$1
+            aws lambda get-function --function-name $function_name --query 'Configuration.State' --output text 2>/dev/null || echo "NOT_FOUND"
+          }
+
           # Create environment variables
           cat > env.json << EOF
           {
@@ -154,16 +160,58 @@ jobs:
             --compatible-runtimes python3.13 \
             --query 'LayerVersionArn' --output text 2>/dev/null || echo "")
 
-          # Deploy or update function with layers
+                    # Deploy or update function with layers
           if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
             echo "Updating existing function..."
+
+            # Check current function state
+            echo "Checking current function state..."
+            current_state=$(check_lambda_state $FUNCTION_NAME)
+            echo "Current function state: $current_state"
+
+            # Wait if function is updating
+            if [ "$current_state" = "Updating" ]; then
+              echo "Function is currently updating, waiting for it to complete..."
+              aws lambda wait function-updated --function-name $FUNCTION_NAME
+              echo "Function update completed"
+            fi
+
+            # Update function code first
+            echo "Updating function code..."
             aws lambda update-function-code --function-name $FUNCTION_NAME --zip-file fileb://lambda-deploy.zip
-            aws lambda update-function-configuration \
-              --function-name $FUNCTION_NAME \
-              --environment file://env.json \
-              --timeout 30 \
-              --memory-size 512 \
-              --layers $DEPENDENCIES_LAYER_ARN $APP_LAYER_ARN
+
+            # Wait for code update to complete
+            echo "Waiting for function code update to complete..."
+            aws lambda wait function-updated --function-name $FUNCTION_NAME
+
+            # Update function configuration with retry logic
+            echo "Updating function configuration..."
+            max_retries=5
+            retry_count=0
+
+            while [ $retry_count -lt $max_retries ]; do
+              if aws lambda update-function-configuration \
+                --function-name $FUNCTION_NAME \
+                --environment file://env.json \
+                --timeout 30 \
+                --memory-size 512 \
+                --layers $DEPENDENCIES_LAYER_ARN $APP_LAYER_ARN; then
+                echo "Function configuration updated successfully"
+                break
+              else
+                retry_count=$((retry_count + 1))
+                echo "Configuration update failed, attempt $retry_count of $max_retries"
+                if [ $retry_count -lt $max_retries ]; then
+                  echo "Waiting 10 seconds before retry..."
+                  sleep 10
+                fi
+              fi
+            done
+
+            if [ $retry_count -eq $max_retries ]; then
+              echo "Failed to update function configuration after $max_retries attempts"
+              exit 1
+            fi
           else
             echo "Creating new function..."
             aws lambda create-function \
