@@ -40,14 +40,11 @@ class TestConvertCurrency:
         request = {"message": "convert 100 USD to EUR"}
 
         mock_result = {
-            "type": "currency_rate",
-            "message": "100.00 USD = 85.00 EUR (Rate: 0.8500)",
-            "amount": 100.0,
-            "from_currency": "USD",
-            "to_currency": "EUR",
+            "original": {"amount": 100.0, "currency": "USD"},
+            "converted": {"amount": 85.0, "currency": "EUR"},
             "rate": 0.85,
-            "converted_amount": 85.0,
-            "last_updated": "2024-01-01T12:00:00Z",
+            "last_updated_unix": 1640995200,
+            "last_updated_utc": "2022-01-01T00:00:00Z",
         }
 
         with patch(
@@ -71,14 +68,11 @@ class TestConvertCurrency:
         request = {"message": "what's the exchange rate from USD to EUR"}
 
         mock_result = {
-            "type": "currency_rate",
-            "message": "The current exchange rate from USD to EUR is 0.8500",
-            "amount": 0.0,
-            "from_currency": "USD",
-            "to_currency": "EUR",
+            "original": {"amount": 0.0, "currency": "USD"},
+            "converted": {"amount": 0.0, "currency": "EUR"},
             "rate": 0.85,
-            "converted_amount": 0.0,
-            "last_updated": "2024-01-01T12:00:00Z",
+            "last_updated_unix": 1640995200,
+            "last_updated_utc": "2022-01-01T00:00:00Z",
         }
 
         with patch(
@@ -88,7 +82,7 @@ class TestConvertCurrency:
             response = await convert_currency(request, mock_user)
 
         assert isinstance(response, ChatResponse)
-        assert response.message == "The current exchange rate from USD to EUR is 0.8500"
+        assert response.message == "0.00 USD = 0.00 EUR (Rate: 0.8500)"
         assert response.confidence_score == 0.9
         assert len(response.quick_replies) == 2
         assert not any(qr.text == "Show rate only" for qr in response.quick_replies)
@@ -101,10 +95,7 @@ class TestConvertCurrency:
         mock_user = {"id": "test-user-123", "email": "test@example.com"}
         request = {"message": "convert 100 USD to INVALID"}
 
-        mock_result = {
-            "type": "currency_error",
-            "message": "Sorry, I don't support the currency 'INVALID'.",
-        }
+        mock_result = None
 
         with patch(
             "app.api.v1.currency.currency_conversion_service.handle_currency_request",
@@ -113,7 +104,7 @@ class TestConvertCurrency:
             response = await convert_currency(request, mock_user)
 
         assert isinstance(response, ChatResponse)
-        assert response.message == "Sorry, I don't support the currency 'INVALID'."
+        assert response.message == "Sorry, I couldn't process that currency conversion request."
         assert response.confidence_score == 0.0
         assert response.quick_replies == []  # ChatResponse defaults to empty list
 
@@ -402,14 +393,11 @@ class TestCurrencyAPIIntegration:
 
         # Mock the service to return a realistic response
         mock_result = {
-            "type": "currency_rate",
-            "message": "50.00 USD = 42.50 EUR (Rate: 0.8500) (updated 2024-01-01T12:00:00Z)",
-            "amount": 50.0,
-            "from_currency": "USD",
-            "to_currency": "EUR",
+            "original": {"amount": 50.0, "currency": "USD"},
+            "converted": {"amount": 42.5, "currency": "EUR"},
             "rate": 0.85,
-            "converted_amount": 42.5,
-            "last_updated": "2024-01-01T12:00:00Z",
+            "last_updated_unix": 1640995200,
+            "last_updated_utc": "2022-01-01T00:00:00Z",
         }
 
         with patch(

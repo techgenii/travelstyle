@@ -77,6 +77,14 @@ class TestUserEndpoints:
         assert response.status_code == 500
         assert response.json()["detail"] == "Failed to retrieve user profile"
 
+    @patch("app.api.v1.user.db_helpers.get_user_profile")
+    def test_get_current_user_profile_not_found(self, mock_get_profile, authenticated_client):
+        """Test get_current_user_profile when profile is not found."""
+        mock_get_profile.return_value = None
+        response = authenticated_client.get("/api/v1/users/me")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.json()["detail"] == "User profile not found"
+
     def test_get_user_preferences_success(self, authenticated_client):
         """Test successful user preferences retrieval."""
         response = authenticated_client.get("/api/v1/users/preferences")
@@ -164,6 +172,21 @@ class TestUserEndpoints:
         response = authenticated_client.put("/api/v1/users/preferences", json=preferences_data)
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
+    def test_update_user_preferences_empty_data(self, authenticated_client):
+        """Test update_user_preferences_endpoint with empty preferences data."""
+        response = authenticated_client.put("/api/v1/users/preferences", json={})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["detail"] == "Preferences data is required"
+
+    def test_update_user_preferences_no_valid_fields(self, authenticated_client):
+        """Test update_user_preferences_endpoint with no valid preference fields."""
+        response = authenticated_client.put(
+            "/api/v1/users/preferences",
+            json={"invalid_field": "value"},
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["detail"] == "No valid preference fields to update"
+
     def test_user_endpoints_no_auth(self, client):
         """Test user endpoints without authentication."""
         response = client.get("/api/v1/users/me")
@@ -236,6 +259,15 @@ class TestUserEndpoints:
         response = authenticated_client.post("/api/v1/users/destinations/save", json={})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
+    def test_save_destination_missing_destination_name(self, authenticated_client):
+        """Test save_destination_endpoint with missing destination_name."""
+        response = authenticated_client.post(
+            "/api/v1/users/destinations/save",
+            json={"destination_data": {"country": "France"}},
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["detail"] == "destination_name is required"
+
     @patch("app.api.v1.user.db_helpers.save_user_profile")
     def test_update_current_user_profile_success(self, mock_save_profile, authenticated_client):
         """Test successful user profile update."""
@@ -271,3 +303,87 @@ class TestUserEndpoints:
         """Test user profile update without authentication."""
         response = client.put("/api/v1/users/me", json={"first_name": "Jane"})
         assert response.status_code in (401, 403)
+
+    def test_update_current_user_profile_no_valid_fields(self, authenticated_client):
+        """Test update_current_user_profile with no valid fields to update."""
+        response = authenticated_client.put(
+            "/api/v1/users/me",
+            json={},  # Empty update data
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["detail"] == "No valid fields to update"
+
+    @patch("app.api.v1.user.db_helpers.save_user_profile")
+    def test_update_current_user_profile_generic_exception(
+        self, mock_save_profile, authenticated_client
+    ):
+        """Test update_current_user_profile when a generic exception is raised."""
+        mock_save_profile.side_effect = Exception("Unexpected error")
+        response = authenticated_client.put(
+            "/api/v1/users/me",
+            json={"first_name": "Jane"},
+        )
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.json()["detail"] == "Failed to update user profile"
+
+
+class TestGetPreferencesData:
+    """Test the get_preferences_data helper function."""
+
+    def test_get_preferences_data_without_user_id(self):
+        """Test get_preferences_data without user_id."""
+        from app.api.v1.user import get_preferences_data
+
+        result = get_preferences_data()
+
+        expected_default = {
+            "style_preferences": {},
+            "travel_patterns": {},
+            "size_info": {},
+            "quick_reply_preferences": {},
+            "packing_methods": {},
+            "currency_preferences": {},
+        }
+        assert result == expected_default
+
+    def test_get_preferences_data_with_user_id_exception(self):
+        """Test get_preferences_data with valid user_id but database exception."""
+        from app.api.v1.user import get_preferences_data
+
+        # Mock db_helpers to raise an exception
+        with patch("app.api.v1.user.db_helpers") as mock_db:
+            mock_db.get_user_preferences.side_effect = Exception("Database error")
+
+            result = get_preferences_data("test-user-123")
+
+            # Should return default preferences when exception occurs
+            expected_default = {
+                "style_preferences": {},
+                "travel_patterns": {},
+                "size_info": {},
+                "quick_reply_preferences": {},
+                "packing_methods": {},
+                "currency_preferences": {},
+            }
+            assert result == expected_default
+
+    def test_get_preferences_data_with_user_id_none_result(self):
+        """Test get_preferences_data with valid user_id but None result from database."""
+        from app.api.v1.user import get_preferences_data
+
+        # Mock db_helpers to return None
+        with patch("app.api.v1.user.db_helpers") as mock_db:
+            mock_db.get_user_preferences.return_value = None
+
+            result = get_preferences_data("test-user-123")
+
+            # Should return default preferences when database returns None
+            expected_default = {
+                "style_preferences": {},
+                "travel_patterns": {},
+                "size_info": {},
+                "quick_reply_preferences": {},
+                "packing_methods": {},
+                "currency_preferences": {},
+            }
+            assert result == expected_default

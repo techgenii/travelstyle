@@ -187,12 +187,11 @@ class TestCurrencyEndpoints:
             "app.services.currency_conversion_service.currency_conversion_service.handle_currency_request"
         ) as mock_handle:
             mock_handle.return_value = {
-                "type": "conversion",
-                "message": "100 USD = 85 EUR",
-                "data": {
-                    "original": {"amount": 100.0, "currency": "USD"},
-                    "converted": {"amount": 85.0, "currency": "EUR"},
-                },
+                "original": {"amount": 100.0, "currency": "USD"},
+                "converted": {"amount": 85.0, "currency": "EUR"},
+                "rate": 0.85,
+                "last_updated_unix": 1640995200,
+                "last_updated_utc": "2022-01-01T00:00:00Z",
             }
             response = authenticated_client.post(
                 "/api/v1/currency/convert",
@@ -201,7 +200,8 @@ class TestCurrencyEndpoints:
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
             assert "message" in data
-            assert "100 USD = 85 EUR" in data["message"]
+            assert "100.00 USD = 85.00 EUR" in data["message"]
+            assert "Rate: 0.8500" in data["message"]
 
     def test_currency_convert_chat_failure(self, authenticated_client):
         """Test currency conversion via chat endpoint when it fails."""
