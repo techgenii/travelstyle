@@ -51,7 +51,7 @@ jobs:
           rm -rf $BUILD_DIR $ZIP_FILE
           mkdir -p $BUILD_DIR
 
-          pip install -r requirements.txt --target $BUILD_DIR --no-cache-dir --upgrade
+          pip install -r requirements-lambda.txt --target $BUILD_DIR --no-cache-dir --upgrade
           cp -r app/* $BUILD_DIR/
           find $BUILD_DIR \( -name '__pycache__' -o -name '*.pyc' \) -exec rm -rf {} +
 
@@ -68,15 +68,50 @@ jobs:
           name: lambda-package
           path: backend/lambda-deploy.zip
 
+      - name: Validate Secrets
+        run: |
+          echo "Validating required secrets..."
+          # Check if secrets are set (they will be empty strings if not set)
+          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then echo "❌ Missing OPENAI_API_KEY"; exit 1; fi
+          if [ -z "${{ secrets.OPENAI_ORG_ID }}" ]; then echo "❌ Missing OPENAI_ORG_ID"; exit 1; fi
+          if [ -z "${{ secrets.QLOO_API_KEY }}" ]; then echo "❌ Missing QLOO_API_KEY"; exit 1; fi
+          if [ -z "${{ secrets.OPENWEATHER_API_KEY }}" ]; then echo "❌ Missing OPENWEATHER_API_KEY"; exit 1; fi
+          if [ -z "${{ secrets.EXCHANGE_API_KEY }}" ]; then echo "❌ Missing EXCHANGE_API_KEY"; exit 1; fi
+          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then echo "❌ Missing SUPABASE_URL"; exit 1; fi
+          if [ -z "${{ secrets.SUPABASE_KEY }}" ]; then echo "❌ Missing SUPABASE_KEY"; exit 1; fi
+          echo "✅ All required secrets are present"
+
       - name: Deploy Lambda Function
         run: |
           cd backend
 
-          if [ "$ENV_VARS" != "{}" ]; then
-            echo "{\"Variables\": $ENV_VARS}" > env.json
-          else
-            echo '{"Variables": {}}' > env.json
-          fi
+          # Create environment variables JSON
+          cat > env.json << EOF
+          {
+            "Variables": {
+              "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
+              "OPENAI_ORG_ID": "${{ secrets.OPENAI_ORG_ID }}",
+              "QLOO_API_KEY": "${{ secrets.QLOO_API_KEY }}",
+              "OPENWEATHER_API_KEY": "${{ secrets.OPENWEATHER_API_KEY }}",
+              "EXCHANGE_API_KEY": "${{ secrets.EXCHANGE_API_KEY }}",
+              "SUPABASE_URL": "${{ secrets.SUPABASE_URL }}",
+              "SUPABASE_KEY": "${{ secrets.SUPABASE_KEY }}",
+              "API_V1_STR": "/api/v1",
+              "PROJECT_NAME": "TravelStyle AI",
+              "VERSION": "1.0.0"
+            }
+          }
+          EOF
+
+          # Debug: Check the generated JSON
+          echo "Generated env.json:"
+          cat env.json
+          echo "JSON validation:"
+          python3 -m json.tool env.json || echo "❌ Invalid JSON format"
+
+          # Debug: Show JSON structure without values
+          echo "JSON structure (values masked):"
+          cat env.json | python3 -c "import json, sys; data = json.load(sys.stdin); [print(f'  \"{key}\": \"***\"') for key, value in data['Variables'].items()]"
 
           if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
             aws lambda wait function-active --function-name $FUNCTION_NAME

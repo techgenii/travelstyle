@@ -1,7 +1,6 @@
 
 # Core FastAPI and dependencies
 fastapi
-uvicorn[standard]
 mangum
 
 # Data validation and settings

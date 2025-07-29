@@ -1,4 +1,6 @@
 # Development and testing dependencies
+uvicorn[standard]
+
 pytest
 pytest-asyncio
 pytest-cov

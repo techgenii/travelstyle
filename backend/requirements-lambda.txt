@@ -1,0 +1,44 @@
+# Core FastAPI and ASGI dependencies for Lambda
+fastapi
+starlette
+mangum
+
+# Data validation and settings
+pydantic
+pydantic-settings
+email-validator
+
+# HTTP client for external APIs
+httpx
+
+# Authentication and security
+python-jose[cryptography]
+python-multipart
+PyJWT
+
+# Database - Supabase client
+supabase
+
+# Password hashing
+passlib[bcrypt]
+
+# Environment variables
+python-dotenv
+
+# AI integration
+openai==1.55.3
+
+# Core dependencies that FastAPI/Starlette needs
+anyio
+click
+h11
+idna
+sniffio
+typing-extensions
+
+# Additional dependencies for the application
+certifi
+charset-normalizer
+cryptography
+multidict
+yarl
