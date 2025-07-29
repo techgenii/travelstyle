@@ -82,7 +82,7 @@ jobs:
           # Create minimal function package (just the handler)
           mkdir -p function
           echo 'import sys; sys.path.insert(0, "/opt/python"); sys.path.insert(0, "/opt/app")' > function/lambda_function.py
-          cat app/main.py >> function/lambda_function.py
+          cat ../app/main.py >> function/lambda_function.py
           cd function
           zip -r ../lambda-deploy.zip .
           cd ..
