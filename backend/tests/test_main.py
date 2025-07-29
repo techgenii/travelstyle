@@ -61,10 +61,10 @@ def test_redoc(client):
 
 def test_lifespan_startup_and_shutdown():
     """Test lifespan function startup and shutdown behavior."""
-    from app.main import lifespan
+    from app.travelstyle import lifespan
 
     # Mock logger to capture log messages
-    with patch("app.main.logger") as mock_logger:
+    with patch("app.travelstyle.logger") as mock_logger:
         # Test the lifespan context manager
         async def test_lifespan():
             async with lifespan(None):
@@ -85,7 +85,7 @@ def test_lifespan_startup_and_shutdown():
 def test_main_block_exists():
     """Test that the main module exists and can be executed."""
     # Import the main module to verify it loads correctly
-    from app.main import app
+    from app.travelstyle import travelstyle_app as app
 
     # Verify the app was created successfully
     assert app is not None
@@ -93,22 +93,22 @@ def test_main_block_exists():
     assert app.title == "TravelStyle AI"
 
     # Verify the Lambda handler function exists (for AWS Lambda deployment)
-    import app.main
+    import app.travelstyle
 
-    assert hasattr(app.main, "handler")
-    assert callable(app.main.handler)
+    assert hasattr(app.travelstyle, "handler")
+    assert callable(app.travelstyle.handler)
 
     # Verify the lifespan function exists
-    assert hasattr(app.main, "lifespan")
-    assert callable(app.main.lifespan)
+    assert hasattr(app.travelstyle, "lifespan")
+    assert callable(app.travelstyle.lifespan)
 
     # Verify the app has the expected routers
-    assert len(app.main.app.routes) > 0
+    assert len(app.travelstyle.travelstyle_app.routes) > 0
 
 
 def test_handler_success():
     """Test Lambda handler with successful event."""
-    from app.main import handler
+    from app.travelstyle import handler
 
     # Mock event and context
     event = {
@@ -122,9 +122,9 @@ def test_handler_success():
     context = MagicMock()
 
     # Mock logger to capture log messages
-    with patch("app.main.logger") as mock_logger:
+    with patch("app.travelstyle.logger") as mock_logger:
         # Mock Mangum to return a successful response
-        with patch("app.main.Mangum") as mock_mangum:
+        with patch("app.travelstyle.Mangum") as mock_mangum:
             mock_mangum_instance = MagicMock()
             mock_mangum_instance.return_value = {
                 "statusCode": 200,
@@ -152,7 +152,7 @@ def test_handler_success():
 
 def test_handler_with_query_parameters():
     """Test Lambda handler with query parameters."""
-    from app.main import handler
+    from app.travelstyle import handler
 
     # Mock event with query parameters
     event = {
@@ -166,9 +166,9 @@ def test_handler_with_query_parameters():
     context = MagicMock()
 
     # Mock logger to capture log messages
-    with patch("app.main.logger") as mock_logger:
+    with patch("app.travelstyle.logger") as mock_logger:
         # Mock Mangum to return a successful response
-        with patch("app.main.Mangum") as mock_mangum:
+        with patch("app.travelstyle.Mangum") as mock_mangum:
             mock_mangum_instance = MagicMock()
             mock_mangum_instance.return_value = {
                 "statusCode": 200,
@@ -191,7 +191,7 @@ def test_handler_with_query_parameters():
 
 def test_handler_with_missing_path():
     """Test Lambda handler with missing path in event."""
-    from app.main import handler
+    from app.travelstyle import handler
 
     # Mock event without path
     event = {
@@ -204,9 +204,9 @@ def test_handler_with_missing_path():
     context = MagicMock()
 
     # Mock logger to capture log messages
-    with patch("app.main.logger") as mock_logger:
+    with patch("app.travelstyle.logger") as mock_logger:
         # Mock Mangum to return a successful response
-        with patch("app.main.Mangum") as mock_mangum:
+        with patch("app.travelstyle.Mangum") as mock_mangum:
             mock_mangum_instance = MagicMock()
             mock_mangum_instance.return_value = {
                 "statusCode": 200,
@@ -227,7 +227,7 @@ def test_handler_with_missing_path():
 
 def test_handler_with_missing_http_method():
     """Test Lambda handler with missing httpMethod in event."""
-    from app.main import handler
+    from app.travelstyle import handler
 
     # Mock event without httpMethod
     event = {
@@ -240,9 +240,9 @@ def test_handler_with_missing_http_method():
     context = MagicMock()
 
     # Mock logger to capture log messages
-    with patch("app.main.logger") as mock_logger:
+    with patch("app.travelstyle.logger") as mock_logger:
         # Mock Mangum to return a successful response
-        with patch("app.main.Mangum") as mock_mangum:
+        with patch("app.travelstyle.Mangum") as mock_mangum:
             mock_mangum_instance = MagicMock()
             mock_mangum_instance.return_value = {
                 "statusCode": 200,
@@ -263,7 +263,7 @@ def test_handler_with_missing_http_method():
 
 def test_handler_with_missing_query_parameters():
     """Test Lambda handler with missing queryStringParameters in event."""
-    from app.main import handler
+    from app.travelstyle import handler
 
     # Mock event without queryStringParameters
     event = {
@@ -276,9 +276,9 @@ def test_handler_with_missing_query_parameters():
     context = MagicMock()
 
     # Mock logger to capture log messages
-    with patch("app.main.logger") as mock_logger:
+    with patch("app.travelstyle.logger") as mock_logger:
         # Mock Mangum to return a successful response
-        with patch("app.main.Mangum") as mock_mangum:
+        with patch("app.travelstyle.Mangum") as mock_mangum:
             mock_mangum_instance = MagicMock()
             mock_mangum_instance.return_value = {
                 "statusCode": 200,
@@ -299,7 +299,7 @@ def test_handler_with_missing_query_parameters():
 
 def test_handler_exception():
     """Test Lambda handler with exception handling."""
-    from app.main import handler
+    from app.travelstyle import handler
 
     # Mock event and context
     event = {
@@ -313,9 +313,9 @@ def test_handler_exception():
     context = MagicMock()
 
     # Mock logger to capture log messages
-    with patch("app.main.logger") as mock_logger:
+    with patch("app.travelstyle.logger") as mock_logger:
         # Mock Mangum to raise an exception
-        with patch("app.main.Mangum") as mock_mangum:
+        with patch("app.travelstyle.Mangum") as mock_mangum:
             mock_mangum_instance = MagicMock()
             mock_mangum_instance.side_effect = Exception("Test exception")
             mock_mangum.return_value = mock_mangum_instance
@@ -337,7 +337,7 @@ def test_handler_exception():
 
 def test_handler_with_post_request():
     """Test Lambda handler with POST request."""
-    from app.main import handler
+    from app.travelstyle import handler
 
     # Mock event for POST request
     event = {
@@ -351,9 +351,9 @@ def test_handler_with_post_request():
     context = MagicMock()
 
     # Mock logger to capture log messages
-    with patch("app.main.logger") as mock_logger:
+    with patch("app.travelstyle.logger") as mock_logger:
         # Mock Mangum to return a successful response
-        with patch("app.main.Mangum") as mock_mangum:
+        with patch("app.travelstyle.Mangum") as mock_mangum:
             mock_mangum_instance = MagicMock()
             mock_mangum_instance.return_value = {
                 "statusCode": 200,
@@ -376,7 +376,7 @@ def test_handler_with_post_request():
 
 def test_handler_with_base64_encoded_body():
     """Test Lambda handler with base64 encoded body."""
-    from app.main import handler
+    from app.travelstyle import handler
 
     # Mock event with base64 encoded body
     event = {
@@ -390,9 +390,9 @@ def test_handler_with_base64_encoded_body():
     context = MagicMock()
 
     # Mock logger to capture log messages
-    with patch("app.main.logger") as mock_logger:
+    with patch("app.travelstyle.logger") as mock_logger:
         # Mock Mangum to return a successful response
-        with patch("app.main.Mangum") as mock_mangum:
+        with patch("app.travelstyle.Mangum") as mock_mangum:
             mock_mangum_instance = MagicMock()
             mock_mangum_instance.return_value = {
                 "statusCode": 200,
@@ -414,7 +414,7 @@ def test_handler_with_base64_encoded_body():
 
 def test_handler_logging_and_print():
     """Test that handler logs and prints response information."""
-    from app.main import handler
+    from app.travelstyle import handler
 
     # Mock event and context
     event = {
@@ -428,10 +428,10 @@ def test_handler_logging_and_print():
     context = MagicMock()
 
     # Mock logger and print to capture output
-    with patch("app.main.logger") as mock_logger:
+    with patch("app.travelstyle.logger") as mock_logger:
         with patch("builtins.print") as mock_print:
             # Mock Mangum to return a successful response
-            with patch("app.main.Mangum") as mock_mangum:
+            with patch("app.travelstyle.Mangum") as mock_mangum:
                 mock_mangum_instance = MagicMock()
                 mock_response = {
                     "statusCode": 200,

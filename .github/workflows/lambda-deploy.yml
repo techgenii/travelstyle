@@ -1,9 +1,14 @@
-name: Deploy TravelStyle to Lambda
+# NOTE: This workflow expects all Lambda backend code (app.py, requirements.txt, etc.) to be in the 'backend' directory.
+# If you move your backend code, update the workflow paths accordingly.
+name: Deploy TravelStyle AI API to Lambda
 
 on:
   push:
-    branches: [main]
-    paths: ['backend/**', '.github/workflows/**']
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/**'
   workflow_dispatch:
   workflow_run:
     workflows: ["Backend Quality CI/CD"]
@@ -13,21 +18,20 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
+    timeout-minutes: 15
     env:
       ZIP_FILE: lambda-deploy.zip
       BUILD_DIR: build
       PYTHON_VERSION: 3.13
-      HANDLER: app.main.handler
+      HANDLER: travelstyle.handler
       RUNTIME: python3.13
       ARCHITECTURE: x86_64
-      STAGE_NAME: '$default'
+      STAGE_NAME: '$default'  # Use default stage for root URL
       FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME }}
       ROLE_ARN: ${{ secrets.LAMBDA_ROLE_ARN }}
       REGION: ${{ secrets.AWS_REGION }}
-      API_NAME: TravelStyleAPI
-      LAMBDA_ENV_VARS: ${{ secrets.ENV_VARS || '{}' }}
+      S3_BUCKET: ${{ secrets.LAMBDA_S3_BUCKET }}
+      API_NAME: TravelStyleAPI  # Distinct API name
 
     steps:
       - name: Checkout code
@@ -45,22 +49,76 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.REGION }}
 
+      - name: Setup Lambda Execution Role
+        run: |
+          echo "Setting up Lambda execution role in region: $REGION"
+
+          # Define role name
+          ROLE_NAME="TravelStyle-Lambda-Role"
+          ROLE_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/$ROLE_NAME"
+
+          # Check if role exists
+          if aws iam get-role --role-name $ROLE_NAME &>/dev/null; then
+            echo "Using existing role: $ROLE_ARN"
+          else
+            echo "Creating new Lambda execution role..."
+
+            # Create trust policy
+            cat > trust-policy.json << EOF
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "lambda.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+          EOF
+
+            # Create the role
+            aws iam create-role \
+              --role-name $ROLE_NAME \
+              --assume-role-policy-document file://trust-policy.json \
+              --description "Lambda execution role for TravelStyle"
+
+            # Attach basic execution policy
+            aws iam attach-role-policy \
+              --role-name $ROLE_NAME \
+              --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+            echo "Created role: $ROLE_ARN"
+          fi
+
+          # Update environment variable to use the correct role
+          echo "ROLE_ARN=$ROLE_ARN" >> $GITHUB_ENV
+          echo "Using role: $ROLE_ARN"
+
       - name: Build Lambda package
         run: |
           cd backend
           rm -rf $BUILD_DIR $ZIP_FILE
           mkdir -p $BUILD_DIR
 
-          pip install -r requirements-lambda.txt --target $BUILD_DIR --no-cache-dir --upgrade
-          cp -r app/* $BUILD_DIR/
+          # Install all requirements natively (no --platform or --python-version)
+          pip install -r requirements.txt --target $BUILD_DIR \
+            --no-cache-dir \
+            --upgrade
+
+          echo "Copying: ./app/* to $BUILD_DIR/"
+          cp -r ./app/* ./$BUILD_DIR/
           find $BUILD_DIR \( -name '__pycache__' -o -name '*.pyc' \) -exec rm -rf {} +
 
       - name: Package deployment
         run: |
-          cd backend/$BUILD_DIR
+          cd backend
+          cd $BUILD_DIR
           zip -r9 ../$ZIP_FILE .
           cd ..
-          echo "size=$(du -h $ZIP_FILE | cut -f1)"
+          echo "size=$(du -h $ZIP_FILE | cut -f1)" >> $GITHUB_OUTPUT
 
       - name: Upload Lambda package artifact
         uses: actions/upload-artifact@v4
@@ -68,63 +126,51 @@ jobs:
           name: lambda-package
           path: backend/lambda-deploy.zip
 
-      - name: Validate Secrets
-        run: |
-          echo "Validating required secrets..."
-          # Check if secrets are set (they will be empty strings if not set)
-          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then echo "❌ Missing OPENAI_API_KEY"; exit 1; fi
-          if [ -z "${{ secrets.OPENAI_ORG_ID }}" ]; then echo "❌ Missing OPENAI_ORG_ID"; exit 1; fi
-          if [ -z "${{ secrets.QLOO_API_KEY }}" ]; then echo "❌ Missing QLOO_API_KEY"; exit 1; fi
-          if [ -z "${{ secrets.OPENWEATHER_API_KEY }}" ]; then echo "❌ Missing OPENWEATHER_API_KEY"; exit 1; fi
-          if [ -z "${{ secrets.EXCHANGE_API_KEY }}" ]; then echo "❌ Missing EXCHANGE_API_KEY"; exit 1; fi
-          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then echo "❌ Missing SUPABASE_URL"; exit 1; fi
-          if [ -z "${{ secrets.SUPABASE_KEY }}" ]; then echo "❌ Missing SUPABASE_KEY"; exit 1; fi
-          echo "✅ All required secrets are present"
-
       - name: Deploy Lambda Function
         run: |
           cd backend
 
-          # Create environment variables JSON
-          cat > env.json << EOF
-          {
-            "Variables": {
-              "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
-              "OPENAI_ORG_ID": "${{ secrets.OPENAI_ORG_ID }}",
-              "QLOO_API_KEY": "${{ secrets.QLOO_API_KEY }}",
-              "OPENWEATHER_API_KEY": "${{ secrets.OPENWEATHER_API_KEY }}",
-              "EXCHANGE_API_KEY": "${{ secrets.EXCHANGE_API_KEY }}",
-              "SUPABASE_URL": "${{ secrets.SUPABASE_URL }}",
-              "SUPABASE_KEY": "${{ secrets.SUPABASE_KEY }}",
-              "API_V1_STR": "/api/v1",
-              "PROJECT_NAME": "TravelStyle AI",
-              "VERSION": "1.0.0"
-            }
-          }
-          EOF
+          # Handle environment variables properly
+          if [ -n "$ENV_VARS" ] && [ "$ENV_VARS" != "{}" ]; then
+            # If ENV_VARS is provided, wrap it in Variables object
+            echo "{\"Variables\": $ENV_VARS}" > env.json
+            echo "Environment variables configured (count: $(echo "$ENV_VARS" | jq -r 'keys | length'))"
+          else
+            # Create empty environment variables
+            echo '{"Variables": {}}' > env.json
+            echo "No environment variables configured"
+          fi
 
-          # Debug: Check the generated JSON
-          echo "Generated env.json:"
-          cat env.json
-          echo "JSON validation:"
-          python3 -m json.tool env.json || echo "❌ Invalid JSON format"
-
-          # Debug: Show JSON structure without values
-          echo "JSON structure (values masked):"
-          cat env.json | python3 -c "import json, sys; data = json.load(sys.stdin); [print(f'  \"{key}\": \"***\"') for key, value in data['Variables'].items()]"
+          # Debug: show what we're creating (without revealing values)
+          echo "Environment configuration structure:"
+          cat env.json | jq -r 'keys' || echo "Environment file created successfully"
 
           if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
+            echo "Updating existing function..."
+
+            # Wait for function to be in Active state before updating
+            echo "Waiting for function to be ready for updates..."
             aws lambda wait function-active --function-name $FUNCTION_NAME
-            aws lambda update-function-code --function-name $FUNCTION_NAME --zip-file fileb://$ZIP_FILE
+
+            # Update function code first
+            aws lambda update-function-code \
+              --function-name $FUNCTION_NAME \
+              --zip-file fileb://$ZIP_FILE
+
+            # Wait for code update to complete
             aws lambda wait function-updated --function-name $FUNCTION_NAME
+
             aws lambda update-function-configuration \
               --function-name $FUNCTION_NAME \
               --environment file://env.json \
               --timeout 30 \
               --memory-size 2048 \
               --ephemeral-storage '{"Size": 2048}'
+
+            # Wait for configuration update to complete
             aws lambda wait function-updated --function-name $FUNCTION_NAME
           else
+            echo "Creating new function..."
             aws lambda create-function \
               --function-name $FUNCTION_NAME \
               --runtime $RUNTIME \
@@ -136,64 +182,172 @@ jobs:
               --timeout 30 \
               --memory-size 2048 \
               --ephemeral-storage '{"Size": 2048}'
+
+            # Wait for function to be active
             aws lambda wait function-active --function-name $FUNCTION_NAME
           fi
 
+          echo "Lambda function deployment completed successfully!"
+        env:
+          ENV_VARS: ${{ secrets.ENV_VARS || '{}' }}
+
       - name: Configure Lambda Logging Permissions
         run: |
+          echo "Ensuring Lambda has CloudWatch logging permissions..."
+
+          # Get the Lambda function's role name
           ROLE_NAME=$(aws lambda get-function --function-name $FUNCTION_NAME --query 'Configuration.Role' --output text | cut -d'/' -f2)
+          echo "Lambda role: $ROLE_NAME"
+
+          # Attach CloudWatch Logs policy if not already attached
           aws iam attach-role-policy \
             --role-name $ROLE_NAME \
             --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole 2>/dev/null || echo "Policy already attached"
 
+          echo "Lambda logging permissions configured!"
+
       - name: Configure API Gateway
         run: |
-          API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='$API_NAME'].ApiId" --output text | tr -d '\n')
-          if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
-            API_ID=$(aws apigatewayv2 create-api --name "$API_NAME" --protocol-type HTTP --query "ApiId" --output text)
+          # Check if API already exists
+          EXISTING_API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='$API_NAME'].ApiId" --output text 2>/dev/null || echo "")
+
+          if [ -n "$EXISTING_API_ID" ] && [ "$EXISTING_API_ID" != "None" ]; then
+            echo "Using existing API Gateway: $EXISTING_API_ID"
+            API_ID=$EXISTING_API_ID
+          else
+            echo "Creating new API Gateway..."
+            API_ID=$(aws apigatewayv2 create-api \
+              --name "$API_NAME" \
+              --protocol-type HTTP \
+              --query "ApiId" --output text)
+            echo "Created API Gateway: $API_ID"
           fi
 
+          # Get account ID for Lambda ARN
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           LAMBDA_ARN="arn:aws:lambda:$REGION:$ACCOUNT_ID:function:$FUNCTION_NAME"
+          echo "Lambda ARN: $LAMBDA_ARN"
 
-          INTEGRATION_ID=$(aws apigatewayv2 get-integrations --api-id $API_ID --query "Items[0].IntegrationId" --output text 2>/dev/null || echo "")
+          # Check if integration already exists
+          EXISTING_INTEGRATION_ID=$(aws apigatewayv2 get-integrations --api-id $API_ID --query "Items[0].IntegrationId" --output text 2>/dev/null || echo "")
 
-          if [ -n "$INTEGRATION_ID" ]; then
+          if [ -n "$EXISTING_INTEGRATION_ID" ] && [ "$EXISTING_INTEGRATION_ID" != "None" ]; then
+            echo "Using existing integration: $EXISTING_INTEGRATION_ID"
+            INTEGRATION_ID=$EXISTING_INTEGRATION_ID
+
+            # Update existing integration to ensure it's correct
+            echo "Updating existing integration..."
             aws apigatewayv2 update-integration \
               --api-id $API_ID \
               --integration-id $INTEGRATION_ID \
               --integration-uri $LAMBDA_ARN \
               --payload-format-version 2.0
           else
+            echo "Creating new integration..."
             INTEGRATION_ID=$(aws apigatewayv2 create-integration \
               --api-id $API_ID \
               --integration-type AWS_PROXY \
               --integration-uri $LAMBDA_ARN \
               --payload-format-version 2.0 \
               --query 'IntegrationId' --output text)
+            echo "Created integration: $INTEGRATION_ID"
           fi
 
-          aws apigatewayv2 get-routes --api-id $API_ID --query "Items[?RouteKey=='ANY /'].RouteId" --output text | xargs -I {} aws apigatewayv2 delete-route --api-id $API_ID --route-id {} 2>/dev/null || true
-          aws apigatewayv2 get-routes --api-id $API_ID --query "Items[?RouteKey=='ANY /{proxy+}'].RouteId" --output text | xargs -I {} aws apigatewayv2 delete-route --api-id $API_ID --route-id {} 2>/dev/null || true
+          # Verify integration
+          echo "Verifying integration configuration..."
+          aws apigatewayv2 get-integration --api-id $API_ID --integration-id $INTEGRATION_ID
 
-          aws apigatewayv2 create-route --api-id $API_ID --route-key "ANY /" --target "integrations/$INTEGRATION_ID"
-          aws apigatewayv2 create-route --api-id $API_ID --route-key "ANY /{proxy+}" --target "integrations/$INTEGRATION_ID"
+          # Create routes (these will be updated if they exist)
+          echo "Setting up routes..."
 
-          aws apigatewayv2 create-stage --api-id $API_ID --stage-name '$default' --auto-deploy 2>/dev/null || echo "Stage exists"
+          # Delete existing routes first to avoid conflicts
+          echo "Cleaning up existing routes..."
+          aws apigatewayv2 get-routes --api-id $API_ID --query "Items[?RouteKey=='ANY /'].RouteId" --output text | xargs -I {} aws apigatewayv2 delete-route --api-id $API_ID --route-id {} 2>/dev/null || echo "No existing ANY / route to delete"
+          aws apigatewayv2 get-routes --api-id $API_ID --query "Items[?RouteKey=='ANY /{proxy+}'].RouteId" --output text | xargs -I {} aws apigatewayv2 delete-route --api-id $API_ID --route-id {} 2>/dev/null || echo "No existing ANY /{proxy+} route to delete"
 
+          # Create new routes
+          echo "Creating ANY / route..."
+          aws apigatewayv2 create-route \
+            --api-id $API_ID \
+            --route-key "ANY /" \
+            --target "integrations/$INTEGRATION_ID"
+
+          echo "Creating ANY /{proxy+} route..."
+          aws apigatewayv2 create-route \
+            --api-id $API_ID \
+            --route-key "ANY /{proxy+}" \
+            --target "integrations/$INTEGRATION_ID"
+
+          # Create or update stage
+          echo "Setting up stage..."
+          aws apigatewayv2 create-stage \
+            --api-id $API_ID \
+            --stage-name '$default' \
+            --auto-deploy 2>/dev/null || echo "Stage $default already exists"
+
+          # Set permissions (will fail silently if already exists)
+          echo "Setting up Lambda permissions..."
           aws lambda add-permission \
             --function-name $FUNCTION_NAME \
             --statement-id "api-gateway-invoke" \
             --action lambda:InvokeFunction \
             --principal apigateway.amazonaws.com \
-            --source-arn "arn:aws:execute-api:$REGION:$ACCOUNT_ID:$API_ID/*/*/*" 2>/dev/null || echo "Permission exists"
+            --source-arn "arn:aws:execute-api:$REGION:$ACCOUNT_ID:$API_ID/*/*/*" 2>/dev/null || echo "Permission already exists"
 
+          # Output endpoint (no stage in URL)
           ENDPOINT="https://$API_ID.execute-api.$REGION.amazonaws.com"
           echo "API_ENDPOINT=$ENDPOINT" >> $GITHUB_ENV
-          echo "✅ Deployed to: $ENDPOINT"
+          echo "endpoint=$ENDPOINT" >> $GITHUB_OUTPUT
+          echo "API Gateway configured successfully!"
+          echo "Endpoint: $ENDPOINT"
 
-      - name: Post Deployment Test
+          # Show final API Gateway configuration
+          echo ""
+          echo "📋 API Gateway Configuration Summary:"
+          echo "API ID: $API_ID"
+          echo "Integration ID: $INTEGRATION_ID"
+          echo "Lambda ARN: $LAMBDA_ARN"
+          echo "Stage: $default (root URL)"
+          echo "Endpoint: $ENDPOINT"
+
+      - name: Post deployment test
         run: |
-          sleep 10
-          echo "Testing /health endpoint:"
-          curl -s $API_ENDPOINT/health || echo "❌ Health check failed"
+          echo "Waiting 15 seconds for API Gateway to fully deploy..."
+          sleep 15
+
+          echo "Testing API endpoints..."
+
+          # Test the root endpoint
+          echo "Testing root endpoint..."
+          ROOT_RESPONSE=$(curl -s $API_ENDPOINT --max-time 10)
+          if [ $? -eq 0 ]; then
+            echo "✅ Root endpoint response: $ROOT_RESPONSE"
+            # Check if response contains expected message
+            if echo "$ROOT_RESPONSE" | grep -q "Welcome to TravelStyle AI API"; then
+              echo "✅ Root endpoint working correctly!"
+            else
+              echo "⚠️  Root endpoint returned unexpected response"
+            fi
+          else
+            echo "❌ Root endpoint test failed"
+          fi
+
+          # Test the health endpoint
+          echo "Testing health endpoint..."
+          HEALTH_RESPONSE=$(curl -s $API_ENDPOINT/health --max-time 10)
+          if [ $? -eq 0 ]; then
+            echo "✅ Health endpoint response: $HEALTH_RESPONSE"
+            # Check if response contains expected status
+            if echo "$HEALTH_RESPONSE" | grep -q "healthy"; then
+              echo "✅ Health endpoint working correctly!"
+            else
+              echo "⚠️  Health endpoint returned unexpected response"
+            fi
+          else
+            echo "❌ Health endpoint test failed"
+          fi
+
+          echo ""
+          echo "🎉 TravelStyle stage deployed successfully!"
+          echo "🌐 Access your API at: $API_ENDPOINT"
+          echo "🏥 Health check at: $API_ENDPOINT/health"

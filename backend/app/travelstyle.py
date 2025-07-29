@@ -50,7 +50,7 @@ async def lifespan(fastapi_app: FastAPI):  # pylint: disable=unused-argument
 
 
 # Create FastAPI application
-app = FastAPI(
+travelstyle_app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="AI-powered travel wardrobe consultant with cultural intelligence",
@@ -58,7 +58,7 @@ app = FastAPI(
 )
 
 # Middleware
-app.add_middleware(
+travelstyle_app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Configure appropriately for production
     allow_credentials=True,
@@ -66,33 +66,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(
+travelstyle_app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["*"],  # Configure appropriately for production
 )
 
 # Exception handlers
-app.add_exception_handler(HTTPException, custom_http_exception_handler)
+travelstyle_app.add_exception_handler(HTTPException, custom_http_exception_handler)
 
 # Include routers
-app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["authentication"])
-app.include_router(chat.router, prefix=f"{settings.API_V1_STR}/chat", tags=["chat"])
-app.include_router(
+travelstyle_app.include_router(
+    auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["authentication"]
+)
+travelstyle_app.include_router(chat.router, prefix=f"{settings.API_V1_STR}/chat", tags=["chat"])
+travelstyle_app.include_router(
     recommendations.router,
     prefix=f"{settings.API_V1_STR}/recs",
     tags=["recommendations"],
 )
-app.include_router(user.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
-app.include_router(currency.router, prefix=f"{settings.API_V1_STR}/currency", tags=["currency"])
+travelstyle_app.include_router(user.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
+travelstyle_app.include_router(
+    currency.router, prefix=f"{settings.API_V1_STR}/currency", tags=["currency"]
+)
 
 
-@app.get("/")
+@travelstyle_app.get("/")
 async def root():
     """Root endpoint returning API welcome message and version."""
     return {"message": "Welcome to TravelStyle AI API", "version": settings.VERSION}
 
 
-@app.get("/health")
+@travelstyle_app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring API status."""
     return {"status": "healthy", "cache": "supabase"}
@@ -106,7 +110,7 @@ def handler(event, context):
 
     try:
         # Use Mangum to handle the FastAPI app
-        mangum_handler = Mangum(app)
+        mangum_handler = Mangum(travelstyle_app)
         response = mangum_handler(event, context)
         logger.info(f"Lambda response: {response}")
         print(f"Lambda response: {response}")

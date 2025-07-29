@@ -22,7 +22,7 @@ Pytest configuration and fixtures for TravelStyle AI backend tests.
 import warnings
 
 import pytest
-from app.main import app
+from app.travelstyle import travelstyle_app as app
 from fastapi.testclient import TestClient
 
 # Configure warning filters to suppress known deprecation warnings
