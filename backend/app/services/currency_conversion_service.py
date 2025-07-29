@@ -415,17 +415,23 @@ User message: {user_message}
 
             pair_data = await currency_service.get_pair_exchange_rate(from_currency, to_currency)
             if not pair_data:
+                logger.error(f"No pair data returned for {from_currency} to {to_currency}")
                 return None
 
-            conversion_rate = pair_data["rate"]
+            # Safely access the required keys with defaults
+            conversion_rate = pair_data.get("rate")
+            if conversion_rate is None:
+                logger.error(f"No rate found in pair data: {pair_data}")
+                return None
+
             converted_amount = round(amount * conversion_rate, 2)
 
             return {
                 "original": {"amount": round(amount, 2), "currency": from_currency},
                 "converted": {"amount": converted_amount, "currency": to_currency},
                 "rate": conversion_rate,
-                "last_updated_unix": pair_data["last_updated_unix"],
-                "last_updated_utc": pair_data["last_updated_utc"],
+                "last_updated_unix": pair_data.get("last_updated_unix"),
+                "last_updated_utc": pair_data.get("last_updated_utc"),
             }
 
         except Exception as e:
