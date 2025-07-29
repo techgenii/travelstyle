@@ -343,7 +343,7 @@ User message: {user_message}
 """
 
             response = await openai_service.client.chat.completions.create(
-                model="gpt-4-mini",
+                model="gpt-4.1-nano",
                 messages=[
                     {
                         "role": "system",
