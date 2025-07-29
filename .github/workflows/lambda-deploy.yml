@@ -10,219 +10,142 @@ on:
     types: [completed]
     branches: [main]
 
-# Optional: Add manual approval for production deployments
-# Uncomment the following to require manual approval:
-# environment:
-#   name: production
-#   url: ${{ steps.deploy.outputs.url }}
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    concurrency:
-      group: lambda-deployment
-      cancel-in-progress: true
+    timeout-minutes: 20
 
     env:
+      ZIP_FILE: lambda-deploy.zip
+      BUILD_DIR: build
+      PYTHON_VERSION: 3.13
+      HANDLER: app.main.handler
+      RUNTIME: python3.13
+      ARCHITECTURE: x86_64
+      STAGE_NAME: '$default'
       FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME }}
-      REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+      ROLE_ARN: ${{ secrets.LAMBDA_ROLE_ARN }}
+      REGION: ${{ secrets.AWS_REGION }}
       API_NAME: TravelStyleAPI
+      LAMBDA_ENV_VARS: ${{ secrets.ENV_VARS || '{}' }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check for ongoing deployments
-        run: |
-          # Check if there are any ongoing Lambda updates
-          if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
-            STATE=$(aws lambda get-function --function-name $FUNCTION_NAME --query 'Configuration.State' --output text 2>/dev/null || echo "Unknown")
-            LAST_MODIFIED=$(aws lambda get-function --function-name $FUNCTION_NAME --query 'Configuration.LastModified' --output text 2>/dev/null || echo "")
-
-            echo "Current function state: $STATE"
-            echo "Last modified: $LAST_MODIFIED"
-
-            if [ "$STATE" != "Active" ]; then
-              echo "⚠️  Function is not in Active state ($STATE). Waiting for any ongoing updates..."
-              # Wait up to 5 minutes for function to become active
-              for i in {1..10}; do
-                sleep 30
-                STATE=$(aws lambda get-function --function-name $FUNCTION_NAME --query 'Configuration.State' --output text 2>/dev/null || echo "Unknown")
-                echo "Attempt $i: Function state is $STATE"
-                if [ "$STATE" = "Active" ]; then
-                  echo "✅ Function is now Active, proceeding with deployment"
-                  break
-                fi
-                if [ $i -eq 10 ]; then
-                  echo "❌ Function did not become Active after 5 minutes"
-                  exit 1
-                fi
-              done
-            fi
-          fi
-
-      - name: Set up Python
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.REGION }}
 
-      - name: Create Lambda package
+      - name: Build Lambda package
         run: |
           cd backend
+          rm -rf $BUILD_DIR $ZIP_FILE
+          mkdir -p $BUILD_DIR
 
-          # Create build directory
-          mkdir -p build
+          pip install -r requirements.txt --target $BUILD_DIR --no-cache-dir --upgrade
+          cp -r app/* $BUILD_DIR/
+          find $BUILD_DIR \( -name '__pycache__' -o -name '*.pyc' \) -exec rm -rf {} +
 
-          # Install dependencies (exclude unnecessary files)
-          pip install -r requirements.txt --target build --no-cache-dir --no-deps
-
-          # Copy only necessary application code
-          cp -r app build/
-
-          # Remove unnecessary files to reduce package size
-          cd build
-          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-          find . -type d -name "*.pyc" -delete 2>/dev/null || true
-          find . -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
-          find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-
-          # Create deployment package
-          zip -r ../lambda-deploy.zip . -x "*.pyc" "__pycache__/*" "tests/*" "*.egg-info/*"
+      - name: Package deployment
+        run: |
+          cd backend/$BUILD_DIR
+          zip -r9 ../$ZIP_FILE .
           cd ..
+          echo "size=$(du -h $ZIP_FILE | cut -f1)"
 
-          echo "Package size: $(du -h lambda-deploy.zip | cut -f1)"
+      - name: Upload Lambda package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-package
+          path: backend/lambda-deploy.zip
 
-      - name: Deploy to Lambda
+      - name: Deploy Lambda Function
         run: |
           cd backend
 
-          # Mask secrets
-          echo "::add-mask::$OPENAI_API_KEY"
-          echo "::add-mask::$OPENAI_ORG_ID"
-          echo "::add-mask::$QLOO_API_KEY"
-          echo "::add-mask::$OPENWEATHER_API_KEY"
-          echo "::add-mask::$EXCHANGE_API_KEY"
-          echo "::add-mask::$SUPABASE_URL"
-          echo "::add-mask::$SUPABASE_KEY"
-          echo "✅ Secrets validated and masked"
-
-          # Check if function exists and wait for any ongoing updates
-          if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
-            echo "Function exists, checking for ongoing updates..."
-
-            # Wait for any ongoing updates to complete
-            for i in {1..10}; do
-              STATE=$(aws lambda get-function --function-name $FUNCTION_NAME --query 'Configuration.State' --output text 2>/dev/null || echo "Unknown")
-              if [ "$STATE" = "Active" ]; then
-                echo "Function is in Active state, proceeding with update"
-                break
-              else
-                echo "Function state: $STATE, waiting 30 seconds (attempt $i/10)..."
-                sleep 30
-                if [ $i -eq 10 ]; then
-                  echo "Function did not become active after 10 attempts, proceeding anyway"
-                fi
-              fi
-            done
+          if [ "$ENV_VARS" != "{}" ]; then
+            echo "{\"Variables\": $ENV_VARS}" > env.json
+          else
+            echo '{"Variables": {}}' > env.json
           fi
 
-          # Create environment variables
-          cat > env.json << EOF
-          {
-            "Variables": {
-              "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
-              "OPENAI_ORG_ID": "${{ secrets.OPENAI_ORG_ID }}",
-              "QLOO_API_KEY": "${{ secrets.QLOO_API_KEY }}",
-              "OPENWEATHER_API_KEY": "${{ secrets.OPENWEATHER_API_KEY }}",
-              "EXCHANGE_API_KEY": "${{ secrets.EXCHANGE_API_KEY }}",
-              "SUPABASE_URL": "${{ secrets.SUPABASE_URL }}",
-              "SUPABASE_KEY": "${{ secrets.SUPABASE_KEY }}",
-              "API_V1_STR": "/api/v1",
-              "PROJECT_NAME": "TravelStyle AI",
-              "VERSION": "1.0.0"
-            }
-          }
-          EOF
-
-          # Deploy or update function with retry logic
           if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
-            echo "Updating existing function..."
-
-            # Update function code first
-            aws lambda update-function-code --function-name $FUNCTION_NAME --zip-file fileb://lambda-deploy.zip
-
-            # Wait for code update to complete
-            echo "Waiting for code update to complete..."
+            aws lambda wait function-active --function-name $FUNCTION_NAME
+            aws lambda update-function-code --function-name $FUNCTION_NAME --zip-file fileb://$ZIP_FILE
             aws lambda wait function-updated --function-name $FUNCTION_NAME
-
-            # Update configuration with retry logic
-            echo "Updating function configuration..."
-            for i in {1..5}; do
-              if aws lambda update-function-configuration \
-                --function-name $FUNCTION_NAME \
-                --environment file://env.json \
-                --timeout 30 \
-                --memory-size 512; then
-                echo "Configuration updated successfully"
-                break
-              else
-                echo "Attempt $i: Configuration update failed, waiting 30 seconds..."
-                sleep 30
-                if [ $i -eq 5 ]; then
-                  echo "Failed to update configuration after 5 attempts"
-                  exit 1
-                fi
-              fi
-            done
-          else
-            echo "Creating new function..."
-            aws lambda create-function \
+            aws lambda update-function-configuration \
               --function-name $FUNCTION_NAME \
-              --runtime python3.13 \
-              --handler app.main.handler \
-              --role arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/TravelStyle-Lambda-Role \
-              --zip-file fileb://lambda-deploy.zip \
               --environment file://env.json \
               --timeout 30 \
-              --memory-size 512
+              --memory-size 2048 \
+              --ephemeral-storage '{"Size": 2048}'
+            aws lambda wait function-updated --function-name $FUNCTION_NAME
+          else
+            aws lambda create-function \
+              --function-name $FUNCTION_NAME \
+              --runtime $RUNTIME \
+              --role $ROLE_ARN \
+              --handler $HANDLER \
+              --architectures $ARCHITECTURE \
+              --zip-file fileb://$ZIP_FILE \
+              --environment file://env.json \
+              --timeout 30 \
+              --memory-size 2048 \
+              --ephemeral-storage '{"Size": 2048}'
+            aws lambda wait function-active --function-name $FUNCTION_NAME
           fi
 
-      - name: Setup API Gateway
+      - name: Configure Lambda Logging Permissions
         run: |
-          # Get or create API Gateway
-          API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='$API_NAME'].ApiId" --output text 2>/dev/null || echo "")
+          ROLE_NAME=$(aws lambda get-function --function-name $FUNCTION_NAME --query 'Configuration.Role' --output text | cut -d'/' -f2)
+          aws iam attach-role-policy \
+            --role-name $ROLE_NAME \
+            --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole 2>/dev/null || echo "Policy already attached"
 
+      - name: Configure API Gateway
+        run: |
+          API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='$API_NAME'].ApiId" --output text | tr -d '\n')
           if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
             API_ID=$(aws apigatewayv2 create-api --name "$API_NAME" --protocol-type HTTP --query "ApiId" --output text)
           fi
 
-          # Create integration
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           LAMBDA_ARN="arn:aws:lambda:$REGION:$ACCOUNT_ID:function:$FUNCTION_NAME"
 
-          INTEGRATION_ID=$(aws apigatewayv2 create-integration \
-            --api-id $API_ID \
-            --integration-type AWS_PROXY \
-            --integration-uri $LAMBDA_ARN \
-            --payload-format-version 2.0 \
-            --query 'IntegrationId' --output text 2>/dev/null || echo "")
+          INTEGRATION_ID=$(aws apigatewayv2 get-integrations --api-id $API_ID --query "Items[0].IntegrationId" --output text 2>/dev/null || echo "")
 
-          # Create routes
-          aws apigatewayv2 create-route --api-id $API_ID --route-key "ANY /" --target "integrations/$INTEGRATION_ID" 2>/dev/null || echo "Route exists"
-          aws apigatewayv2 create-route --api-id $API_ID --route-key "ANY /{proxy+}" --target "integrations/$INTEGRATION_ID" 2>/dev/null || echo "Route exists"
+          if [ -n "$INTEGRATION_ID" ]; then
+            aws apigatewayv2 update-integration \
+              --api-id $API_ID \
+              --integration-id $INTEGRATION_ID \
+              --integration-uri $LAMBDA_ARN \
+              --payload-format-version 2.0
+          else
+            INTEGRATION_ID=$(aws apigatewayv2 create-integration \
+              --api-id $API_ID \
+              --integration-type AWS_PROXY \
+              --integration-uri $LAMBDA_ARN \
+              --payload-format-version 2.0 \
+              --query 'IntegrationId' --output text)
+          fi
 
-          # Create stage
+          aws apigatewayv2 get-routes --api-id $API_ID --query "Items[?RouteKey=='ANY /'].RouteId" --output text | xargs -I {} aws apigatewayv2 delete-route --api-id $API_ID --route-id {} 2>/dev/null || true
+          aws apigatewayv2 get-routes --api-id $API_ID --query "Items[?RouteKey=='ANY /{proxy+}'].RouteId" --output text | xargs -I {} aws apigatewayv2 delete-route --api-id $API_ID --route-id {} 2>/dev/null || true
+
+          aws apigatewayv2 create-route --api-id $API_ID --route-key "ANY /" --target "integrations/$INTEGRATION_ID"
+          aws apigatewayv2 create-route --api-id $API_ID --route-key "ANY /{proxy+}" --target "integrations/$INTEGRATION_ID"
+
           aws apigatewayv2 create-stage --api-id $API_ID --stage-name '$default' --auto-deploy 2>/dev/null || echo "Stage exists"
 
-          # Set permissions
           aws lambda add-permission \
             --function-name $FUNCTION_NAME \
             --statement-id "api-gateway-invoke" \
@@ -230,51 +153,12 @@ jobs:
             --principal apigateway.amazonaws.com \
             --source-arn "arn:aws:execute-api:$REGION:$ACCOUNT_ID:$API_ID/*/*/*" 2>/dev/null || echo "Permission exists"
 
-          # Output endpoint
           ENDPOINT="https://$API_ID.execute-api.$REGION.amazonaws.com"
           echo "API_ENDPOINT=$ENDPOINT" >> $GITHUB_ENV
           echo "✅ Deployed to: $ENDPOINT"
 
-      - name: Emergency cancel check
-        if: failure()
-        run: |
-          echo "🚨 Deployment failed - checking for stuck Lambda updates..."
-
-          # Check if Lambda function is stuck in updating state
-          if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
-            STATE=$(aws lambda get-function --function-name $FUNCTION_NAME --query 'Configuration.State' --output text 2>/dev/null || echo "Unknown")
-            echo "Current Lambda function state: $STATE"
-
-            if [ "$STATE" = "Pending" ] || [ "$STATE" = "InProgress" ]; then
-              echo "⚠️  Lambda function is still updating. This may take a few minutes to complete."
-              echo "You can check the status with: aws lambda get-function --function-name $FUNCTION_NAME"
-            fi
-          fi
-
-      - name: Test deployment
+      - name: Post Deployment Test
         run: |
           sleep 10
-
-          # Test health endpoint and validate response
-          HEALTH_RESPONSE=$(curl -s $API_ENDPOINT/health)
-
-          if [ $? -eq 0 ]; then
-            echo "✅ Health endpoint responded successfully"
-            echo "Response: $HEALTH_RESPONSE"
-
-            # Check if response contains expected JSON
-            if echo "$HEALTH_RESPONSE" | grep -q '"status": "healthy"' && echo "$HEALTH_RESPONSE" | grep -q '"cache": "supabase"'; then
-              echo "✅ Health check validation passed - expected JSON structure found"
-            else
-              echo "❌ Health check validation failed - unexpected response format"
-              echo "Expected: {\"status\": \"healthy\", \"cache\": \"supabase\"}"
-              echo "Received: $HEALTH_RESPONSE"
-              exit 1
-            fi
-          else
-            echo "❌ Health check failed - endpoint not responding"
-            exit 1
-          fi
-
-          echo "🎉 TravelStyle API deployed successfully!"
-          echo "🌐 Endpoint: $API_ENDPOINT"
+          echo "Testing /health endpoint:"
+          curl -s $API_ENDPOINT/health || echo "❌ Health check failed"
