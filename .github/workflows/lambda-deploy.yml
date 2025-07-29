@@ -10,10 +10,19 @@ on:
     types: [completed]
     branches: [main]
 
+# Optional: Add manual approval for production deployments
+# Uncomment the following to require manual approval:
+# environment:
+#   name: production
+#   url: ${{ steps.deploy.outputs.url }}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    concurrency:
+      group: lambda-deployment
+      cancel-in-progress: true
 
     env:
       FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME }}
@@ -23,6 +32,35 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Check for ongoing deployments
+        run: |
+          # Check if there are any ongoing Lambda updates
+          if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
+            STATE=$(aws lambda get-function --function-name $FUNCTION_NAME --query 'Configuration.State' --output text 2>/dev/null || echo "Unknown")
+            LAST_MODIFIED=$(aws lambda get-function --function-name $FUNCTION_NAME --query 'Configuration.LastModified' --output text 2>/dev/null || echo "")
+
+            echo "Current function state: $STATE"
+            echo "Last modified: $LAST_MODIFIED"
+
+            if [ "$STATE" != "Active" ]; then
+              echo "⚠️  Function is not in Active state ($STATE). Waiting for any ongoing updates..."
+              # Wait up to 5 minutes for function to become active
+              for i in {1..10}; do
+                sleep 30
+                STATE=$(aws lambda get-function --function-name $FUNCTION_NAME --query 'Configuration.State' --output text 2>/dev/null || echo "Unknown")
+                echo "Attempt $i: Function state is $STATE"
+                if [ "$STATE" = "Active" ]; then
+                  echo "✅ Function is now Active, proceeding with deployment"
+                  break
+                fi
+                if [ $i -eq 10 ]; then
+                  echo "❌ Function did not become Active after 5 minutes"
+                  exit 1
+                fi
+              done
+            fi
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -76,6 +114,26 @@ jobs:
           echo "::add-mask::$SUPABASE_KEY"
           echo "✅ Secrets validated and masked"
 
+          # Check if function exists and wait for any ongoing updates
+          if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
+            echo "Function exists, checking for ongoing updates..."
+
+            # Wait for any ongoing updates to complete
+            for i in {1..10}; do
+              STATE=$(aws lambda get-function --function-name $FUNCTION_NAME --query 'Configuration.State' --output text 2>/dev/null || echo "Unknown")
+              if [ "$STATE" = "Active" ]; then
+                echo "Function is in Active state, proceeding with update"
+                break
+              else
+                echo "Function state: $STATE, waiting 30 seconds (attempt $i/10)..."
+                sleep 30
+                if [ $i -eq 10 ]; then
+                  echo "Function did not become active after 10 attempts, proceeding anyway"
+                fi
+              fi
+            done
+          fi
+
           # Create environment variables
           cat > env.json << EOF
           {
@@ -94,15 +152,36 @@ jobs:
           }
           EOF
 
-          # Deploy or update function
+          # Deploy or update function with retry logic
           if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
             echo "Updating existing function..."
+
+            # Update function code first
             aws lambda update-function-code --function-name $FUNCTION_NAME --zip-file fileb://lambda-deploy.zip
-            aws lambda update-function-configuration \
-              --function-name $FUNCTION_NAME \
-              --environment file://env.json \
-              --timeout 30 \
-              --memory-size 512
+
+            # Wait for code update to complete
+            echo "Waiting for code update to complete..."
+            aws lambda wait function-updated --function-name $FUNCTION_NAME
+
+            # Update configuration with retry logic
+            echo "Updating function configuration..."
+            for i in {1..5}; do
+              if aws lambda update-function-configuration \
+                --function-name $FUNCTION_NAME \
+                --environment file://env.json \
+                --timeout 30 \
+                --memory-size 512; then
+                echo "Configuration updated successfully"
+                break
+              else
+                echo "Attempt $i: Configuration update failed, waiting 30 seconds..."
+                sleep 30
+                if [ $i -eq 5 ]; then
+                  echo "Failed to update configuration after 5 attempts"
+                  exit 1
+                fi
+              fi
+            done
           else
             echo "Creating new function..."
             aws lambda create-function \
@@ -155,6 +234,22 @@ jobs:
           ENDPOINT="https://$API_ID.execute-api.$REGION.amazonaws.com"
           echo "API_ENDPOINT=$ENDPOINT" >> $GITHUB_ENV
           echo "✅ Deployed to: $ENDPOINT"
+
+      - name: Emergency cancel check
+        if: failure()
+        run: |
+          echo "🚨 Deployment failed - checking for stuck Lambda updates..."
+
+          # Check if Lambda function is stuck in updating state
+          if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
+            STATE=$(aws lambda get-function --function-name $FUNCTION_NAME --query 'Configuration.State' --output text 2>/dev/null || echo "Unknown")
+            echo "Current Lambda function state: $STATE"
+
+            if [ "$STATE" = "Pending" ] || [ "$STATE" = "InProgress" ]; then
+              echo "⚠️  Lambda function is still updating. This may take a few minutes to complete."
+              echo "You can check the status with: aws lambda get-function --function-name $FUNCTION_NAME"
+            fi
+          fi
 
       - name: Test deployment
         run: |
