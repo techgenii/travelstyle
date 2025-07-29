@@ -82,19 +82,40 @@ jobs:
           # Create minimal function package (just the handler)
           mkdir -p function
           echo 'import sys; sys.path.insert(0, "/opt/python"); sys.path.insert(0, "/opt/app")' > function/lambda_function.py
-          cat ../app/main.py >> function/lambda_function.py
+          echo 'from app.main import handler' >> function/lambda_function.py
           cd function
           zip -r ../lambda-deploy.zip .
           cd ..
 
+          # Move zip files to backend directory for deployment step
+          mv dependencies-layer.zip ../
+          mv app-layer.zip ../
+          mv lambda-deploy.zip ../
+
           echo "Layer sizes:"
-          echo "Dependencies layer: $(du -h dependencies-layer.zip | cut -f1)"
-          echo "App layer: $(du -h app-layer.zip | cut -f1)"
-          echo "Function package: $(du -h lambda-deploy.zip | cut -f1)"
+          echo "Dependencies layer: $(du -h ../dependencies-layer.zip | cut -f1)"
+          echo "App layer: $(du -h ../app-layer.zip | cut -f1)"
+          echo "Function package: $(du -h ../lambda-deploy.zip | cut -f1)"
+
+          # Debug: List files in backend directory
+          echo "Files in backend directory:"
+          ls -la ../
+
+          # Debug: Check if zip files exist
+          echo "Checking zip files:"
+          ls -la ../*.zip || echo "No zip files found"
 
       - name: Deploy to Lambda
         run: |
           cd backend
+
+          # Debug: Check what files are available
+          echo "Files in backend directory:"
+          ls -la
+
+          # Debug: Check if zip files exist
+          echo "Checking for zip files:"
+          ls -la *.zip || echo "No zip files found in backend directory"
 
           # Create environment variables
           cat > env.json << EOF
@@ -122,7 +143,7 @@ jobs:
             --layer-name "TravelStyle-Dependencies" \
             --description "Dependencies for TravelStyle API" \
             --zip-file fileb://dependencies-layer.zip \
-            --compatible-runtimes python3.11 \
+            --compatible-runtimes python3.13 \
             --query 'LayerVersionArn' --output text 2>/dev/null || echo "")
 
           # Create app layer
@@ -130,7 +151,7 @@ jobs:
             --layer-name "TravelStyle-App" \
             --description "Application code for TravelStyle API" \
             --zip-file fileb://app-layer.zip \
-            --compatible-runtimes python3.11 \
+            --compatible-runtimes python3.13 \
             --query 'LayerVersionArn' --output text 2>/dev/null || echo "")
 
           # Deploy or update function with layers
@@ -147,7 +168,7 @@ jobs:
             echo "Creating new function..."
             aws lambda create-function \
               --function-name $FUNCTION_NAME \
-              --runtime python3.11 \
+              --runtime python3.13 \
               --handler lambda_function.handler \
               --role arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/TravelStyle-Lambda-Role \
               --zip-file fileb://lambda-deploy.zip \
