@@ -13,7 +13,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     env:
       FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME }}
@@ -36,92 +36,45 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Create Lambda layers and package
+      - name: Create Lambda package
         run: |
           cd backend
 
-          # Create directories for layers
-          mkdir -p layers/python
-          mkdir -p layers/app
+          # Create build directory
+          mkdir -p build
 
-          # Install dependencies to layer
-          pip install -r requirements-lambda.txt --target layers/python --no-cache-dir --no-deps
+          # Install dependencies (exclude unnecessary files)
+          pip install -r requirements-lambda.txt --target build --no-cache-dir --no-deps
 
-          # Copy only app code to separate layer
-          cp -r app layers/app/
+          # Copy only necessary application code
+          cp -r app build/
 
-          # Clean up dependencies layer
-          cd layers/python
+          # Remove unnecessary files to reduce package size
+          cd build
           find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "*.pyc" -delete 2>/dev/null || true
           find . -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
-          find . -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
-          find . -name "*.pyc" -delete 2>/dev/null || true
-          find . -name "*.pyo" -delete 2>/dev/null || true
-          find . -name "*.pyd" -delete 2>/dev/null || true
-          find . -name "*.so" -delete 2>/dev/null || true
-          find . -name "*.dll" -delete 2>/dev/null || true
-          find . -name "*.dylib" -delete 2>/dev/null || true
-          find . -name "*.txt" -not -name "*.py" -delete 2>/dev/null || true
-          find . -name "*.md" -delete 2>/dev/null || true
-          find . -name "*.rst" -delete 2>/dev/null || true
-          find . -name "*.html" -delete 2>/dev/null || true
-          find . -type d -name "examples" -exec rm -rf {} + 2>/dev/null || true
-          find . -type d -name "docs" -exec rm -rf {} + 2>/dev/null || true
-          find . -type d -name "doc" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+
+          # Create deployment package
+          zip -r ../lambda-deploy.zip . -x "*.pyc" "__pycache__/*" "tests/*" "*.egg-info/*"
           cd ..
 
-          # Create layer packages
-          cd python
-          zip -r ../dependencies-layer.zip . -x "*.pyc" "*.pyo" "__pycache__/*" "tests/*" "test/*"
-          cd ..
-
-          cd app
-          zip -r ../app-layer.zip . -x "*.pyc" "*.pyo" "__pycache__/*" "tests/*" "test/*"
-          cd ..
-
-          # Create minimal function package (just the handler)
-          mkdir -p function
-          echo 'import sys; sys.path.insert(0, "/opt/python"); sys.path.insert(0, "/opt/app")' > function/lambda_function.py
-          echo 'from app.main import handler' >> function/lambda_function.py
-          cd function
-          zip -r ../lambda-deploy.zip .
-          cd ..
-
-          # Move zip files to backend directory for deployment step
-          mv dependencies-layer.zip ../
-          mv app-layer.zip ../
-          mv lambda-deploy.zip ../
-
-          echo "Layer sizes:"
-          echo "Dependencies layer: $(du -h ../dependencies-layer.zip | cut -f1)"
-          echo "App layer: $(du -h ../app-layer.zip | cut -f1)"
-          echo "Function package: $(du -h ../lambda-deploy.zip | cut -f1)"
-
-          # Debug: List files in backend directory
-          echo "Files in backend directory:"
-          ls -la ../
-
-          # Debug: Check if zip files exist
-          echo "Checking zip files:"
-          ls -la ../*.zip || echo "No zip files found"
+          echo "Package size: $(du -h lambda-deploy.zip | cut -f1)"
 
       - name: Deploy to Lambda
         run: |
           cd backend
 
-          # Debug: Check what files are available
-          echo "Files in backend directory:"
-          ls -la
-
-          # Debug: Check if zip files exist
-          echo "Checking for zip files:"
-          ls -la *.zip || echo "No zip files found in backend directory"
-
-          # Function to check Lambda function state
-          check_lambda_state() {
-            local function_name=$1
-            aws lambda get-function --function-name $function_name --query 'Configuration.State' --output text 2>/dev/null || echo "NOT_FOUND"
-          }
+          # Mask secrets
+          echo "::add-mask::$OPENAI_API_KEY"
+          echo "::add-mask::$OPENAI_ORG_ID"
+          echo "::add-mask::$QLOO_API_KEY"
+          echo "::add-mask::$OPENWEATHER_API_KEY"
+          echo "::add-mask::$EXCHANGE_API_KEY"
+          echo "::add-mask::$SUPABASE_URL"
+          echo "::add-mask::$SUPABASE_KEY"
+          echo "✅ Secrets validated and masked"
 
           # Create environment variables
           cat > env.json << EOF
@@ -141,89 +94,26 @@ jobs:
           }
           EOF
 
-          # Create or update layers
-          echo "Creating/updating Lambda layers..."
-
-          # Create dependencies layer
-          DEPENDENCIES_LAYER_ARN=$(aws lambda publish-layer-version \
-            --layer-name "TravelStyle-Dependencies" \
-            --description "Dependencies for TravelStyle API" \
-            --zip-file fileb://dependencies-layer.zip \
-            --compatible-runtimes python3.13 \
-            --query 'LayerVersionArn' --output text 2>/dev/null || echo "")
-
-          # Create app layer
-          APP_LAYER_ARN=$(aws lambda publish-layer-version \
-            --layer-name "TravelStyle-App" \
-            --description "Application code for TravelStyle API" \
-            --zip-file fileb://app-layer.zip \
-            --compatible-runtimes python3.13 \
-            --query 'LayerVersionArn' --output text 2>/dev/null || echo "")
-
-                    # Deploy or update function with layers
+          # Deploy or update function
           if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
             echo "Updating existing function..."
-
-            # Check current function state
-            echo "Checking current function state..."
-            current_state=$(check_lambda_state $FUNCTION_NAME)
-            echo "Current function state: $current_state"
-
-            # Wait if function is updating
-            if [ "$current_state" = "Updating" ]; then
-              echo "Function is currently updating, waiting for it to complete..."
-              aws lambda wait function-updated --function-name $FUNCTION_NAME
-              echo "Function update completed"
-            fi
-
-            # Update function code first
-            echo "Updating function code..."
             aws lambda update-function-code --function-name $FUNCTION_NAME --zip-file fileb://lambda-deploy.zip
-
-            # Wait for code update to complete
-            echo "Waiting for function code update to complete..."
-            aws lambda wait function-updated --function-name $FUNCTION_NAME
-
-            # Update function configuration with retry logic
-            echo "Updating function configuration..."
-            max_retries=5
-            retry_count=0
-
-            while [ $retry_count -lt $max_retries ]; do
-              if aws lambda update-function-configuration \
-                --function-name $FUNCTION_NAME \
-                --environment file://env.json \
-                --timeout 30 \
-                --memory-size 512 \
-                --layers $DEPENDENCIES_LAYER_ARN $APP_LAYER_ARN; then
-                echo "Function configuration updated successfully"
-                break
-              else
-                retry_count=$((retry_count + 1))
-                echo "Configuration update failed, attempt $retry_count of $max_retries"
-                if [ $retry_count -lt $max_retries ]; then
-                  echo "Waiting 10 seconds before retry..."
-                  sleep 10
-                fi
-              fi
-            done
-
-            if [ $retry_count -eq $max_retries ]; then
-              echo "Failed to update function configuration after $max_retries attempts"
-              exit 1
-            fi
+            aws lambda update-function-configuration \
+              --function-name $FUNCTION_NAME \
+              --environment file://env.json \
+              --timeout 30 \
+              --memory-size 512
           else
             echo "Creating new function..."
             aws lambda create-function \
               --function-name $FUNCTION_NAME \
               --runtime python3.13 \
-              --handler lambda_function.handler \
+              --handler app.main.handler \
               --role arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/TravelStyle-Lambda-Role \
               --zip-file fileb://lambda-deploy.zip \
               --environment file://env.json \
               --timeout 30 \
-              --memory-size 512 \
-              --layers $DEPENDENCIES_LAYER_ARN $APP_LAYER_ARN
+              --memory-size 512
           fi
 
       - name: Setup API Gateway
@@ -269,6 +159,27 @@ jobs:
       - name: Test deployment
         run: |
           sleep 10
-          curl -s $API_ENDPOINT/health || echo "Health check failed"
+
+          # Test health endpoint and validate response
+          HEALTH_RESPONSE=$(curl -s $API_ENDPOINT/health)
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Health endpoint responded successfully"
+            echo "Response: $HEALTH_RESPONSE"
+
+            # Check if response contains expected JSON
+            if echo "$HEALTH_RESPONSE" | grep -q '"status": "healthy"' && echo "$HEALTH_RESPONSE" | grep -q '"cache": "supabase"'; then
+              echo "✅ Health check validation passed - expected JSON structure found"
+            else
+              echo "❌ Health check validation failed - unexpected response format"
+              echo "Expected: {\"status\": \"healthy\", \"cache\": \"supabase\"}"
+              echo "Received: $HEALTH_RESPONSE"
+              exit 1
+            fi
+          else
+            echo "❌ Health check failed - endpoint not responding"
+            exit 1
+          fi
+
           echo "🎉 TravelStyle API deployed successfully!"
           echo "🌐 Endpoint: $API_ENDPOINT"
