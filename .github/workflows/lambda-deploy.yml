@@ -23,7 +23,7 @@ jobs:
       ZIP_FILE: lambda-deploy.zip
       BUILD_DIR: build
       PYTHON_VERSION: 3.13
-      HANDLER: travelstyle.handler
+      HANDLER: app.travelstyle.handler
       RUNTIME: python3.13
       ARCHITECTURE: x86_64
       STAGE_NAME: '$default'  # Use default stage for root URL
@@ -108,8 +108,8 @@ jobs:
             --no-cache-dir \
             --upgrade
 
-          echo "Copying: ./app/* to $BUILD_DIR/"
-          cp -r ./app/* ./$BUILD_DIR/
+          echo "Copying: ./app directory to $BUILD_DIR/"
+          cp -r ./app ./$BUILD_DIR/
           find $BUILD_DIR \( -name '__pycache__' -o -name '*.pyc' \) -exec rm -rf {} +
 
       - name: Package deployment
