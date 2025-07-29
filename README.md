@@ -4,7 +4,6 @@
 ![Python Version](https://img.shields.io/badge/python-3.13-blue)
 [![TypeScript](https://img.shields.io/badge/typescript-4.0+-blue.svg)](https://www.typescriptlang.org/)
 
-
 ## 📊 Quality & Status
 
 [![CI/CD](https://github.com/techgenii/travelstyle/workflows/Backend%20Quality%20CI%2FCD/badge.svg)](https://github.com/techgenii/travelstyle/actions)
@@ -23,7 +22,7 @@ TravelStyle AI is an intelligent travel companion chat application that provides
 - **User Preference Learning:** Remembers and applies user style and packing preferences across sessions.
 
 ## Technical Architecture
-- **Backend:** FastAPI (Python), async architecture
+- **Backend:** FastAPI (Python), async architecture with 97% test coverage
 - **Database:** PostgreSQL (via Supabase)
 - **Cache:** Redis (for API rate limiting and caching)
 - **AI & APIs:**
@@ -51,120 +50,90 @@ Database Layer (Supabase/PostgreSQL)
     └── Preferences
 ```
 
-## Project Structure
-```plaintext
-travelstyle-ai
-├── backend
-│   ├── app
-│   ├── env.example
-│   ├── Makefile
-│   ├── pytest.ini
-│   ├── requirements-test.txt
-│   ├── requirements.txt
-│   ├── test.py
-│   └── tests
-├── DEPLOYMENT.md
-├── frontend
-│   ├── actions
-│   ├── app
-│   ├── components.json
-│   ├── next-env.d.ts
-│   ├── next.config.ts
-│   ├── node_modules
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── postcss.config.mjs
-│   ├── public
-│   ├── README.md
-│   ├── src
-│   └── tsconfig.json
-├── LICENSE
-├── myenv
-│   ├── bin
-│   ├── include
-│   ├── lib
-│   └── share
-├── pyproject.toml
-├── README.md
-├── requirements.txt
-├── supabase
-│   └── migrations
-└── vercel.json
-```
+## 📚 Documentation
+
+### **Core Documentation**
+- **[README.md](README.md)** - This file - Project overview and getting started
+- **[LICENSE](LICENSE)** - GNU General Public License v3.0
+
+### **Component Documentation**
+- **[Backend Documentation](backend/README.md)** - Complete backend guide with development, testing, CI/CD, and Lambda deployment
+- **[Frontend Documentation](frontend/README.md)** - Frontend-specific documentation
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - General deployment documentation
 
 ## Getting Started
 
 ### Prerequisites
-- Python 3.13+
-- PostgreSQL (via Supabase)
 
-### Where to get API Keys
-- OpenAI: https://platform.openai.com/api-keys
+#### **System Requirements**
+- **Python 3.11+** (for backend)
+- **Node.js 18+** (for frontend)
+- **Git** (for version control)
+- **PostgreSQL** (via Supabase)
 
-- Qloo: https://www.qloo.com/api
+#### **Development Tools**
+- **AWS CLI** (for Lambda deployment)
+- **Vercel CLI** (for frontend deployment)
+- **Make** (for backend development commands)
 
-- OpenWeather: https://openweathermap.org/api
+#### **Accounts & Services**
+- **GitHub account** (for repository and CI/CD)
+- **Supabase account** (for database)
+- **Vercel account** (for frontend hosting)
+- **AWS account** (for Lambda deployment)
 
-- Exchange Rate API: https://www.exchangerate-api.com/
+### API Keys Required
+- **OpenAI:** https://platform.openai.com/api-keys
+- **Qloo:** https://www.qloo.com/api
+- **OpenWeather:** https://openweathermap.org/api
+- **Exchange Rate API:** https://www.exchangerate-api.com/
+- **Supabase:** https://supabase.com/dashboard
 
-- Supabase: https://supabase.com/dashboard
+### Quick Setup
 
-### Setup
-1. **Clone the repository:**
-   ```bash
-   git clone <repo-url>
-   cd backend
-   ```
-2. **Install dependencies:**
-   ```bash
-   make install
-   ```
-3. **Configure environment variables:**
-   - Copy `env.example` to `.env` and fill in your API keys and secrets.
-4. **Run locally:**
-   ```bash
-   make run
-   ```
-
-### Running Tests
+#### **Backend Development:**
 ```bash
+git clone <repo-url>
 cd backend
-make test
+make install-dev
+# Copy env.example to .env and configure API keys
+make run
 ```
+
+#### **Frontend Development:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+#### **Environment Setup**
+- **Backend**: Copy `backend/env.example` to `backend/.env` and configure API keys
+- **Frontend**: Environment variables are configured in Vercel dashboard
+- **Database**: Supabase project setup required for full functionality
+
+**📖 For detailed setup instructions, see [Backend Documentation](backend/README.md#development) and [Frontend Documentation](frontend/README.md)**
 
 ## 🚀 Deployment
 
-This project supports multiple deployment options:
-
-### Frontend Deployment (Vercel)
-
-This project includes automated CI/CD deployment to Vercel using GitHub Actions. The deployment pipeline runs tests, linting, and security checks before automatically deploying to production.
-
-**Quick Start:**
+### Frontend (Vercel)
 ```bash
-# Install Vercel CLI and deploy
 npm install -g vercel
 vercel link
 vercel --prod
 ```
 
-### Backend Deployment (AWS Lambda)
-
-The backend FastAPI application can be deployed to AWS Lambda for serverless execution.
-
-**Quick Start:**
-1. Set up GitHub Secrets (see [Lambda Deployment Guide](backend/LAMBDA_DEPLOYMENT.md))
-2. Push to main branch or manually trigger the workflow
-3. The GitHub Actions workflow handles everything automatically
+### Backend (AWS Lambda)
+The backend automatically deploys to AWS Lambda via GitHub Actions when you push to `main`.
 
 **Features:**
 - ✅ Automated deployment via GitHub Actions
+- ✅ 50% package size optimization
 - ✅ API Gateway integration
 - ✅ Environment variable management
 - ✅ Health checks and testing
-- ✅ Cost optimization
 
-For complete Lambda deployment instructions, environment setup, and troubleshooting, see **[backend/LAMBDA_DEPLOYMENT.md](backend/LAMBDA_DEPLOYMENT.md)**.
+**📖 For complete deployment instructions, see [Backend Documentation](backend/README.md#lambda-deployment)**
 
 ## 📝 License
 

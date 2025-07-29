@@ -40,7 +40,6 @@ from app.models.auth import (
     ResetPasswordRequest,
     ResetPasswordResponse,
 )
-from app.models.user import UserProfileResponse
 from app.services.auth_service import auth_service
 
 logger = logging.getLogger(__name__)
@@ -179,125 +178,6 @@ async def register(register_data: RegisterRequest):
             detail=str(e),
         ) from e
     except Exception as e:  # pylint: disable=broad-except
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
-        ) from e
-
-
-@router.get("/me", status_code=status.HTTP_200_OK, response_model=UserProfileResponse)
-async def get_current_user_profile(current_user: dict = current_user_dependency):
-    """
-    Get current user profile information.
-
-    Returns profile data for the authenticated user.
-    """
-    try:
-        user_id = current_user.get("id")
-        if not user_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
-
-        profile = await auth_service.get_user_profile(user_id)
-        if not profile:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found"
-            )
-
-        return profile
-    except HTTPException:
-        raise
-    except Exception as e:  # pylint: disable=broad-except
-        logger.error("Get user profile error: %s", type(e).__name__)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
-        ) from e
-
-
-@router.put("/me", status_code=status.HTTP_200_OK)
-async def update_current_user_profile(updates: dict, current_user: dict = current_user_dependency):
-    """
-    Update current user profile information.
-
-    Updates profile data for the authenticated user.
-    """
-    try:
-        user_id = current_user.get("id")
-        if not user_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
-
-        # Only allow updating specific fields
-        allowed_updates = {
-            "first_name": updates.get("first_name"),
-            "last_name": updates.get("last_name"),
-        }
-
-        # Remove None values
-        allowed_updates = {k: v for k, v in allowed_updates.items() if v is not None}
-
-        if not allowed_updates:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="No valid fields to update"
-            )
-
-        profile = await auth_service.update_user_profile_sync(user_id, allowed_updates)
-        if not profile:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found"
-            )
-
-        return profile
-    except HTTPException:
-        raise
-    except Exception as e:  # pylint: disable=broad-except
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
-        ) from e
-
-
-@router.put("/me/preferences", status_code=status.HTTP_200_OK)
-async def update_current_user_preferences(
-    preferences: dict, current_user: dict = current_user_dependency
-):
-    """
-    Update current user preferences.
-
-    Updates preference data for the authenticated user.
-    """
-    try:
-        user_id = current_user.get("id")
-        if not user_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
-
-        # Only allow updating specific preference fields
-        allowed_preferences = {
-            "style_preferences": preferences.get("style_preferences"),
-            "size_info": preferences.get("size_info"),
-            "travel_patterns": preferences.get("travel_patterns"),
-            "quick_reply_preferences": preferences.get("quick_reply_preferences"),
-            "packing_methods": preferences.get("packing_methods"),
-            "currency_preferences": preferences.get("currency_preferences"),
-        }
-
-        # Remove None values
-        allowed_preferences = {k: v for k, v in allowed_preferences.items() if v is not None}
-
-        if not allowed_preferences:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No valid preference fields to update",
-            )
-
-        success = await auth_service.update_user_preferences(user_id, allowed_preferences)
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update user preferences",
-            )
-
-        return {"message": "Preferences updated successfully", "success": True}
-    except HTTPException:
-        raise
-    except Exception as e:  # pylint: disable=broad-except
-        logger.error("Update user preferences error: %s", type(e).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         ) from e

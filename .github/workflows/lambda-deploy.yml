@@ -36,25 +36,61 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Create Lambda package
+      - name: Create Lambda layers and package
         run: |
           cd backend
 
-          # Create build directory
-          mkdir -p build
+          # Create directories for layers
+          mkdir -p layers/python
+          mkdir -p layers/app
 
-          # Install dependencies
-          pip install -r requirements.txt --target build --no-cache-dir
+          # Install dependencies to layer
+          pip install -r requirements-lambda.txt --target layers/python --no-cache-dir --no-deps
 
-          # Copy application code
-          cp -r app build/
+          # Copy only app code to separate layer
+          cp -r app layers/app/
 
-          # Create deployment package
-          cd build
+          # Clean up dependencies layer
+          cd layers/python
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+          find . -name "*.pyc" -delete 2>/dev/null || true
+          find . -name "*.pyo" -delete 2>/dev/null || true
+          find . -name "*.pyd" -delete 2>/dev/null || true
+          find . -name "*.so" -delete 2>/dev/null || true
+          find . -name "*.dll" -delete 2>/dev/null || true
+          find . -name "*.dylib" -delete 2>/dev/null || true
+          find . -name "*.txt" -not -name "*.py" -delete 2>/dev/null || true
+          find . -name "*.md" -delete 2>/dev/null || true
+          find . -name "*.rst" -delete 2>/dev/null || true
+          find . -name "*.html" -delete 2>/dev/null || true
+          find . -type d -name "examples" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "docs" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "doc" -exec rm -rf {} + 2>/dev/null || true
+          cd ..
+
+          # Create layer packages
+          cd python
+          zip -r ../dependencies-layer.zip . -x "*.pyc" "*.pyo" "__pycache__/*" "tests/*" "test/*"
+          cd ..
+
+          cd app
+          zip -r ../app-layer.zip . -x "*.pyc" "*.pyo" "__pycache__/*" "tests/*" "test/*"
+          cd ..
+
+          # Create minimal function package (just the handler)
+          mkdir -p function
+          echo 'import sys; sys.path.insert(0, "/opt/python"); sys.path.insert(0, "/opt/app")' > function/lambda_function.py
+          cat app/main.py >> function/lambda_function.py
+          cd function
           zip -r ../lambda-deploy.zip .
           cd ..
 
-          echo "Package size: $(du -h lambda-deploy.zip | cut -f1)"
+          echo "Layer sizes:"
+          echo "Dependencies layer: $(du -h dependencies-layer.zip | cut -f1)"
+          echo "App layer: $(du -h app-layer.zip | cut -f1)"
+          echo "Function package: $(du -h lambda-deploy.zip | cut -f1)"
 
       - name: Deploy to Lambda
         run: |
@@ -78,7 +114,26 @@ jobs:
           }
           EOF
 
-          # Deploy or update function
+          # Create or update layers
+          echo "Creating/updating Lambda layers..."
+
+          # Create dependencies layer
+          DEPENDENCIES_LAYER_ARN=$(aws lambda publish-layer-version \
+            --layer-name "TravelStyle-Dependencies" \
+            --description "Dependencies for TravelStyle API" \
+            --zip-file fileb://dependencies-layer.zip \
+            --compatible-runtimes python3.11 \
+            --query 'LayerVersionArn' --output text 2>/dev/null || echo "")
+
+          # Create app layer
+          APP_LAYER_ARN=$(aws lambda publish-layer-version \
+            --layer-name "TravelStyle-App" \
+            --description "Application code for TravelStyle API" \
+            --zip-file fileb://app-layer.zip \
+            --compatible-runtimes python3.11 \
+            --query 'LayerVersionArn' --output text 2>/dev/null || echo "")
+
+          # Deploy or update function with layers
           if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
             echo "Updating existing function..."
             aws lambda update-function-code --function-name $FUNCTION_NAME --zip-file fileb://lambda-deploy.zip
@@ -86,18 +141,20 @@ jobs:
               --function-name $FUNCTION_NAME \
               --environment file://env.json \
               --timeout 30 \
-              --memory-size 512
+              --memory-size 512 \
+              --layers $DEPENDENCIES_LAYER_ARN $APP_LAYER_ARN
           else
             echo "Creating new function..."
             aws lambda create-function \
               --function-name $FUNCTION_NAME \
               --runtime python3.11 \
-              --handler app.main.handler \
+              --handler lambda_function.handler \
               --role arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/TravelStyle-Lambda-Role \
               --zip-file fileb://lambda-deploy.zip \
               --environment file://env.json \
               --timeout 30 \
-              --memory-size 512
+              --memory-size 512 \
+              --layers $DEPENDENCIES_LAYER_ARN $APP_LAYER_ARN
           fi
 
       - name: Setup API Gateway

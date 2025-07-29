@@ -23,7 +23,6 @@ Initializes the FastAPI app, middleware, routers, and error handlers.
 import logging
 from contextlib import asynccontextmanager
 
-import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -99,16 +98,11 @@ async def health_check():
     return {"status": "healthy", "cache": "supabase"}
 
 
-if __name__ == "__main__":
-    # Note: Binding to 0.0.0.0 is necessary for development server
-    # In production, use proper host configuration
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)  # nosec B104
-
-
-# Expose the FastAPI app as the handler
-# Lambda handler with enhanced logging
 def handler(event, context):
     logger.info(f"Lambda invoked with event: {event}")
+    logger.info(f"Event path: {event.get('path', 'NO_PATH')}")
+    logger.info(f"Event httpMethod: {event.get('httpMethod', 'NO_METHOD')}")
+    logger.info(f"Event queryStringParameters: {event.get('queryStringParameters', 'NO_QUERY')}")
 
     try:
         # Use Mangum to handle the FastAPI app

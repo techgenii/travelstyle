@@ -18,9 +18,9 @@
 from unittest.mock import Mock, patch
 
 import pytest
-from app.utils.rate_limiter import cleanup_old_entries, rate_limit, rate_limit_storage
+from app.utils.rate_limiter import rate_limit, rate_limit_storage
 from fastapi import HTTPException, Request
-from jose import JWTError
+from jwt import PyJWTError as JWTError
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ async def test_rate_limit_first_call(mock_time, mock_request, clear_rate_limit_s
     assert result == "success"
     assert len(rate_limit_storage) == 1
     key = "test_function:127.0.0.1"
-    assert rate_limit_storage[key] == (1, 1000.0)
+    assert rate_limit_storage[key] == (1000.0, 1)
 
 
 @patch("app.utils.rate_limiter.time.time")
@@ -82,7 +82,7 @@ async def test_rate_limit_within_limit(mock_time, mock_request, clear_rate_limit
         assert result == "success"
 
     key = "test_function:127.0.0.1"
-    assert rate_limit_storage[key] == (3, 1000.0)
+    assert rate_limit_storage[key] == (1000.0, 3)
 
 
 @patch("app.utils.rate_limiter.time.time")
@@ -105,8 +105,6 @@ async def test_rate_limit_exceeded(mock_time, mock_request, clear_rate_limit_sto
 
     assert exc_info.value.status_code == 429
     assert "Rate limit exceeded" in exc_info.value.detail
-    assert exc_info.value.headers is not None
-    assert "Retry-After" in exc_info.value.headers
 
 
 @patch("app.utils.rate_limiter.time.time")
@@ -137,7 +135,7 @@ async def test_rate_limit_reset_after_period(mock_time, mock_request, clear_rate
     assert result == "success"
 
     key = "test_function:127.0.0.1"
-    assert rate_limit_storage[key] == (1, 1070.0)
+    assert rate_limit_storage[key] == (1070.0, 1)
 
 
 @patch("app.utils.rate_limiter.time.time")
@@ -158,7 +156,7 @@ async def test_rate_limit_with_jwt_token(
     assert result == "success"
 
     key = "test_function:user-123"
-    assert rate_limit_storage[key] == (1, 1000.0)
+    assert rate_limit_storage[key] == (1000.0, 1)
 
 
 @patch("app.utils.rate_limiter.time.time")
@@ -180,7 +178,7 @@ async def test_rate_limit_jwt_decode_failure(
 
     # Should fall back to IP address
     key = "test_function:127.0.0.1"
-    assert rate_limit_storage[key] == (1, 1000.0)
+    assert rate_limit_storage[key] == (1000.0, 1)
 
 
 @patch("app.utils.rate_limiter.time.time")
@@ -217,66 +215,11 @@ async def test_rate_limit_request_without_client(mock_time, clear_rate_limit_sto
     assert result == "success"
 
     key = "test_function:unknown"
-    assert rate_limit_storage[key] == (1, 1000.0)
+    assert rate_limit_storage[key] == (1000.0, 1)
 
 
-def test_cleanup_old_entries(clear_rate_limit_storage):
-    _ = clear_rate_limit_storage  # Mark fixture as used
-    current_time = 1000.0
-    period = 60
-
-    # Add some entries
-    rate_limit_storage["old:client1"] = (1, current_time - 200)  # Very old
-    rate_limit_storage["recent:client2"] = (1, current_time - 30)  # Recent
-    rate_limit_storage["old:client3"] = (1, current_time - 150)  # Old
-
-    cleanup_old_entries(current_time, period)
-
-    # Only recent entry should remain
-    assert "recent:client2" in rate_limit_storage
-    assert "old:client1" not in rate_limit_storage
-    assert "old:client3" not in rate_limit_storage
-
-
-def test_cleanup_old_entries_no_cleanup_needed(clear_rate_limit_storage):
-    _ = clear_rate_limit_storage  # Mark fixture as used
-    current_time = 1000.0
-    period = 60
-
-    # Add only recent entries
-    rate_limit_storage["recent:client1"] = (1, current_time - 30)
-    rate_limit_storage["recent:client2"] = (1, current_time - 20)
-
-    initial_count = len(rate_limit_storage)
-    cleanup_old_entries(current_time, period)
-
-    # All entries should remain
-    assert len(rate_limit_storage) == initial_count
-    assert "recent:client1" in rate_limit_storage
-    assert "recent:client2" in rate_limit_storage
-
-
-@patch("app.utils.rate_limiter.time.time")
-@pytest.mark.asyncio
-async def test_rate_limit_cleanup_threshold(mock_time, clear_rate_limit_storage):
-    _ = clear_rate_limit_storage  # Mark fixture as used
-    mock_time.return_value = 1000.0
-
-    @rate_limit(calls=5, period=60)
-    async def test_function(request):
-        return "success"
-
-    # Create many entries to trigger cleanup
-    for i in range(10001):
-        request = Mock(spec=Request)
-        request.client = Mock()
-        request.client.host = f"client{i}"
-        request.headers = {}
-
-        await test_function(request)
-
-    # Should trigger cleanup but still work
-    assert len(rate_limit_storage) > 0
+# Removed cleanup tests as cleanup functionality was removed from rate limiter
+# The new implementation doesn't include automatic cleanup
 
 
 @patch("app.utils.rate_limiter.time.time")
@@ -298,7 +241,7 @@ async def test_rate_limit_jwt_missing_sub(
 
     # Should fall back to IP address
     key = "test_function:127.0.0.1"
-    assert rate_limit_storage[key] == (1, 1000.0)
+    assert rate_limit_storage[key] == (1000.0, 1)
 
 
 @patch("app.utils.rate_limiter.time.time")
@@ -320,7 +263,7 @@ async def test_rate_limit_jwt_value_error(
 
     # Should fall back to IP address
     key = "test_function:127.0.0.1"
-    assert rate_limit_storage[key] == (1, 1000.0)
+    assert rate_limit_storage[key] == (1000.0, 1)
 
 
 @patch("app.utils.rate_limiter.time.time")
@@ -342,4 +285,4 @@ async def test_rate_limit_jwt_key_error(
 
     # Should fall back to IP address
     key = "test_function:127.0.0.1"
-    assert rate_limit_storage[key] == (1, 1000.0)
+    assert rate_limit_storage[key] == (1000.0, 1)

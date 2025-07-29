@@ -18,9 +18,17 @@
 import asyncio
 from collections import namedtuple
 from types import SimpleNamespace
+from unittest.mock import patch
 
-from app.utils.error_handlers import custom_http_exception_handler
+from app.utils.error_handlers import (
+    custom_http_exception_handler,
+    handle_api_errors,
+    validate_data_not_empty,
+    validate_required_fields,
+    validate_user_id,
+)
 from app.utils.user_utils import extract_user_profile
+from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
 
 
@@ -147,3 +155,260 @@ def test_custom_http_exception_handler_non_http_exception():
     assert response.status_code == 500
     assert response.body is not None
     assert b"Internal server error" in response.body
+
+
+def test_custom_http_exception_handler_http_exception():
+    """Test custom HTTP exception handler with HTTPException."""
+    request = DummyRequest()
+    exc = HTTPException(status_code=404, detail="Not found")
+    response = asyncio.run(custom_http_exception_handler(request, exc))
+    assert isinstance(response, JSONResponse)
+    assert response.status_code == 404
+    assert response.body is not None
+    assert b"Not found" in response.body
+    assert b"status_code" in response.body
+
+
+def test_validate_user_id_success():
+    """Test validate_user_id with valid user ID."""
+    current_user = {"id": "user123", "email": "test@example.com"}
+    user_id = validate_user_id(current_user)
+    assert user_id == "user123"
+
+
+def test_validate_user_id_missing_id():
+    """Test validate_user_id with missing user ID."""
+    current_user = {"email": "test@example.com"}  # No 'id' field
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            validate_user_id(current_user)
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == status.HTTP_400_BAD_REQUEST
+            assert e.detail == "Invalid user ID"
+
+
+def test_validate_user_id_empty_id():
+    """Test validate_user_id with empty user ID."""
+    current_user = {"id": "", "email": "test@example.com"}
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            validate_user_id(current_user)
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == status.HTTP_400_BAD_REQUEST
+            assert e.detail == "Invalid user ID"
+
+
+def test_validate_user_id_none_id():
+    """Test validate_user_id with None user ID."""
+    current_user = {"id": None, "email": "test@example.com"}
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            validate_user_id(current_user)
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == status.HTTP_400_BAD_REQUEST
+            assert e.detail == "Invalid user ID"
+
+
+def test_validate_required_fields_success():
+    """Test validate_required_fields with all required fields present."""
+    data = {"name": "John", "email": "john@example.com", "age": 30}
+    required_fields = ["name", "email"]
+    # Should not raise any exception
+    validate_required_fields(data, required_fields)
+
+
+def test_validate_required_fields_missing_single():
+    """Test validate_required_fields with one missing field."""
+    data = {"name": "John", "age": 30}  # Missing 'email'
+    required_fields = ["name", "email"]
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            validate_required_fields(data, required_fields)
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == status.HTTP_400_BAD_REQUEST
+            assert e.detail == "Missing required fields: email"
+
+
+def test_validate_required_fields_missing_multiple():
+    """Test validate_required_fields with multiple missing fields."""
+    data = {"name": "John"}  # Missing 'email' and 'age'
+    required_fields = ["name", "email", "age"]
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            validate_required_fields(data, required_fields)
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == status.HTTP_400_BAD_REQUEST
+            assert e.detail == "Missing required fields: email, age"
+
+
+def test_validate_required_fields_empty_data():
+    """Test validate_required_fields with empty data."""
+    data = {}
+    required_fields = ["name", "email"]
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            validate_required_fields(data, required_fields)
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == status.HTTP_400_BAD_REQUEST
+            assert e.detail == "Missing required fields: name, email"
+
+
+def test_validate_required_fields_empty_required_list():
+    """Test validate_required_fields with empty required fields list."""
+    data = {"name": "John", "email": "john@example.com"}
+    required_fields = []
+    # Should not raise any exception
+    validate_required_fields(data, required_fields)
+
+
+def test_validate_data_not_empty_success():
+    """Test validate_data_not_empty with non-empty data."""
+    data = {"name": "John", "email": "john@example.com"}
+    # Should not raise any exception
+    validate_data_not_empty(data)
+
+
+def test_validate_data_not_empty_empty_dict():
+    """Test validate_data_not_empty with empty dictionary."""
+    data = {}
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            validate_data_not_empty(data)
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == status.HTTP_400_BAD_REQUEST
+            assert e.detail == "Data is required"
+
+
+def test_validate_data_not_empty_none_data():
+    """Test validate_data_not_empty with None data."""
+    data = None
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            validate_data_not_empty(data)
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == status.HTTP_400_BAD_REQUEST
+            assert e.detail == "Data is required"
+
+
+def test_validate_data_not_empty_custom_field_name():
+    """Test validate_data_not_empty with custom field name."""
+    data = {}
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            validate_data_not_empty(data, field_name="request body")
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == status.HTTP_400_BAD_REQUEST
+            assert e.detail == "Request Body is required"  # title() capitalizes first letter
+
+
+def test_handle_api_errors_success():
+    """Test handle_api_errors decorator with successful function."""
+
+    @handle_api_errors("Test error", 400)
+    async def test_function():
+        return {"success": True}
+
+    result = asyncio.run(test_function())
+    assert result == {"success": True}
+
+
+def test_handle_api_errors_http_exception():
+    """Test handle_api_errors decorator with HTTPException (should re-raise)."""
+
+    @handle_api_errors("Test error", 400)
+    async def test_function():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            asyncio.run(test_function())
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == 404
+            assert e.detail == "Not found"
+
+
+def test_handle_api_errors_generic_exception():
+    """Test handle_api_errors decorator with generic exception."""
+
+    @handle_api_errors("Database error", 500)
+    async def test_function():
+        raise ValueError("Database connection failed")
+
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            asyncio.run(test_function())
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == 500
+            assert e.detail == "Database error"
+            # Verify logging was called with format string
+            mock_logger.error.assert_called_once_with("%s error: %s", "test_function", "ValueError")
+
+
+def test_handle_api_errors_custom_status_code():
+    """Test handle_api_errors decorator with custom status code."""
+
+    @handle_api_errors("Validation error", 422)
+    async def test_function():
+        raise TypeError("Invalid data type")
+
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            asyncio.run(test_function())
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == 422
+            assert e.detail == "Validation error"
+            # Verify logging was called with format string
+            mock_logger.error.assert_called_once_with("%s error: %s", "test_function", "TypeError")
+
+
+def test_handle_api_errors_with_parameters():
+    """Test handle_api_errors decorator with function parameters."""
+
+    @handle_api_errors("Processing error", 500)
+    async def test_function(param1: str, param2: int):
+        if param1 == "error":
+            raise RuntimeError("Processing failed")
+        return {"param1": param1, "param2": param2}
+
+    # Test successful case
+    result = asyncio.run(test_function("test", 42))
+    assert result == {"param1": "test", "param2": 42}
+
+    # Test error case
+    with patch("app.utils.error_handlers.logger") as mock_logger:
+        try:
+            asyncio.run(test_function("error", 42))
+            assert False, "Expected HTTPException to be raised"
+        except HTTPException as e:
+            assert e.status_code == 500
+            assert e.detail == "Processing error"
+            # Verify logging was called with format string
+            mock_logger.error.assert_called_once_with(
+                "%s error: %s", "test_function", "RuntimeError"
+            )
+
+
+def test_handle_api_errors_preserves_function_metadata():
+    """Test that handle_api_errors preserves function metadata."""
+
+    @handle_api_errors("Test error", 400)
+    async def test_function():
+        """Test function docstring."""
+        return True
+
+    # Check that function metadata is preserved
+    assert test_function.__name__ == "test_function"
+    assert test_function.__doc__ == "Test function docstring."
+    assert callable(test_function)

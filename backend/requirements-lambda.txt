@@ -1,0 +1,28 @@
+# Core FastAPI and dependencies - minimal versions
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+mangum==0.17.0
+
+# Data validation - minimal
+pydantic==2.5.0
+pydantic-settings==2.1.0
+email-validator==2.1.0
+
+# HTTP client - lightweight
+httpx==0.25.2
+
+# Authentication - minimal
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.6
+
+# Database - Supabase client
+supabase==2.3.0
+
+# Password hashing - minimal
+passlib[bcrypt]==1.7.4
+
+# Environment variables
+python-dotenv==1.0.0
+
+# AI integration - specific version
+openai==1.55.3

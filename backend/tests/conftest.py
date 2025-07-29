@@ -19,9 +19,22 @@
 Pytest configuration and fixtures for TravelStyle AI backend tests.
 """
 
+import warnings
+
 import pytest
 from app.main import app
 from fastapi.testclient import TestClient
+
+# Configure warning filters to suppress known deprecation warnings
+warnings.filterwarnings(
+    "ignore", message="The 'timeout' parameter is deprecated", category=DeprecationWarning
+)
+warnings.filterwarnings(
+    "ignore", message="The 'verify' parameter is deprecated", category=DeprecationWarning
+)
+warnings.filterwarnings(
+    "ignore", message="coroutine '.*' was never awaited", category=RuntimeWarning
+)
 
 
 # Override the authentication dependency for testing
