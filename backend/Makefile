@@ -160,7 +160,7 @@ prod-test: | $(REPORT_DIR)
 run:
 	@echo "$(GREEN)Starting development server...$(NC)"
 	@echo "$(YELLOW)Server will be available at: http://$(HOST):$(PORT)$(NC)"
-	uvicorn $(APP_DIR).main:app --reload --host $(HOST) --port $(PORT)
+	uvicorn $(APP_DIR).travelstyle:travelstyle_app --reload --host $(HOST) --port $(PORT)
 
 # Cleanup (dev only)
 .PHONY: clean clean-reports clean-cache

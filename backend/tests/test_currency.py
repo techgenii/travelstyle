@@ -423,6 +423,7 @@ async def test_convert_currency_success():
                     "base_code": "USD",
                     "target_code": "EUR",
                     "conversion_rate": 0.85,
+                    "conversion_result": 85.0,
                     "time_last_update_unix": 1234567890,
                     "time_last_update_utc": "2024-01-01T12:00:00Z",
                 }
@@ -433,6 +434,7 @@ async def test_convert_currency_success():
         assert result is not None
         assert result["original"]["amount"] == 100.0
         assert result["original"]["currency"] == "USD"
+        assert result["converted"]["amount"] == 85.0
         assert result["converted"]["currency"] == "EUR"
         assert result["rate"] == 0.85
 

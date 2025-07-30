@@ -306,11 +306,10 @@ async def test_get_pair_exchange_rate_generic_exception(currency_service):
 
 @pytest.mark.asyncio
 async def test_convert_currency_with_get_pair_exchange_rate_failure(currency_service):
-    """Test convert_currency when get_pair_exchange_rate returns None."""
-    with patch.object(
-        currency_service,
-        "get_pair_exchange_rate",
-        new=AsyncMock(return_value=None),
+    """Test convert_currency when API returns error."""
+    with patch(
+        "httpx.AsyncClient.get",
+        new=AsyncMock(side_effect=httpx.HTTPStatusError("404", request=None, response=None)),
     ):
         result = await currency_service.convert_currency(100, "USD", "EUR")
         assert result is None
@@ -319,39 +318,54 @@ async def test_convert_currency_with_get_pair_exchange_rate_failure(currency_ser
 @pytest.mark.asyncio
 async def test_convert_currency_amount_rounding(currency_service):
     """Test convert_currency with proper amount rounding."""
-    with patch.object(
-        currency_service,
-        "get_pair_exchange_rate",
-        new=AsyncMock(
-            return_value={
-                "base_code": "USD",
-                "target_code": "EUR",
-                "rate": 0.123456789,  # Long decimal
-                "last_updated_unix": 1234567890,
-                "last_updated_utc": "2024-01-01T12:00:00Z",
-            }
-        ),
+    mock_response = MockAsyncResponse(
+        {
+            "result": "success",
+            "documentation": "https://www.exchangerate-api.com/docs",
+            "terms_of_use": "https://www.exchangerate-api.com/terms",
+            "time_last_update_unix": 1234567890,
+            "time_last_update_utc": "2024-01-01T12:00:00Z",
+            "time_next_update_unix": 1234567890,
+            "time_next_update_utc": "2024-01-01T12:00:00Z",
+            "base_code": "USD",
+            "target_code": "EUR",
+            "conversion_rate": 0.123456789,  # Long decimal
+            "conversion_result": 12.3456789,  # API calculated result
+        }
+    )
+
+    with patch(
+        "httpx.AsyncClient.get",
+        new=AsyncMock(return_value=mock_response),
     ):
         result = await currency_service.convert_currency(100, "USD", "EUR")
         assert result is not None
-        assert result["converted"]["amount"] == 12.35  # Should be rounded to 2 decimal places
+        assert result["converted"]["amount"] == 12.3456789  # API calculated result
+        assert result["rate"] == 0.123456789
 
 
 @pytest.mark.asyncio
 async def test_convert_currency_zero_amount(currency_service):
     """Test convert_currency with zero amount."""
-    with patch.object(
-        currency_service,
-        "get_pair_exchange_rate",
-        new=AsyncMock(
-            return_value={
-                "base_code": "USD",
-                "target_code": "EUR",
-                "rate": 0.85,
-                "last_updated_unix": 1234567890,
-                "last_updated_utc": "2024-01-01T12:00:00Z",
-            }
-        ),
+    mock_response = MockAsyncResponse(
+        {
+            "result": "success",
+            "documentation": "https://www.exchangerate-api.com/docs",
+            "terms_of_use": "https://www.exchangerate-api.com/terms",
+            "time_last_update_unix": 1234567890,
+            "time_last_update_utc": "2024-01-01T12:00:00Z",
+            "time_next_update_unix": 1234567890,
+            "time_next_update_utc": "2024-01-01T12:00:00Z",
+            "base_code": "USD",
+            "target_code": "EUR",
+            "conversion_rate": 0.85,
+            "conversion_result": 0.0,
+        }
+    )
+
+    with patch(
+        "httpx.AsyncClient.get",
+        new=AsyncMock(return_value=mock_response),
     ):
         result = await currency_service.convert_currency(0, "USD", "EUR")
         assert result is not None
@@ -362,18 +376,25 @@ async def test_convert_currency_zero_amount(currency_service):
 @pytest.mark.asyncio
 async def test_convert_currency_negative_amount(currency_service):
     """Test convert_currency with negative amount."""
-    with patch.object(
-        currency_service,
-        "get_pair_exchange_rate",
-        new=AsyncMock(
-            return_value={
-                "base_code": "USD",
-                "target_code": "EUR",
-                "rate": 0.85,
-                "last_updated_unix": 1234567890,
-                "last_updated_utc": "2024-01-01T12:00:00Z",
-            }
-        ),
+    mock_response = MockAsyncResponse(
+        {
+            "result": "success",
+            "documentation": "https://www.exchangerate-api.com/docs",
+            "terms_of_use": "https://www.exchangerate-api.com/terms",
+            "time_last_update_unix": 1234567890,
+            "time_last_update_utc": "2024-01-01T12:00:00Z",
+            "time_next_update_unix": 1234567890,
+            "time_next_update_utc": "2024-01-01T12:00:00Z",
+            "base_code": "USD",
+            "target_code": "EUR",
+            "conversion_rate": 0.85,
+            "conversion_result": -85.0,
+        }
+    )
+
+    with patch(
+        "httpx.AsyncClient.get",
+        new=AsyncMock(return_value=mock_response),
     ):
         result = await currency_service.convert_currency(-100, "USD", "EUR")
         assert result is not None

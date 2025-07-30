@@ -21,6 +21,7 @@ Handles conversation management and AI-powered travel recommendations.
 """
 
 import logging
+import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
@@ -140,23 +141,62 @@ async def archive_conversation_endpoint(
         raise HTTPException(status_code=500, detail="Failed to archive conversation") from e
 
 
+@router.post("/start")
+async def start_conversation_endpoint(
+    conversation_data: dict = None, current_user: dict = current_user_dependency
+):
+    """Start a new conversation without sending an initial message
+
+    Creates a conversation and returns the conversation_id for future messages.
+    """
+    try:
+        # Use empty dict if no data provided
+        if conversation_data is None:
+            conversation_data = {}
+
+        # Auto-generate conversation_id if not provided
+        conversation_id = conversation_data.get("conversation_id") or str(uuid.uuid4())
+
+        # Create conversation with minimal data
+        conversation = await db_helpers.create_chat_session(
+            user_id=current_user["id"],
+            conversation_id=conversation_id,
+            destination=conversation_data.get("destination"),
+        )
+
+        return {
+            "conversation_id": conversation_id,
+            "conversation": conversation,
+            "message": "Conversation started successfully",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Start conversation error: %s", type(e).__name__)
+        raise HTTPException(status_code=500, detail="Failed to start conversation") from e
+
+
 @router.post("/sessions/create")
 async def create_session_endpoint(session_data: dict, current_user: dict = current_user_dependency):
-    """Create a new chat session"""
+    """Create a new chat session
+
+    If conversation_id is not provided, one will be auto-generated.
+    Returns the created session along with the conversation_id.
+    """
     try:
         # Validate required fields
         if not session_data:
             raise HTTPException(status_code=400, detail="Session data is required")
 
-        if "conversation_id" not in session_data:
-            raise HTTPException(status_code=400, detail="conversation_id is required")
+        # Auto-generate conversation_id if not provided
+        conversation_id = session_data.get("conversation_id") or str(uuid.uuid4())
 
         session = await db_helpers.create_chat_session(
             user_id=current_user["id"],
-            conversation_id=session_data["conversation_id"],
+            conversation_id=conversation_id,
             destination=session_data.get("destination"),
         )
-        return {"session": session}
+        return {"session": session, "conversation_id": conversation_id}
     except HTTPException:
         raise
     except KeyError as e:

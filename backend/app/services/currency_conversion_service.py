@@ -413,26 +413,15 @@ User message: {user_message}
                 logger.error(f"Invalid currency code: {from_currency} or {to_currency}")
                 return None
 
-            pair_data = await currency_service.get_pair_exchange_rate(from_currency, to_currency)
-            if not pair_data:
-                logger.error(f"No pair data returned for {from_currency} to {to_currency}")
+            # Use the direct conversion method instead of getting rate separately
+            conversion_result = await currency_service.convert_currency(
+                amount, from_currency, to_currency
+            )
+            if not conversion_result:
+                logger.error(f"No conversion result returned for {from_currency} to {to_currency}")
                 return None
 
-            # Safely access the required keys with defaults
-            conversion_rate = pair_data.get("rate")
-            if conversion_rate is None:
-                logger.error(f"No rate found in pair data: {pair_data}")
-                return None
-
-            converted_amount = round(amount * conversion_rate, 2)
-
-            return {
-                "original": {"amount": round(amount, 2), "currency": from_currency},
-                "converted": {"amount": converted_amount, "currency": to_currency},
-                "rate": conversion_rate,
-                "last_updated_unix": pair_data.get("last_updated_unix"),
-                "last_updated_utc": pair_data.get("last_updated_utc"),
-            }
+            return conversion_result
 
         except Exception as e:
             logger.error(f"Error handling currency request: {e}")

@@ -568,9 +568,9 @@ class TestHandleCurrencyRequest:
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.get_pair_exchange_rate",
+                "app.services.currency_conversion_service.currency_service.convert_currency",
                 new_callable=AsyncMock,
-            ) as mock_rate,
+            ) as mock_convert,
         ):
             # Create a proper mock response with valid currencies and amount
             mock_choice = MagicMock()
@@ -582,8 +582,10 @@ class TestHandleCurrencyRequest:
             mock_response.choices = [mock_choice]
             mock_openai.return_value = mock_response
 
-            # Mock exchange rate service response
-            mock_rate.return_value = {
+            # Mock currency conversion service response
+            mock_convert.return_value = {
+                "original": {"amount": 100.0, "currency": "USD"},
+                "converted": {"amount": 85.0, "currency": "EUR"},
                 "rate": 0.85,
                 "last_updated_utc": "2024-01-01T12:00:00Z",
                 "last_updated_unix": 1704110400,
@@ -609,9 +611,9 @@ class TestHandleCurrencyRequest:
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.get_pair_exchange_rate",
+                "app.services.currency_conversion_service.currency_service.convert_currency",
                 new_callable=AsyncMock,
-            ) as mock_rate,
+            ) as mock_convert,
         ):
             # Create a proper mock response with valid currencies but no amount
             mock_choice = MagicMock()
@@ -623,8 +625,10 @@ class TestHandleCurrencyRequest:
             mock_response.choices = [mock_choice]
             mock_openai.return_value = mock_response
 
-            # Mock exchange rate service response
-            mock_rate.return_value = {
+            # Mock currency conversion service response
+            mock_convert.return_value = {
+                "original": {"amount": 0.0, "currency": "USD"},
+                "converted": {"amount": 0.0, "currency": "EUR"},
                 "rate": 0.85,
                 "last_updated_utc": "2024-01-01T12:00:00Z",
                 "last_updated_unix": 1704110400,
@@ -717,9 +721,9 @@ class TestHandleCurrencyRequest:
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.get_pair_exchange_rate",
+                "app.services.currency_conversion_service.currency_service.convert_currency",
                 new_callable=AsyncMock,
-            ) as mock_rate,
+            ) as mock_convert,
         ):
             # Create a proper mock response with valid currencies
             mock_choice = MagicMock()
@@ -731,8 +735,8 @@ class TestHandleCurrencyRequest:
             mock_response.choices = [mock_choice]
             mock_openai.return_value = mock_response
 
-            # Make exchange rate service return None
-            mock_rate.return_value = None
+            # Make currency conversion service return None
+            mock_convert.return_value = None
 
             result = await currency_conversion_service.handle_currency_request(
                 "convert 100 USD to EUR"
@@ -742,16 +746,16 @@ class TestHandleCurrencyRequest:
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_no_rate_in_response(self):
-        """Test currency request when exchange rate response doesn't contain rate."""
+        """Test currency request when currency conversion service returns None."""
         with (
             patch(
                 "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.get_pair_exchange_rate",
+                "app.services.currency_conversion_service.currency_service.convert_currency",
                 new_callable=AsyncMock,
-            ) as mock_rate,
+            ) as mock_convert,
         ):
             # Create a proper mock response with valid currencies
             mock_choice = MagicMock()
@@ -763,12 +767,8 @@ class TestHandleCurrencyRequest:
             mock_response.choices = [mock_choice]
             mock_openai.return_value = mock_response
 
-            # Mock exchange rate service response without rate
-            mock_rate.return_value = {
-                "last_updated_utc": "2024-01-01T12:00:00Z",
-                "last_updated_unix": 1704110400,
-                # Missing "rate" key
-            }
+            # Mock currency conversion service returning None (API error or invalid response)
+            mock_convert.return_value = None
 
             result = await currency_conversion_service.handle_currency_request(
                 "convert 100 USD to EUR"
@@ -817,9 +817,9 @@ class TestHandleCurrencyRequest:
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.get_pair_exchange_rate",
+                "app.services.currency_conversion_service.currency_service.convert_currency",
                 new_callable=AsyncMock,
-            ) as mock_rate,
+            ) as mock_convert,
         ):
             # Create a proper mock response with decimal amount
             mock_choice = MagicMock()
@@ -831,8 +831,10 @@ class TestHandleCurrencyRequest:
             mock_response.choices = [mock_choice]
             mock_openai.return_value = mock_response
 
-            # Mock exchange rate service response
-            mock_rate.return_value = {
+            # Mock currency conversion service response
+            mock_convert.return_value = {
+                "original": {"amount": 50.75, "currency": "USD"},
+                "converted": {"amount": 43.14, "currency": "EUR"},
                 "rate": 0.85,
                 "last_updated_utc": "2024-01-01T12:00:00Z",
                 "last_updated_unix": 1704110400,
@@ -857,9 +859,9 @@ class TestHandleCurrencyRequest:
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.get_pair_exchange_rate",
+                "app.services.currency_conversion_service.currency_service.convert_currency",
                 new_callable=AsyncMock,
-            ) as mock_rate,
+            ) as mock_convert,
         ):
             # Create a proper mock response with negative amount
             mock_choice = MagicMock()
@@ -871,8 +873,10 @@ class TestHandleCurrencyRequest:
             mock_response.choices = [mock_choice]
             mock_openai.return_value = mock_response
 
-            # Mock exchange rate service response
-            mock_rate.return_value = {
+            # Mock currency conversion service response
+            mock_convert.return_value = {
+                "original": {"amount": -25.0, "currency": "USD"},
+                "converted": {"amount": -21.25, "currency": "EUR"},
                 "rate": 0.85,
                 "last_updated_utc": "2024-01-01T12:00:00Z",
                 "last_updated_unix": 1704110400,
@@ -913,9 +917,9 @@ class TestHandleCurrencyRequest:
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.get_pair_exchange_rate",
+                "app.services.currency_conversion_service.currency_service.convert_currency",
                 new_callable=AsyncMock,
-            ) as mock_rate,
+            ) as mock_convert,
         ):
             # Create a proper mock response with valid currencies
             mock_choice = MagicMock()
@@ -927,8 +931,10 @@ class TestHandleCurrencyRequest:
             mock_response.choices = [mock_choice]
             mock_openai.return_value = mock_response
 
-            # Mock exchange rate service response
-            mock_rate.return_value = {
+            # Mock currency conversion service response
+            mock_convert.return_value = {
+                "original": {"amount": 100.0, "currency": "USD"},
+                "converted": {"amount": 85.0, "currency": "EUR"},
                 "rate": 0.85,
                 "last_updated_utc": "2024-01-01T12:00:00Z",
                 "last_updated_unix": 1704110400,

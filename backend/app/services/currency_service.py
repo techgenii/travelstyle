@@ -92,7 +92,7 @@ class CurrencyService:
     async def convert_currency(
         self, amount: float, from_currency: str, to_currency: str
     ) -> dict[str, Any] | None:
-        """Convert currency amounts.
+        """Convert currency amounts using the direct conversion endpoint.
 
         Args:
             amount: Amount to convert
@@ -102,23 +102,57 @@ class CurrencyService:
         Returns:
             Dictionary containing conversion result or None if error
         """
-        pair_data = await self.get_pair_exchange_rate(from_currency, to_currency)
-        if not pair_data:
-            return None
+        try:
+            from_currency = from_currency.strip().upper()
+            to_currency = to_currency.strip().upper()
 
-        conversion_rate = pair_data["rate"]
-        converted_amount = round(amount * conversion_rate, 2)
-        return {
-            "original": {"amount": amount, "currency": from_currency},
-            "converted": {"amount": converted_amount, "currency": to_currency},
-            "rate": conversion_rate,
-            "last_updated_unix": pair_data["last_updated_unix"],
-            "last_updated_utc": pair_data["last_updated_utc"],
-        }
+            # Use the direct conversion endpoint with amount
+            conversion_url = (
+                f"{self.base_url}{self.api_key}/pair/{from_currency}/{to_currency}/{amount}"
+            )
+
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(conversion_url)
+                response.raise_for_status()
+                try:
+                    data = response.json()
+                except Exception as e:
+                    logger.error("Failed to parse JSON: %s, content: %s", e, response.content)
+                    return None
+
+                logger.debug("Currency conversion API response: %s", data)
+                if not isinstance(data, dict) or data.get("result") != "success":
+                    logger.error(
+                        "Currency conversion failed: %s", data.get("error-type", "unknown error")
+                    )
+                    return None
+
+                return {
+                    "original": {"amount": amount, "currency": data["base_code"]},
+                    "converted": {
+                        "amount": data["conversion_result"],
+                        "currency": data["target_code"],
+                    },
+                    "rate": data["conversion_rate"],
+                    "last_updated_unix": data["time_last_update_unix"],
+                    "last_updated_utc": data["time_last_update_utc"],
+                }
+        except Exception as e:
+            logger.error("Currency conversion error: %s", type(e).__name__)
+            return None
 
     async def get_pair_exchange_rate(
         self, base_currency: str = "USD", target_currency: str = "USD"
     ) -> dict[str, Any] | None:
+        """Get exchange rate for a currency pair (without conversion).
+
+        Args:
+            base_currency: Source currency code
+            target_currency: Target currency code
+
+        Returns:
+            Dictionary containing exchange rate or None if error
+        """
         try:
             base_currency = base_currency.strip().upper()
             target_currency = target_currency.strip().upper()

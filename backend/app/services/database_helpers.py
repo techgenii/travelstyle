@@ -188,7 +188,17 @@ class DatabaseHelpers:
             }
 
             response = self.client.table("conversations").insert(session_data).execute()
-            return response.data[0] if response.data else {}
+
+            # Return a clean session object without datetime objects
+            if response.data and len(response.data) > 0:
+                session = response.data[0]
+                # Convert datetime objects to ISO format strings for JSON serialization
+                if "created_at" in session and isinstance(session["created_at"], datetime):
+                    session["created_at"] = session["created_at"].isoformat()
+                if "updated_at" in session and isinstance(session["updated_at"], datetime):
+                    session["updated_at"] = session["updated_at"].isoformat()
+                return session
+            return {}
 
         except Exception as e:
             logger.error(f"Error creating chat session: {e}")
