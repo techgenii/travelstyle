@@ -1,50 +1,37 @@
-// components/auth/forgot-password-form.tsx
 "use client"
 
 import { useActionState } from "react"
+import { forgotPassword } from "@/actions/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { forgotPassword } from "@/actions/auth"
 import Link from "next/link"
-import { AuthFormWrapper } from "./auth-form-wrapper" // Corrected import
+import { cn } from "@/lib/utils"
 
 export function ForgotPasswordForm() {
-  const [state, action, isPending] = useActionState(forgotPassword, { success: false, message: "" })
+  const [state, formAction, isPending] = useActionState(forgotPassword, {
+    success: false,
+    message: "",
+    error: "",
+  })
 
   return (
-    <AuthFormWrapper title="Forgot Password">
-      <form action={action} className="space-y-6">
-        <p className="text-sm text-gray-600 text-center">
-          Enter your email address and we'll send you a link to reset your password.
-        </p>
-        <div>
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            placeholder="you@example.com"
-            required
-            className="mt-1 bg-white border-gray-200 rounded-xl px-4 py-3 text-base focus:border-gray-300 focus:ring-0"
-          />
-        </div>
-        {state.message && (
-          <p className={`text-sm ${state.success ? "text-green-600" : "text-red-600"}`}>{state.message}</p>
-        )}
-        <Button
-          type="submit"
-          className="w-full bg-black text-white rounded-xl px-4 py-3 hover:bg-gray-800 disabled:bg-gray-300"
-          disabled={isPending}
-        >
-          {isPending ? "Sending..." : "Send Reset Link"}
-        </Button>
-        <div className="text-center text-sm text-gray-600">
-          <Link href="/login" className="font-medium text-gray-700 hover:underline">
-            Back to Login
-          </Link>
-        </div>
-      </form>
-    </AuthFormWrapper>
+    <form action={formAction} className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input id="email" name="email" type="email" placeholder="m@example.com" required disabled={isPending} />
+      </div>
+      {state?.error && <p className="text-red-500 text-sm">{state.error}</p>}
+      {state?.success && <p className="text-green-500 text-sm">{state.message}</p>}
+      <Button type="submit" className={cn("w-full", isPending && "opacity-70 cursor-not-allowed")} disabled={isPending}>
+        {isPending ? "Sending..." : "Send Reset Link"}
+      </Button>
+      <div className="text-center text-sm text-gray-600">
+        Remember your password?{" "}
+        <Link href="/login" className="font-medium text-purple-600 hover:underline">
+          Log In
+        </Link>
+      </div>
+    </form>
   )
 }

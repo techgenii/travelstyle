@@ -4,16 +4,16 @@ import { useState, useEffect } from "react"
 import { MobileFrame } from "@/components/mobile-frame"
 import { HomeScreen } from "@/components/home-screen"
 import { ChatInterface } from "@/components/chat-interface"
-import { Header } from "@/components/header"
 import { RecentChatsScreen } from "@/components/recent-chats-screen"
 import { ProfileScreen } from "@/components/profile-screen"
+import { SettingsScreen } from "@/components/settings-screen"
 import { BottomNavigation } from "@/components/bottom-navigation"
-import { sendChatMessage } from "@/lib/services/chat"
+import { sendChatMessage, getChatHistory, createChatSession } from "@/lib/services/chat"
 import type { ConversationContext as BackendConversationContext } from "@/lib/services/chat"
-import { isAuthenticated, redirectToLogin } from "@/lib/auth" // Import auth utilities
+import { checkAuthStatus, redirectToLogin } from "@/lib/auth" // Import auth utilities
 import { useIsMobile } from "@/hooks/use-is-mobile"
 
-type AppScreen = "home" | "chat" | "recent" | "profile"
+type AppScreen = "home" | "chat" | "recent" | "profile" | "settings" // Removed "currency"
 type NavigationTab = "home" | "recent" | "profile"
 type ChatContext = "wardrobe" | "style" | "currency" | "general"
 
@@ -33,44 +33,58 @@ export default function TravelStyleApp() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isAuthChecked, setIsAuthChecked] = useState(false) // New state for auth check
-
-  const fullName = "Sarah Johnson" // This would come from user context after login
-  const firstName = fullName.split(" ")[0]
+  const [user, setUser] = useState<{ id: string; firstName: string; email: string } | null>(null)
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null) // Track current session
 
   const isMobile = useIsMobile()
 
   useEffect(() => {
     // Check authentication status on mount
-    if (!isAuthenticated()) {
-      redirectToLogin()
-    } else {
-      setIsAuthChecked(true)
+    const checkAuth = async () => {
+      const { isAuthenticated: authenticated, user: userData } = await checkAuthStatus()
+      if (!authenticated) {
+        redirectToLogin()
+      } else {
+        setUser(userData)
+        setIsAuthChecked(true)
+      }
     }
+    checkAuth()
   }, [])
 
-  if (!isAuthChecked) {
+  if (!isAuthChecked || !user) {
     // Optionally render a loading spinner or null while checking auth
-    return null
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading application...</p>
+        </div>
+      </div>
+    )
   }
 
   const generateResponse = async (userMessage: string, context: ChatContext): Promise<Message> => {
     try {
       const backendContext: BackendConversationContext = {
-        user_id: "mock_user_id", // Replace with actual user ID from auth
+        user_id: user.id, // Use actual user ID from auth
+        session_id: currentSessionId || undefined, // Include session ID if available
         // Map frontend context to backend context if needed
+        // For example, if context is 'wardrobe', you might add:
+        // trip_purpose: context === 'wardrobe' ? 'wardrobe_planning' : undefined,
       }
 
       const response = await sendChatMessage(userMessage, backendContext)
 
       return {
-        id: Date.now().toString(),
+        id: response.message_id, // Use message_id from backend
         text: response.message,
         isUser: false,
         timestamp: new Date(response.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         quickReplies: response.quick_replies.map((qr) => ({
           id: qr.action || qr.text,
           text: qr.text,
-          emoji: "💬",
+          emoji: "💬", // Default emoji, can be customized
         })),
         showFeedback: true,
       }
@@ -106,14 +120,25 @@ export default function TravelStyleApp() {
     if (tab !== "home" && currentScreen === "chat") {
       setMessages([])
       setChatContext("general")
+      setCurrentSessionId(null) // Clear session when leaving chat
     }
   }
 
-  const handleActionSelect = (actionId: string) => {
+  const handleActionSelect = async (actionId: string) => {
     if (actionId === "recent") {
       setActiveTab("recent")
       setCurrentScreen("recent")
       return
+    }
+
+    // Create a new chat session when starting a conversation (including currency)
+    try {
+      const sessionResponse = await createChatSession() // This calls /chat/start
+      setCurrentSessionId(sessionResponse.session_id)
+      console.log(`Created new chat session: ${sessionResponse.session_id}`)
+    } catch (error) {
+      console.error("Failed to create chat session:", error)
+      // Continue without session ID - the backend might handle this gracefully
     }
 
     let context: ChatContext = "general"
@@ -128,7 +153,7 @@ export default function TravelStyleApp() {
         context = "style"
         initialMessage = "I want to learn about style etiquette"
         break
-      case "currency":
+      case "currency": // Currency converter starts a chat session
         context = "currency"
         initialMessage = "I need help with currency conversion"
         break
@@ -185,6 +210,7 @@ export default function TravelStyleApp() {
 
   const handleFeedback = (messageId: string, type: "positive" | "negative") => {
     console.log(`Feedback for message ${messageId}: ${type}`)
+    // Here you would send feedback to your backend
   }
 
   const handleBackToHome = () => {
@@ -192,6 +218,7 @@ export default function TravelStyleApp() {
     setActiveTab("home")
     setMessages([])
     setChatContext("general")
+    setCurrentSessionId(null) // Clear session when going back to home
   }
 
   const getScreenTitle = () => {
@@ -207,40 +234,88 @@ export default function TravelStyleApp() {
     }
   }
 
-  const handleChatSelect = (chatId: string) => {
+  const handleChatSelect = async (chatId: string) => {
     console.log(`Loading chat: ${chatId}`)
     setCurrentScreen("chat")
     setActiveTab("home")
-    setChatContext("general")
-    setMessages([])
+    setChatContext("general") // Reset context for loaded chat, or infer from chat history
+    setIsLoading(true)
+    try {
+      // In a real scenario, you'd fetch messages for this specific chatId
+      // For now, we'll just simulate loading and clear messages
+      const history = await getChatHistory(user.id) // This would ideally fetch history for a specific conversation ID
+      // For demonstration, let's just clear and add a placeholder
+      setMessages([
+        {
+          id: "loaded-chat-1",
+          text: `Welcome back to chat ${chatId}!`,
+          isUser: false,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        },
+      ])
+    } catch (error) {
+      console.error("Failed to load chat history:", error)
+      setMessages([
+        {
+          id: "error-load",
+          text: "Failed to load chat history. Please try again.",
+          isUser: false,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        },
+      ])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Centralized settings navigation handler
+  const handleSettingsNavClick = () => {
+    setCurrentScreen("settings")
+    setActiveTab("home") // Keep home tab active when in settings
   }
 
   const renderCurrentScreen = () => {
     switch (currentScreen) {
       case "home":
-        return <HomeScreen onActionSelect={handleActionSelect} userName={firstName} />
+        return (
+          <HomeScreen
+            onActionSelect={handleActionSelect}
+            userName={user.firstName}
+            onProfileClick={handleProfileNavClick}
+            onSettingsClick={handleSettingsNavClick}
+          />
+        )
       case "recent":
         return <RecentChatsScreen onBack={() => handleTabChange("home")} onChatSelect={handleChatSelect} />
       case "profile":
-        return <ProfileScreen onBack={() => handleTabChange("home")} />
+        return (
+          <ProfileScreen onBack={() => handleTabChange("home")} onSettingsClick={handleSettingsNavClick} user={user} />
+        )
+      case "settings":
+        return <SettingsScreen onBack={() => setCurrentScreen("home")} user={user} />
       case "chat":
         return (
-          <div className="flex flex-col h-full bg-[#F8F6FF]">
-            <Header title={getScreenTitle()} showBack={true} onBack={handleBackToHome} />
-            <ChatInterface
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              onQuickReply={handleQuickReply}
-              onFeedback={handleFeedback}
-              isLoading={isLoading}
-            />
-          </div>
+          <ChatInterface
+            title={getScreenTitle()}
+            onBack={handleBackToHome}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            onQuickReply={handleQuickReply}
+            onFeedback={handleFeedback}
+            isLoading={isLoading}
+          />
         )
       default:
-        return <HomeScreen onActionSelect={handleActionSelect} userName={firstName} />
+        return <HomeScreen onActionSelect={handleActionSelect} userName={user.firstName} />
     }
   }
 
+  const handleProfileNavClick = () => {
+    setCurrentScreen("profile")
+    setActiveTab("profile")
+  }
+
+  // Pass handleProfileNavClick to HomeScreen
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       {isMobile ? (
@@ -250,17 +325,21 @@ export default function TravelStyleApp() {
             <div className="flex-1 overflow-hidden">{renderCurrentScreen()}</div>
 
             {/* Bottom Navigation - Only show on main screens, not in chat */}
-            {currentScreen !== "chat" && <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />}
+            {currentScreen !== "chat" && currentScreen !== "settings" && (
+              <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
+            )}
           </div>
         </MobileFrame>
       ) : (
         // Desktop view: Render content directly, allowing it to expand
-        <div className="flex flex-col h-full w-full max-w-screen-lg mx-auto bg-[#F8F6FF] rounded-2xl shadow-lg overflow-hidden">
+        <div className="flex flex-col h-full w-full max-w-screen-lg mx-auto bg-[#F8F6FF] rounded-2xl shadow-lg overflow-hidden h-[800px]">
           {/* Main Content */}
           <div className="flex-1 overflow-hidden">{renderCurrentScreen()}</div>
 
           {/* Bottom Navigation - Only show on main screens, not in chat */}
-          {currentScreen !== "chat" && <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />}
+          {currentScreen !== "chat" && currentScreen !== "settings" && (
+            <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
+          )}
         </div>
       )}
     </div>

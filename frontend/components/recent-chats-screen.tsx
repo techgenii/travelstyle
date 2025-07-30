@@ -6,6 +6,7 @@ import { ChatListItem } from "./chat-list-item"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { MessageCircle } from "lucide-react"
 
 interface ChatHistory {
   id: string
@@ -151,8 +152,8 @@ export function RecentChatsScreen({ onBack, onChatSelect }: RecentChatsScreenPro
   ]
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <Header title="Recent Chats" />
+    <div className="flex flex-col h-full bg-[#F8F6FF]">
+      <Header title="Recent Chats" showBack onBack={onBack} />
 
       {/* Search and Filter Section */}
       <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
@@ -189,45 +190,32 @@ export function RecentChatsScreen({ onBack, onChatSelect }: RecentChatsScreenPro
       </div>
 
       {/* Chat List */}
-      <div className="flex-1 overflow-y-auto">
-        {filteredChats.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 px-4">
-            <div className="text-4xl mb-3">💬</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No conversations found</h3>
-            <p className="text-sm text-gray-600 text-center">
-              {searchQuery || filterType !== "all"
-                ? "Try adjusting your search or filter criteria"
-                : "Start a new conversation to see it here"}
-            </p>
+      <div className="flex-1 overflow-y-auto p-4">
+        {filteredChats.length > 0 ? (
+          <div className="bg-white rounded-2xl shadow-soft overflow-hidden">
+            {Object.entries(groupedChats).map(([groupName, chats]) => (
+              <div key={groupName}>
+                <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+                  <h2 className="text-sm font-medium text-gray-700">{groupName}</h2>
+                </div>
+                {chats.map((chat, index) => (
+                  <ChatListItem
+                    key={chat.id}
+                    chat={chat}
+                    onClick={() => onChatSelect(chat.id)}
+                    isLast={index === chats.length - 1}
+                  />
+                ))}
+              </div>
+            ))}
           </div>
         ) : (
-          Object.entries(groupedChats).map(([groupName, chats]) => (
-            <div key={groupName}>
-              <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-                <h2 className="text-sm font-medium text-gray-700">{groupName}</h2>
-              </div>
-              {chats.map((chat) => (
-                <ChatListItem
-                  key={chat.id}
-                  id={chat.id}
-                  title={chat.title}
-                  lastMessage={chat.lastMessage}
-                  timestamp={chat.timestamp}
-                  type={chat.type}
-                  messageCount={chat.messageCount}
-                  onSelect={onChatSelect}
-                />
-              ))}
-            </div>
-          ))
+          <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
+            <MessageCircle size={48} className="mb-4" />
+            <p className="text-lg font-semibold">No recent chats</p>
+            <p className="text-sm">Start a new conversation to see it here!</p>
+          </div>
         )}
-      </div>
-
-      {/* Stats Footer */}
-      <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
-        <p className="text-xs text-gray-500 text-center">
-          {filteredChats.length} conversation{filteredChats.length !== 1 ? "s" : ""} in the last 30 days
-        </p>
       </div>
     </div>
   )

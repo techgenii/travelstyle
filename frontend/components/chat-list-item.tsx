@@ -1,73 +1,76 @@
 "use client"
 
-import { MessageCircle, Calendar, ChevronRight } from "lucide-react"
+import { MessageSquare, Tag } from "lucide-react"
+import { cn } from "@/lib/utils"
 
-interface ChatListItemProps {
+interface ChatHistory {
   id: string
   title: string
   lastMessage: string
   timestamp: string
   type: "wardrobe" | "style" | "currency" | "general"
   messageCount: number
-  onSelect: (chatId: string) => void
+  createdAt: Date // Assuming this is available for sorting/grouping
 }
 
-const getChatTypeIcon = (type: string) => {
-  switch (type) {
-    case "wardrobe":
-      return "👗"
-    case "style":
-      return "🌍"
-    case "currency":
-      return "💱"
-    default:
-      return "💬"
+interface ChatListItemProps {
+  chat: ChatHistory
+  onClick: (chatId: string) => void
+  isLast: boolean // To control bottom border
+}
+
+export function ChatListItem({ chat, onClick, isLast }: ChatListItemProps) {
+  const getTypeIcon = (type: ChatHistory["type"]) => {
+    switch (type) {
+      case "wardrobe":
+        return "👗"
+      case "style":
+        return "🌍"
+      case "currency":
+        return "💱"
+      case "general":
+      default:
+        return "💬"
+    }
   }
-}
 
-const getChatTypeLabel = (type: string) => {
-  switch (type) {
-    case "wardrobe":
-      return "Wardrobe Planning"
-    case "style":
-      return "Style Etiquette"
-    case "currency":
-      return "Currency Converter"
-    default:
-      return "General Chat"
+  const getTypeColorClass = (type: ChatHistory["type"]) => {
+    switch (type) {
+      case "wardrobe":
+        return "bg-pink-100 text-pink-700"
+      case "style":
+        return "bg-blue-100 text-blue-700"
+      case "currency":
+        return "bg-green-100 text-green-700"
+      case "general":
+      default:
+        return "bg-gray-100 text-gray-700"
+    }
   }
-}
 
-export function ChatListItem({ id, title, lastMessage, timestamp, type, messageCount, onSelect }: ChatListItemProps) {
   return (
     <button
-      onClick={() => onSelect(id)}
-      className="w-full p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200 text-left"
+      onClick={() => onClick(chat.id)}
+      className={cn(
+        "flex items-center p-4 w-full text-left bg-white hover:bg-gray-50 transition-colors",
+        !isLast && "border-b border-gray-100",
+      )}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg">{getChatTypeIcon(type)}</span>
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{getChatTypeLabel(type)}</span>
-          </div>
-
-          <h3 className="text-base font-medium text-gray-900 mb-1 truncate">{title}</h3>
-
-          <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed mb-2">{lastMessage}</p>
-
-          <div className="flex items-center gap-4 text-xs text-gray-500">
-            <div className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              <span>{timestamp}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <MessageCircle className="h-3 w-3" />
-              <span>{messageCount} messages</span>
-            </div>
-          </div>
+      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
+        <span className="text-xl">{getTypeIcon(chat.type)}</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-semibold text-gray-900 truncate">{chat.title}</h3>
+          <span className="text-xs text-gray-500 flex-shrink-0 ml-2">{chat.timestamp}</span>
         </div>
-
-        <ChevronRight className="h-5 w-5 text-gray-400 ml-3 flex-shrink-0" />
+        <p className="text-sm text-gray-600 truncate mb-1">{chat.lastMessage}</p>
+        <div className="flex items-center text-xs text-gray-500">
+          <MessageSquare className="h-3 w-3 mr-1" />
+          <span>{chat.messageCount} messages</span>
+          <Tag className={cn("h-3 w-3 ml-3 mr-1", getTypeColorClass(chat.type))} />
+          <span className={cn("font-medium", getTypeColorClass(chat.type))}>{chat.type}</span>
+        </div>
       </div>
     </button>
   )

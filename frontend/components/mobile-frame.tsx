@@ -1,3 +1,5 @@
+"use client"
+
 import type { ReactNode } from "react"
 
 interface MobileFrameProps {
@@ -6,22 +8,25 @@ interface MobileFrameProps {
 
 export function MobileFrame({ children }: MobileFrameProps) {
   return (
-    <div className="mx-auto max-w-[390px] h-[844px] bg-white relative overflow-hidden rounded-[40px] shadow-2xl border border-gray-200">
-      {/* Status Bar */}
-      <div className="absolute top-0 left-0 right-0 h-11 flex items-center justify-between px-6 text-sm font-semibold text-black z-50">
-        <span>9:41</span>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-3 border border-black rounded-sm">
-            <div className="w-2 h-1 bg-black rounded-sm m-0.5"></div>
-          </div>
-        </div>
+    <div className="relative w-full max-w-md mx-auto aspect-[9/19.5] bg-black rounded-[2.5rem] shadow-2xl overflow-hidden">
+      {/* Notch */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[100px] h-[25px] bg-black rounded-b-xl z-10" />
+
+      {/* Speaker and Camera (mock) */}
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center justify-center w-1/3 h-4">
+        <div className="w-10 h-1.5 bg-gray-700 rounded-full mr-2" />
+        <div className="w-2 h-2 bg-gray-700 rounded-full" />
       </div>
 
-      {/* Content */}
-      <div className="pt-11 pb-8 h-full flex flex-col">{children}</div>
+      {/* Screen content */}
+      <div className="relative w-full h-full pt-[25px] pb-[10px] px-[10px] box-border">
+        <div className="relative w-full h-full bg-white rounded-[2rem] overflow-hidden">{children}</div>
+      </div>
 
-      {/* Home Indicator */}
-      <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-black rounded-full"></div>
+      {/* Side buttons (mock) */}
+      <div className="absolute top-1/4 left-0 w-2 h-10 bg-gray-800 rounded-l-md" />
+      <div className="absolute top-1/2 left-0 w-2 h-16 bg-gray-800 rounded-l-md" />
+      <div className="absolute top-1/3 right-0 w-2 h-16 bg-gray-800 rounded-r-md" />
     </div>
   )
 }

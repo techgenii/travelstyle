@@ -1,24 +1,27 @@
 import { cn } from "@/lib/utils"
+import { colors } from "@/lib/design-system"
 
 interface ChatBubbleProps {
   message: string
   isUser: boolean
-  timestamp?: string
+  timestamp: string
 }
 
 export function ChatBubble({ message, isUser, timestamp }: ChatBubbleProps) {
   return (
-    <div className={cn("flex mb-2", isUser ? "justify-end" : "justify-start")}>
+    <div className={cn("flex w-full", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[75%] px-4 py-3 rounded-[20px] text-base leading-relaxed",
+          "max-w-[70%] p-3 rounded-lg shadow-md",
           isUser
-            ? "bg-[#E8E5FF] text-gray-900 rounded-br-[8px] ml-auto"
-            : "bg-[#F0EFFF] text-gray-900 rounded-bl-[8px] mr-auto",
+            ? cn(colors.gradients.chatBubbleUser, "rounded-br-none") // User bubble gradient
+            : cn(colors.gradients.chatBubbleAI, "rounded-bl-none"), // AI bubble gradient
         )}
       >
-        <p className="whitespace-pre-wrap">{message}</p>
-        {timestamp && <p className="text-xs text-gray-500 mt-1">{timestamp}</p>}
+        <p className={cn("text-sm", isUser ? "text-white" : "text-gray-800")}>{message}</p>
+        <span className={cn("block text-right text-xs mt-1", isUser ? "text-white/80" : "text-gray-600")}>
+          {timestamp}
+        </span>
       </div>
     </div>
   )

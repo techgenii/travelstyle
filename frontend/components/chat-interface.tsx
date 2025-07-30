@@ -1,10 +1,12 @@
 "use client"
 
-import { useRef, useEffect } from "react"
+import { useEffect, useRef } from "react"
+import { Header } from "./header"
 import { ChatBubble } from "./chat-bubble"
 import { ChatInput } from "./chat-input"
 import { QuickReplyButtons } from "./quick-reply-buttons"
 import { ResponseFeedback } from "./response-feedback"
+import { Loader2 } from "lucide-react"
 
 interface Message {
   id: string
@@ -16,19 +18,23 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
+  title: string
+  onBack: () => void
   messages: Message[]
   onSendMessage: (message: string) => void
   onQuickReply: (buttonId: string, text: string) => void
   onFeedback: (messageId: string, type: "positive" | "negative") => void
-  isLoading?: boolean
+  isLoading: boolean
 }
 
 export function ChatInterface({
+  title,
+  onBack,
   messages,
   onSendMessage,
   onQuickReply,
   onFeedback,
-  isLoading = false,
+  isLoading,
 }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -40,51 +46,38 @@ export function ChatInterface({
     scrollToBottom()
   }, [messages])
 
+  const lastAIMessage = messages
+    .slice()
+    .reverse()
+    .find((m) => !m.isUser)
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-        {messages.map((message) => (
-          <div key={message.id}>
-            <ChatBubble message={message.text} isUser={message.isUser} timestamp={message.timestamp} />
+    <div className="flex flex-col h-full bg-[#F8F6FF]">
+      <Header title={title} showBack onBack={onBack} />
 
-            {!message.isUser && message.quickReplies && (
-              <QuickReplyButtons buttons={message.quickReplies} onSelect={onQuickReply} disabled={isLoading} />
-            )}
-
-            {!message.isUser && message.showFeedback && (
-              <ResponseFeedback messageId={message.id} onFeedback={onFeedback} />
-            )}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+        {messages.map((msg) => (
+          <div key={msg.id}>
+            <ChatBubble message={msg.text} isUser={msg.isUser} timestamp={msg.timestamp} />
+            {msg.showFeedback && !msg.isUser && <ResponseFeedback messageId={msg.id} onFeedback={onFeedback} />}
           </div>
         ))}
-
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-[#F0EFFF] rounded-[20px] rounded-bl-[8px] px-4 py-3 max-w-[75%]">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.1s" }}
-                ></div>
-                <div
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.2s" }}
-                ></div>
-              </div>
+            <div className="max-w-[70%] p-3 rounded-lg rounded-bl-none shadow-md bg-gray-200 text-gray-700 flex items-center space-x-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>AI is typing...</span>
             </div>
           </div>
         )}
-
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Container */}
-      <ChatInput
-        onSendMessage={onSendMessage}
-        disabled={isLoading}
-        placeholder="Ask me about travel, style, or currency..."
-      />
+      {lastAIMessage?.quickReplies && lastAIMessage.quickReplies.length > 0 && (
+        <QuickReplyButtons buttons={lastAIMessage.quickReplies} onQuickReply={onQuickReply} />
+      )}
+
+      <ChatInput onSendMessage={onSendMessage} isLoading={isLoading} />
     </div>
   )
 }

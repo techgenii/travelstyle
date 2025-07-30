@@ -1,35 +1,82 @@
 "use client"
 
-import { ChevronLeft, MoreHorizontal } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { ChevronLeft, Settings, User } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { cn } from "@/lib/utils"
+import { colors } from "@/lib/design-system"
 
 interface HeaderProps {
   title: string
-  onBack?: () => void
   showBack?: boolean
-  onMore?: () => void
+  onBack?: () => void
+  showProfile?: boolean
+  onProfileClick?: () => void
+  showSettings?: boolean
+  onSettingsClick?: () => void // New prop for settings click handler
 }
 
-export function Header({ title, onBack, showBack = false, onMore }: HeaderProps) {
+export function Header({
+  title,
+  showBack,
+  onBack,
+  showProfile,
+  onProfileClick,
+  showSettings,
+  onSettingsClick,
+}: HeaderProps) {
+  const router = useRouter()
+
+  const handleBackClick = () => {
+    if (onBack) {
+      onBack()
+    } else {
+      router.back()
+    }
+  }
+
+  const handleProfileClick = () => {
+    if (onProfileClick) {
+      onProfileClick()
+    } else {
+      router.push("/profile") // Fallback
+    }
+  }
+
+  const handleSettingsClick = () => {
+    if (onSettingsClick) {
+      onSettingsClick()
+    } else {
+      router.push("/settings") // Fallback
+    }
+  }
+
   return (
-    <div className="flex items-center justify-between h-15 px-4 bg-transparent">
-      <div className="w-6">
+    <header
+      className={cn(
+        "flex items-center justify-between p-4 h-16",
+        colors.gradients.header, // Apply the header gradient
+      )}
+    >
+      <div className="flex items-center">
         {showBack && (
-          <Button variant="ghost" size="icon" onClick={onBack} className="h-6 w-6 p-0 hover:bg-gray-100">
-            <ChevronLeft className="h-6 w-6 text-gray-900" />
-          </Button>
+          <button onClick={handleBackClick} className="mr-2 p-1 rounded-full hover:bg-white/20 transition-colors">
+            <ChevronLeft className="h-6 w-6 text-white" />
+          </button>
+        )}
+        <h1 className="text-xl font-semibold text-white">{title}</h1>
+      </div>
+      <div className="flex items-center space-x-2">
+        {showProfile && (
+          <button onClick={handleProfileClick} className="p-1 rounded-full hover:bg-white/20 transition-colors">
+            <User className="h-6 w-6 text-white" />
+          </button>
+        )}
+        {showSettings && (
+          <button onClick={handleSettingsClick} className="p-1 rounded-full hover:bg-white/20 transition-colors">
+            <Settings className="h-6 w-6 text-white" />
+          </button>
         )}
       </div>
-
-      <h1 className="text-lg font-semibold text-gray-900 text-center">{title}</h1>
-
-      <div className="w-6">
-        {onMore && (
-          <Button variant="ghost" size="icon" onClick={onMore} className="h-6 w-6 p-0 hover:bg-gray-100">
-            <MoreHorizontal className="h-6 w-6 text-gray-900" />
-          </Button>
-        )}
-      </div>
-    </div>
+    </header>
   )
 }

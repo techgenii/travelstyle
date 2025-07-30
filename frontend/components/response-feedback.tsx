@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { ThumbsUp, ThumbsDown } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface ResponseFeedbackProps {
   messageId: string
@@ -10,38 +10,39 @@ interface ResponseFeedbackProps {
 }
 
 export function ResponseFeedback({ messageId, onFeedback }: ResponseFeedbackProps) {
-  const [feedback, setFeedback] = useState<"positive" | "negative" | null>(null)
+  const [feedbackGiven, setFeedbackGiven] = useState<"positive" | "negative" | null>(null)
 
-  const handleFeedback = (type: "positive" | "negative") => {
-    setFeedback(type)
-    onFeedback(messageId, type)
+  const handleFeedbackClick = (type: "positive" | "negative") => {
+    if (!feedbackGiven) {
+      setFeedbackGiven(type)
+      onFeedback(messageId, type)
+    }
   }
 
   return (
-    <div className="flex gap-2 mt-2 mb-4">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => handleFeedback("positive")}
-        disabled={feedback !== null}
-        className={`h-8 w-8 p-0 rounded-full ${
-          feedback === "positive" ? "bg-green-100 text-green-600" : "hover:bg-gray-100"
-        }`}
+    <div className="flex items-center justify-end space-x-2 mt-2">
+      <button
+        className={cn(
+          "p-1 rounded-full transition-colors",
+          feedbackGiven === "positive" ? "bg-green-100 text-green-600" : "text-gray-400 hover:bg-gray-100",
+        )}
+        onClick={() => handleFeedbackClick("positive")}
+        disabled={!!feedbackGiven}
+        aria-label="Give positive feedback"
       >
         <ThumbsUp className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => handleFeedback("negative")}
-        disabled={feedback !== null}
-        className={`h-8 w-8 p-0 rounded-full ${
-          feedback === "negative" ? "bg-red-100 text-red-600" : "hover:bg-gray-100"
-        }`}
+      </button>
+      <button
+        className={cn(
+          "p-1 rounded-full transition-colors",
+          feedbackGiven === "negative" ? "bg-red-100 text-red-600" : "text-gray-400 hover:bg-gray-100",
+        )}
+        onClick={() => handleFeedbackClick("negative")}
+        disabled={!!feedbackGiven}
+        aria-label="Give negative feedback"
       >
         <ThumbsDown className="h-4 w-4" />
-      </Button>
-      {feedback && <span className="text-xs text-gray-500 self-center ml-2">Thank you for your feedback!</span>}
+      </button>
     </div>
   )
 }

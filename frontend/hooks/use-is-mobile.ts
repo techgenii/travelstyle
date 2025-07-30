@@ -2,15 +2,12 @@
 
 import { useState, useEffect } from "react"
 
-const MOBILE_BREAKPOINT = 768 // Corresponds to Tailwind's 'md' breakpoint
-
-export function useIsMobile() {
+export function useIsMobile(breakpoint = 768): boolean {
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
-    // Function to check if current window width is mobile
     const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+      setIsMobile(window.innerWidth < breakpoint)
     }
 
     // Set initial value
@@ -23,7 +20,7 @@ export function useIsMobile() {
     return () => {
       window.removeEventListener("resize", checkIsMobile)
     }
-  }, []) // Empty dependency array ensures this runs once on mount and cleans up on unmount
+  }, [breakpoint])
 
   return isMobile
 }
