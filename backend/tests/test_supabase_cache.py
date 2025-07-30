@@ -38,24 +38,26 @@ def cache_service(mock_supabase_client):
 
 @pytest.mark.asyncio
 async def test_get_weather_cache_success(cache_service, mock_supabase_client):
-    # Mock the chain: table().select().eq().single().execute()
+    # Mock the chain: table().select().eq().limit(1).execute()
     mock_table = Mock()
     mock_select = Mock()
     mock_eq = Mock()
-    mock_single = Mock()
+    mock_limit = Mock()
 
     mock_supabase_client.table.return_value = mock_table
     mock_table.select.return_value = mock_select
     mock_select.eq.return_value = mock_eq
-    mock_eq.single.return_value = mock_single
-    mock_single.execute.return_value = Mock(
-        data={
-            "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
-            "data": {
-                "temperature": 20,
-                "description": "sunny",
-            },  # Changed from "weather_data" to "data"
-        }
+    mock_eq.limit.return_value = mock_limit
+    mock_limit.execute.return_value = Mock(
+        data=[
+            {
+                "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+                "weather_data": {
+                    "temperature": 20,
+                    "description": "sunny",
+                },
+            }
+        ]
     )
 
     result = await cache_service.get_weather_cache("Paris")
@@ -136,48 +138,57 @@ async def test_set_weather_cache_error(cache_service, mock_supabase_client):
 @pytest.mark.asyncio
 async def test_get_cultural_cache_success(cache_service, mock_supabase_client):
     mock_execute = Mock()
-    mock_execute.data = {
-        "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
-        "data": {
-            "customs": "formal",
-            "dress_code": "business",
-            "_context": "business",
-        },
-    }
+    mock_execute.data = [
+        {
+            "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+            "cultural_data": {
+                "customs": "formal",
+                "dress_code": "business",
+            },
+            "style_data": {
+                "recommendations": "business casual",
+            },
+        }
+    ]
 
-    # Chain mocks for: .table().select().eq().eq().eq().single().execute()
+    # Chain mocks for: .table().select().eq().limit(1).execute()
     mock_table = mock_supabase_client.table.return_value
     mock_select = mock_table.select.return_value
-    mock_eq1 = mock_select.eq.return_value
-    mock_eq2 = mock_eq1.eq.return_value
-    mock_eq3 = mock_eq2.eq.return_value
-    mock_single = mock_eq3.single.return_value
-    mock_single.execute.return_value = mock_execute
+    mock_eq = mock_select.eq.return_value
+    mock_limit = mock_eq.limit.return_value
+    mock_limit.execute.return_value = mock_execute
 
     result = await cache_service.get_cultural_cache("Tokyo", "business")
-    assert result == {"customs": "formal", "dress_code": "business", "_context": "business"}
+    expected = {
+        "cultural_data": {
+            "customs": "formal",
+            "dress_code": "business",
+        },
+        "style_data": {
+            "recommendations": "business casual",
+        },
+    }
+    assert result == expected
 
 
 @pytest.mark.asyncio
 async def test_get_cultural_cache_expired(cache_service, mock_supabase_client):
     mock_table = Mock()
     mock_select = Mock()
-    mock_eq1 = Mock()
-    mock_eq2 = Mock()
-    mock_eq3 = Mock()
-    mock_single = Mock()
+    mock_eq = Mock()
+    mock_limit = Mock()
 
     mock_supabase_client.table.return_value = mock_table
     mock_table.select.return_value = mock_select
-    mock_select.eq.return_value = mock_eq1
-    mock_eq1.eq.return_value = mock_eq2
-    mock_eq2.eq.return_value = mock_eq3
-    mock_eq3.single.return_value = mock_single
-    mock_single.execute.return_value = Mock(
-        data={
-            "expires_at": (datetime.now(UTC) - timedelta(hours=1)).isoformat(),
-            "data": {"customs": "formal"},
-        }
+    mock_select.eq.return_value = mock_eq
+    mock_eq.limit.return_value = mock_limit
+    mock_limit.execute.return_value = Mock(
+        data=[
+            {
+                "expires_at": (datetime.now(UTC) - timedelta(hours=1)).isoformat(),
+                "cultural_data": {"customs": "formal"},
+            }
+        ]
     )
 
     result = await cache_service.get_cultural_cache("Tokyo")

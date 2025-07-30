@@ -1,7 +1,7 @@
 // actions/user.ts
 "use server"
 
-import { fetchApiServer } from "@/lib/api-server" // Use server API
+import { fetchApiServer } from "@/lib/api-server"
 import type { UserOut } from "@/lib/types/api"
 
 interface UserProfileState {
@@ -29,70 +29,26 @@ export async function getUserProfile(token?: string): Promise<UserProfileState> 
   }
 }
 
+// Modified to use PUT /users/me for comprehensive profile updates
 export async function updateUserProfile(
   token: string,
   prevState: UpdateUserProfileState,
-  formData: FormData,
+  // This action now expects a Partial<UserOut> containing all fields to be updated
+  // The client (useSettingsForm) will construct this comprehensive payload.
+  updateData: Partial<UserOut>,
 ): Promise<UpdateUserProfileState> {
   try {
     if (!token) {
       return { success: false, message: "", error: "No authentication token provided" }
     }
 
-    // Extract form data
-    const updateData: Partial<UserOut> = {
-      first_name: formData.get("firstName") as string,
-      last_name: formData.get("lastName") as string,
-      email: formData.get("email") as string,
-      profile_picture_url: formData.get("profilePictureUrl") as string,
-    }
+    console.log("Updating user profile with data via PUT /users/me:", updateData)
 
-    // Parse JSON fields
-    const jsonFields = [
-      "stylePreferences",
-      "sizeInfo",
-      "travelPatterns",
-      "quickReplyPreferences",
-      "packingMethods",
-      "currencyPreferences",
-    ]
-
-    jsonFields.forEach((field) => {
-      const value = formData.get(field) as string
-      if (value) {
-        try {
-          const snakeCaseField = field.replace(/([A-Z])/g, "_$1").toLowerCase()
-          ;(updateData as any)[snakeCaseField] = JSON.parse(value)
-        } catch (error) {
-          console.warn(`Failed to parse ${field}:`, error)
-        }
-      }
-    })
-
-    // Handle selected style names
-    const selectedStyleNames = formData.get("selectedStyleNames") as string
-    if (selectedStyleNames) {
-      try {
-        updateData.selected_style_names = JSON.parse(selectedStyleNames)
-      } catch (error) {
-        console.warn("Failed to parse selectedStyleNames:", error)
-      }
-    }
-
-    // Remove empty/null values
-    Object.keys(updateData).forEach((key) => {
-      if (updateData[key as keyof UserOut] === "" || updateData[key as keyof UserOut] === null) {
-        delete updateData[key as keyof UserOut]
-      }
-    })
-
-    console.log("Updating user profile with data:", updateData)
-
-    // Make API call to update user profile
-    const updatedUser = await fetchApiServer<UserOut>(
+    // Make API call to update user profile (PUT /users/me)
+    await fetchApiServer<UserOut>(
       "/users/me",
       {
-        method: "PATCH",
+        method: "PUT", // Changed from PATCH to PUT
         body: JSON.stringify(updateData),
       },
       token,
@@ -111,3 +67,5 @@ export async function updateUserProfile(
     }
   }
 }
+
+// Removed updateUserPreferences as its functionality is now part of updateUserProfile

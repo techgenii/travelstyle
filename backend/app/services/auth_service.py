@@ -22,6 +22,7 @@ and user registration.
 """
 
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from app.core.config import settings
@@ -69,6 +70,17 @@ class AuthService:
                 raise ValueError("Invalid credentials")
             if not response.session:
                 raise ValueError("No session created")
+
+            # Update last_login field
+            user_id = response.user.id
+            try:
+                current_time = datetime.now(UTC).isoformat()
+                self.client.table("users").update({"last_login": current_time}).eq(
+                    "id", user_id
+                ).execute()
+            except Exception as e:
+                logger.warning(f"Failed to update last_login for user {user_id}: {e}")
+
             user_profile = extract_user_profile(response.user)
             if not user_profile:
                 user_profile = {}

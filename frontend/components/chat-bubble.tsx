@@ -14,8 +14,8 @@ export function ChatBubble({ message, isUser, timestamp }: ChatBubbleProps) {
         className={cn(
           "max-w-[70%] p-3 rounded-lg shadow-md",
           isUser
-            ? cn(colors.gradients.chatBubbleUser, "rounded-br-none") // User bubble gradient
-            : cn(colors.gradients.chatBubbleAI, "rounded-bl-none"), // AI bubble gradient
+            ? cn(colors.gradients.chatBubbleUser, "rounded-br-none")
+            : cn(colors.gradients.chatBubbleAI, "rounded-bl-none"),
         )}
       >
         <p className={cn("text-sm", isUser ? "text-white" : "text-gray-800")}>{message}</p>

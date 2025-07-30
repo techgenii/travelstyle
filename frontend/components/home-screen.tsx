@@ -27,49 +27,29 @@ const proTips = [
   "Leave some space in your luggage for souvenirs and new purchases!",
 ]
 
-const greetings = [
-  "Hello",
-  "Hi there",
-  "Greetings",
-  "Welcome",
-  "Hey",
-  "Nice to see you",
-  "Howdy",
-  "Aloha",
-  "Bonjour",
-  "Hola",
-  "Ciao",
-  "G'day",
-  "Salutations",
-  "What's up",
-  "Good to have you",
-]
-
 interface HomeScreenProps {
   onActionSelect: (actionId: string) => void
   userName: string
   onProfileClick?: () => void
   onSettingsClick?: () => void
+  sessionGreeting: string | null
 }
 
-export function HomeScreen({ onActionSelect, userName, onProfileClick, onSettingsClick }: HomeScreenProps) {
+export function HomeScreen({
+  onActionSelect,
+  userName,
+  onProfileClick,
+  onSettingsClick,
+  sessionGreeting,
+}: HomeScreenProps) {
   const [currentProTip, setCurrentProTip] = useState("")
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // Select a random pro tip when the component mounts
+    setMounted(true)
     const randomIndex = Math.floor(Math.random() * proTips.length)
     setCurrentProTip(proTips[randomIndex])
-  }, []) // Empty dependency array means this runs once on mount
-
-  const [currentGreeting, setCurrentGreeting] = useState("")
-  const [animateGreeting, setAnimateGreeting] = useState(false)
-
-  useEffect(() => {
-    // Select a random greeting when the component mounts
-    const randomIndex = Math.floor(Math.random() * greetings.length)
-    setCurrentGreeting(greetings[randomIndex])
-    setAnimateGreeting(true) // Trigger animation on mount
-  }, [greetings])
+  }, [])
 
   return (
     <div className="flex flex-col h-full bg-[#F8F6FF]">
@@ -81,7 +61,7 @@ export function HomeScreen({ onActionSelect, userName, onProfileClick, onSetting
         onSettingsClick={onSettingsClick}
       />
       <div className="flex-1 overflow-y-auto">
-        <Greeting userName={userName} greetings={greetings} />
+        <Greeting userName={userName} greetingMessage={sessionGreeting || "Hello"} />
 
         {/* Pro Tip Card */}
         <Card className="m-4 pro-tip-gradient text-white shadow-lg rounded-xl">
@@ -90,7 +70,7 @@ export function HomeScreen({ onActionSelect, userName, onProfileClick, onSetting
             <div>
               <h3 className="text-lg font-semibold mb-1">Pro Tip:</h3>
               <p key={currentProTip} className={cn("text-sm opacity-90")}>
-                {currentProTip}
+                {mounted ? currentProTip : proTips[0]}
               </p>
             </div>
           </CardContent>

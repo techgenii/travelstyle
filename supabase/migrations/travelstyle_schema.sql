@@ -316,8 +316,67 @@ CREATE TABLE public.users (
   profile_completed boolean DEFAULT false, -- Whether user has completed their profile
   first_name character varying, -- User's first name
   last_name character varying, -- User's last name
+  default_location character varying, -- User's default weather location
+  max_bookmarks integer DEFAULT 50, -- Maximum number of bookmarks (Free tier default)
+  max_conversations integer DEFAULT 100, -- Maximum number of conversations (Free tier default)
+  subscription_tier character varying DEFAULT 'free'::character varying, -- 'free', 'premium', 'enterprise', etc.
+  subscription_expires_at timestamp with time zone, -- When the subscription expires
+  is_premium boolean DEFAULT false, -- Whether user is premium
   CONSTRAINT users_pkey PRIMARY KEY (id)
 );
+
+-- Add default_location and account limits to users table
+ALTER TABLE public.users
+ADD COLUMN default_location character varying,
+ADD COLUMN max_bookmarks integer DEFAULT 50,
+ADD COLUMN max_conversations integer DEFAULT 100,
+ADD COLUMN subscription_tier character varying DEFAULT 'free'::character varying,
+ADD COLUMN subscription_expires_at timestamp with time zone;
+
+-- Add indexes for performance
+CREATE INDEX idx_users_subscription_tier ON public.users(subscription_tier);
+CREATE INDEX idx_users_subscription_expires ON public.users(subscription_expires_at);
+
+-- Update the user_profile_view to include the new fields
+CREATE OR REPLACE VIEW public.user_profile_view WITH (security_invoker=on) AS
+SELECT
+    -- Basic user identification and authentication
+    u.id,                    -- Unique user identifier (UUID)
+    u.email,                 -- User's email address (unique, used for login)
+
+    -- Personal information
+    u.first_name,            -- User's first name (optional, for personalization)
+    u.last_name,             -- User's last name (optional, for personalization)
+    u.profile_completed,     -- Boolean flag indicating if user has completed their profile setup
+    u.profile_picture_url,   -- URL to user's profile picture/avatar (optional)
+    u.default_location,      -- User's default weather location
+
+    -- Account limits and subscription
+    u.max_bookmarks,         -- Maximum number of bookmarks allowed
+    u.max_conversations,     -- Maximum number of conversations allowed
+    u.subscription_tier,     -- User's subscription tier (free, premium, etc.)
+    u.subscription_expires_at, -- When the subscription expires
+
+    -- Style and fashion preferences (from user_preferences table)
+    p.style_preferences,     -- JSON object containing user's style preferences (colors, patterns, brands, etc.)
+    p.size_info,             -- JSON object with user's clothing sizes and measurements
+
+    -- Travel behavior and preferences
+    p.travel_patterns,       -- JSON object describing user's travel habits (frequency, destinations, trip types)
+    p.quick_reply_preferences, -- JSON object with user's preferred quick reply settings for chat
+
+    -- Packing and organization preferences
+    p.packing_methods,       -- JSON object with user's preferred packing techniques and organization methods
+    p.currency_preferences,  -- JSON object containing user's currency preferences (base currency, conversion settings)
+
+    -- Timestamps and activity tracking
+    u.created_at,            -- When the user account was created
+    u.updated_at,            -- When the user profile was last modified
+    u.last_login             -- When the user last logged into the application
+FROM
+    public.users u
+LEFT JOIN
+    public.user_preferences p ON u.id = p.user_id;
 
 -- =============================================================================
 -- WEATHER CACHING
@@ -348,69 +407,55 @@ CREATE TABLE public.weather_cache (
 -- Purpose: This view consolidates user profile information from multiple tables
 -- into a single, easy-to-query interface for the application's user profile endpoints.
 -- It combines basic user information with detailed preferences for travel and style.
-CREATE VIEW public.user_profile_view WITH (security_invoker=on) AS
-SELECT
-    -- Basic user identification and authentication
-    u.id,                    -- Unique user identifier (UUID)
-    u.email,                 -- User's email address (unique, used for login)
-
-    -- Personal information
-    u.first_name,            -- User's first name (optional, for personalization)
-    u.last_name,             -- User's last name (optional, for personalization)
-    u.profile_completed,     -- Boolean flag indicating if user has completed their profile setup
-    u.profile_picture_url,   -- URL to user's profile picture/avatar (optional)
-
-    -- Style and fashion preferences (from user_preferences table)
-    p.style_preferences,     -- JSON object containing user's style preferences (colors, patterns, brands, etc.)
-    p.size_info,             -- JSON object with user's clothing sizes and measurements
-
-    -- Travel behavior and preferences
-    p.travel_patterns,       -- JSON object describing user's travel habits (frequency, destinations, trip types)
-    p.quick_reply_preferences, -- JSON object with user's preferred quick reply settings for chat
-
-    -- Packing and organization preferences
-    p.packing_methods,       -- JSON object with user's preferred packing techniques and organization methods
-    p.currency_preferences,  -- JSON object containing user's currency preferences (base currency, conversion settings)
-
-    -- Timestamps and activity tracking
-    u.created_at,            -- When the user account was created
-    u.updated_at,            -- When the user profile was last modified
-    u.last_login             -- When the user last logged into the application
-FROM
-    public.users u
-LEFT JOIN
-    public.user_preferences p ON u.id = p.user_id;
+-- Update the user_profile_view to include the new fields
 
 -- Enhanced user activity view with API usage
-CREATE OR REPLACE VIEW user_activity_summary AS
+CREATE VIEW public.user_profile_view WITH (security_invoker=on) AS
 SELECT
     u.id,
     u.email,
-    u.created_at as user_created_at,
-    u.last_login,
+    u.first_name,
+    u.last_name,
     u.profile_completed,
-    COUNT(DISTINCT c.id) as total_conversations,
-    COUNT(DISTINCT rf.id) as total_feedback_given,
-    COUNT(DISTINCT cb.id) as total_bookmarks,
-    COUNT(DISTINCT sd.id) as total_saved_destinations,
-    COUNT(DISTINCT cf.id) as total_currency_favorites,
-    COUNT(DISTINCT pt.id) as total_packing_templates,
-    COUNT(DISTINCT cs.id) as total_active_sessions,
-    COUNT(DISTINCT arl.id) as total_api_requests,
-    COUNT(DISTINCT rh.id) as total_recommendations,
-    MAX(c.created_at) as last_conversation_date,
-    MAX(arl.created_at) as last_api_request_date
-FROM users u
-LEFT JOIN conversations c ON u.id = c.user_id
-LEFT JOIN response_feedback rf ON u.id = rf.user_id
-LEFT JOIN chat_bookmarks cb ON u.id = cb.user_id
-LEFT JOIN saved_destinations sd ON u.id = sd.user_id
-LEFT JOIN currency_favorites cf ON u.id = cf.user_id
-LEFT JOIN packing_templates pt ON u.id = pt.user_id
-LEFT JOIN chat_sessions cs ON u.id = cs.user_id AND cs.is_active = true
-LEFT JOIN api_request_logs arl ON u.id = arl.user_id
-LEFT JOIN recommendation_history rh ON u.id = rh.user_id
-GROUP BY u.id, u.email, u.created_at, u.last_login, u.profile_completed;
+    u.profile_picture_url,
+    p.style_preferences,
+    p.size_info,
+    p.travel_patterns,
+    p.quick_reply_preferences,
+    p.packing_methods,
+    p.currency_preferences,
+    u.created_at,
+    u.updated_at,
+    u.last_login,
+
+    -- NEW: Aggregate list of selected style names
+    ARRAY_REMOVE(ARRAY_AGG(DISTINCT cs.style_name), NULL) AS selected_style_names,
+
+    -- NEW: Additional user fields
+    u.preferences,
+    u.ui_preferences,
+    u.default_location,
+    u.max_bookmarks,
+    u.max_conversations,
+    u.subscription_tier,
+    u.subscription_expires_at,
+    u.is_premium
+FROM
+    public.users u
+LEFT JOIN
+    public.user_preferences p ON u.id = p.user_id
+LEFT JOIN
+    public.user_style_preferences usp ON u.id = usp.user_id
+LEFT JOIN
+    public.clothing_styles cs ON usp.style_id = cs.id
+GROUP BY
+    u.id, u.email, u.first_name, u.last_name, u.profile_completed,
+    u.profile_picture_url, p.style_preferences, p.size_info,
+    p.travel_patterns, p.quick_reply_preferences, p.packing_methods,
+    p.currency_preferences, u.created_at, u.updated_at, u.last_login,
+    u.preferences, u.ui_preferences, u.default_location, u.max_bookmarks,
+    u.max_conversations, u.subscription_tier, u.subscription_expires_at,
+    u.is_premium;
 
 -- API performance view
 CREATE VIEW api_performance_summary AS

@@ -48,6 +48,7 @@ class UserStatus(str, Enum):
 class UserProfileBase(BaseModel):
     first_name: str | None = Field(None, description="User's first name")
     last_name: str | None = Field(None, description="User's last name")
+    default_location: str | None = Field(None, description="User's default weather location")
     profile_completed: bool | None = Field(
         None, description="Whether the user's profile is complete"
     )
@@ -80,6 +81,13 @@ class UserProfileResponse(UserProfileBase):
     id: str = Field(..., description="User's unique identifier")
     email: str = Field(..., description="User's email address")
     profile_picture_url: str | None = Field(None, description="URL to the user's profile picture")
+    max_bookmarks: int | None = Field(None, description="Maximum number of bookmarks allowed")
+    max_conversations: int | None = Field(
+        None, description="Maximum number of conversations allowed"
+    )
+    subscription_tier: str | None = Field(None, description="User's subscription tier")
+    subscription_expires_at: str | None = Field(None, description="When the subscription expires")
+    is_premium: bool | None = Field(None, description="Whether the user has premium status")
     created_at: str | None = Field(None, description="Timestamp when the user was created")
     updated_at: str | None = Field(None, description="Timestamp when the user was last updated")
     last_login: str | None = Field(None, description="Timestamp of the user's last login")

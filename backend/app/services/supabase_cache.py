@@ -53,12 +53,15 @@ class SupabaseCacheService:
                 self.client.table("weather_cache")
                 .select("*")
                 .eq("destination", destination)
-                .single()
+                .limit(1)
                 .execute()
             )
-            expires_at = response.data.get("expires_at")
-            if response.data and expires_at and not self._is_expired(expires_at):
-                return response.data.get("data")
+            # response.data is a list of rows
+            if response.data and len(response.data) > 0:
+                cache_entry = response.data[0]
+                expires_at = cache_entry.get("expires_at")
+                if expires_at and not self._is_expired(expires_at):
+                    return cache_entry.get("weather_data")
             return None
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Weather cache get error: %s", type(e).__name__)
@@ -79,7 +82,7 @@ class SupabaseCacheService:
             expires_at = datetime.now(UTC) + timedelta(hours=ttl_hours)
             cache_data = {
                 "destination": destination,
-                "destination_normalized": destination.lower(),  # or your normalization logic
+                "destination_normalized": destination.lower(),
                 "weather_data": data,
                 "expires_at": expires_at.isoformat(),
                 "created_at": datetime.now(UTC).isoformat(),
@@ -105,14 +108,19 @@ class SupabaseCacheService:
                 self.client.table("cultural_insights_cache")
                 .select("*")
                 .eq("destination", destination)
-                .eq("context", context)
-                .eq("is_active", True)
-                .single()
+                .limit(1)
                 .execute()
             )
-            expires_at = response.data.get("expires_at")
-            if response.data and expires_at and not self._is_expired(expires_at):
-                return response.data.get("data")
+            # response.data is a list of rows
+            if response.data and len(response.data) > 0:
+                cache_entry = response.data[0]
+                expires_at = cache_entry.get("expires_at")
+                if expires_at and not self._is_expired(expires_at):
+                    # Return both cultural_data and style_data
+                    return {
+                        "cultural_data": cache_entry.get("cultural_data"),
+                        "style_data": cache_entry.get("style_data"),
+                    }
             return None
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Cultural cache get error: %s", type(e).__name__)
@@ -134,10 +142,10 @@ class SupabaseCacheService:
             expires_at = datetime.now(UTC) + timedelta(hours=ttl_hours)
             cache_data = {
                 "destination": destination,
-                "context": context,
-                "data": data,
+                "destination_normalized": destination.lower(),
+                "cultural_data": data.get("cultural_data", {}),
+                "style_data": data.get("style_data", {}),
                 "expires_at": expires_at.isoformat(),
-                "is_active": True,
                 "created_at": datetime.now(UTC).isoformat(),
             }
             self.client.table("cultural_insights_cache").upsert(cache_data).execute()

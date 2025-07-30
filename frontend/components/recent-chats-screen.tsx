@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Header } from "./header"
 import { ChatListItem } from "./chat-list-item"
 import { Input } from "@/components/ui/input"
@@ -23,7 +23,7 @@ interface RecentChatsScreenProps {
   onChatSelect: (chatId: string) => void
 }
 
-// Mock data for recent chats
+// Mock data - in a real app, this would come from an API
 const mockChatHistory: ChatHistory[] = [
   {
     id: "1",
@@ -32,7 +32,7 @@ const mockChatHistory: ChatHistory[] = [
     timestamp: "2 hours ago",
     type: "wardrobe",
     messageCount: 12,
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    createdAt: new Date(), // Will be updated in useEffect
   },
   {
     id: "2",
@@ -41,7 +41,7 @@ const mockChatHistory: ChatHistory[] = [
     timestamp: "Yesterday",
     type: "style",
     messageCount: 8,
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    createdAt: new Date(), // Will be updated in useEffect
   },
   {
     id: "3",
@@ -50,7 +50,7 @@ const mockChatHistory: ChatHistory[] = [
     timestamp: "2 days ago",
     type: "currency",
     messageCount: 4,
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(), // Will be updated in useEffect
   },
   {
     id: "4",
@@ -59,7 +59,7 @@ const mockChatHistory: ChatHistory[] = [
     timestamp: "3 days ago",
     type: "wardrobe",
     messageCount: 15,
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(), // Will be updated in useEffect
   },
   {
     id: "5",
@@ -68,7 +68,7 @@ const mockChatHistory: ChatHistory[] = [
     timestamp: "5 days ago",
     type: "style",
     messageCount: 6,
-    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(), // Will be updated in useEffect
   },
   {
     id: "6",
@@ -77,7 +77,7 @@ const mockChatHistory: ChatHistory[] = [
     timestamp: "1 week ago",
     type: "general",
     messageCount: 3,
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(), // Will be updated in useEffect
   },
   {
     id: "7",
@@ -86,7 +86,7 @@ const mockChatHistory: ChatHistory[] = [
     timestamp: "1 week ago",
     type: "wardrobe",
     messageCount: 20,
-    createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(), // Will be updated in useEffect
   },
   {
     id: "8",
@@ -95,17 +95,30 @@ const mockChatHistory: ChatHistory[] = [
     timestamp: "2 weeks ago",
     type: "currency",
     messageCount: 2,
-    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(), // Will be updated in useEffect
   },
 ]
 
 export function RecentChatsScreen({ onBack, onChatSelect }: RecentChatsScreenProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState<"all" | "wardrobe" | "style" | "currency" | "general">("all")
+  const [mounted, setMounted] = useState(false)
+  const [chatHistory, setChatHistory] = useState<ChatHistory[]>([])
+
+  useEffect(() => {
+    setMounted(true)
+    // Update the dates with proper time offsets
+    const now = Date.now()
+    const updatedHistory = mockChatHistory.map((chat, index) => ({
+      ...chat,
+      createdAt: new Date(now - (index + 1) * 24 * 60 * 60 * 1000),
+    }))
+    setChatHistory(updatedHistory)
+  }, [])
 
   // Filter chats from last 30 days
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-  const recentChats = mockChatHistory.filter((chat) => chat.createdAt >= thirtyDaysAgo)
+  const thirtyDaysAgo = mounted ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) : new Date()
+  const recentChats = chatHistory.filter((chat) => chat.createdAt >= thirtyDaysAgo)
 
   // Apply search and filter
   const filteredChats = recentChats.filter((chat) => {
@@ -128,10 +141,8 @@ export function RecentChatsScreen({ onBack, onChatSelect }: RecentChatsScreenPro
         groupKey = "Today"
       } else if (chatDate.toDateString() === yesterday.toDateString()) {
         groupKey = "Yesterday"
-      } else if (chatDate >= new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)) {
-        groupKey = "This Week"
       } else {
-        groupKey = "Earlier"
+        groupKey = chatDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })
       }
 
       if (!groups[groupKey]) {
@@ -140,7 +151,7 @@ export function RecentChatsScreen({ onBack, onChatSelect }: RecentChatsScreenPro
       groups[groupKey].push(chat)
       return groups
     },
-    {} as Record<string, ChatHistory[]>,
+    {} as Record<string, ChatHistory[]>
   )
 
   const filterButtons = [
@@ -176,11 +187,10 @@ export function RecentChatsScreen({ onBack, onChatSelect }: RecentChatsScreenPro
               variant={filterType === filter.key ? "default" : "outline"}
               size="sm"
               onClick={() => setFilterType(filter.key as typeof filterType)}
-              className={`flex-shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-                filterType === filter.key
-                  ? "bg-black text-white"
-                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-              }`}
+              className={`flex-shrink-0 rounded-full px-3 py-1 text-xs font-medium ${filterType === filter.key
+                ? "bg-black text-white"
+                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                }`}
             >
               <span className="mr-1">{filter.emoji}</span>
               {filter.label}

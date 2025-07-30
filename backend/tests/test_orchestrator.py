@@ -407,6 +407,9 @@ async def test_generate_travel_recommendations_no_user_profile():
             weather_service, "get_weather_data", new=AsyncMock(return_value={"weather": "data"})
         ),
         patch.object(
+            qloo_service, "get_style_recommendations", new=AsyncMock(return_value={"style": "data"})
+        ),
+        patch.object(
             currency_service, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
         ),
         patch.object(
@@ -546,6 +549,18 @@ async def test_generate_travel_recommendations_exception_handling():
     with (
         patch.object(currency_conversion_service, "is_currency_request", return_value=False),
         patch.object(
+            qloo_service, "get_cultural_insights", new=AsyncMock(return_value={"insights": "data"})
+        ),
+        patch.object(
+            weather_service, "get_weather_data", new=AsyncMock(return_value={"weather": "data"})
+        ),
+        patch.object(
+            qloo_service, "get_style_recommendations", new=AsyncMock(return_value={"style": "data"})
+        ),
+        patch.object(
+            currency_service, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
+        ),
+        patch.object(
             orchestrator_service, "_parse_trip_context", side_effect=Exception("Parse error")
         ),
     ):
@@ -571,6 +586,18 @@ async def test_generate_travel_recommendations_exception_handling_alternative():
     """Test generate_travel_recommendations when an exception occurs in a different way."""
     with (
         patch.object(currency_conversion_service, "is_currency_request", return_value=False),
+        patch.object(
+            qloo_service, "get_cultural_insights", new=AsyncMock(return_value={"insights": "data"})
+        ),
+        patch.object(
+            weather_service, "get_weather_data", new=AsyncMock(return_value={"weather": "data"})
+        ),
+        patch.object(
+            qloo_service, "get_style_recommendations", new=AsyncMock(return_value={"style": "data"})
+        ),
+        patch.object(
+            currency_service, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
+        ),
         patch.object(openai_service, "generate_response", side_effect=Exception("OpenAI error")),
     ):
         result = await orchestrator_service.generate_travel_recommendations(

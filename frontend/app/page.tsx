@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { MobileFrame } from "@/components/mobile-frame"
 import { HomeScreen } from "@/components/home-screen"
 import { ChatInterface } from "@/components/chat-interface"
@@ -10,10 +10,10 @@ import { SettingsScreen } from "@/components/settings-screen"
 import { BottomNavigation } from "@/components/bottom-navigation"
 import { sendChatMessage, getChatHistory, createChatSession } from "@/lib/services/chat"
 import type { ConversationContext as BackendConversationContext } from "@/lib/services/chat"
-import { checkAuthStatus, redirectToLogin } from "@/lib/auth" // Import auth utilities
+import { checkAuthStatus, redirectToLogin } from "@/lib/auth"
 import { useIsMobile } from "@/hooks/use-is-mobile"
 
-type AppScreen = "home" | "chat" | "recent" | "profile" | "settings" // Removed "currency"
+type AppScreen = "home" | "chat" | "recent" | "profile" | "settings"
 type NavigationTab = "home" | "recent" | "profile"
 type ChatContext = "wardrobe" | "style" | "currency" | "general"
 
@@ -26,20 +26,47 @@ interface Message {
   showFeedback?: boolean
 }
 
+// Define the default greetings here, as this is where the greeting will be selected once per session.
+const defaultGreetings = [
+  "Hello",
+  "Welcome back",
+  "Ready for your next adventure",
+  "Let's explore the world together",
+  "Your travel companion is here",
+  "Time to discover something amazing",
+  "Adventure awaits",
+  "Let's plan your perfect trip",
+  "Ready to explore",
+  "Your journey starts here",
+  "Let's make travel magic happen",
+  "Welcome to your travel hub",
+  "Ready for wanderlust",
+  "Let's create unforgettable memories",
+  "Your next adventure begins now",
+]
+
 export default function TravelStyleApp() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>("home")
   const [activeTab, setActiveTab] = useState<NavigationTab>("home")
   const [chatContext, setChatContext] = useState<ChatContext>("general")
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [isAuthChecked, setIsAuthChecked] = useState(false) // New state for auth check
-  const [user, setUser] = useState<{ id: string; firstName: string; email: string } | null>(null)
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null) // Track current session
+  const [isAuthChecked, setIsAuthChecked] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [user, setUser] = useState<{
+    id: string
+    firstName: string
+    email: string
+    defaultLocation?: string | null
+  } | null>(null) // New: Add defaultLocation to user state
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+  const [sessionGreeting, setSessionGreeting] = useState<string | null>(null) // New state for session greeting
+  const hasSetSessionGreeting = useRef(false) // Ref to ensure greeting is set only once
 
   const isMobile = useIsMobile()
 
   useEffect(() => {
-    // Check authentication status on mount
+    setMounted(true)
     const checkAuth = async () => {
       const { isAuthenticated: authenticated, user: userData } = await checkAuthStatus()
       if (!authenticated) {
@@ -47,13 +74,19 @@ export default function TravelStyleApp() {
       } else {
         setUser(userData)
         setIsAuthChecked(true)
+
+        // Set the session greeting only once after successful authentication
+        if (userData && !hasSetSessionGreeting.current) {
+          const randomIndex = Math.floor(Math.random() * defaultGreetings.length)
+          setSessionGreeting(defaultGreetings[randomIndex])
+          hasSetSessionGreeting.current = true
+        }
       }
     }
     checkAuth()
-  }, [])
+  }, []) // Empty dependency array means this runs once on mount
 
-  if (!isAuthChecked || !user) {
-    // Optionally render a loading spinner or null while checking auth
+  if (!isAuthChecked || !user || !sessionGreeting) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -67,32 +100,28 @@ export default function TravelStyleApp() {
   const generateResponse = async (userMessage: string, context: ChatContext): Promise<Message> => {
     try {
       const backendContext: BackendConversationContext = {
-        user_id: user.id, // Use actual user ID from auth
-        session_id: currentSessionId || undefined, // Include session ID if available
-        // Map frontend context to backend context if needed
-        // For example, if context is 'wardrobe', you might add:
-        // trip_purpose: context === 'wardrobe' ? 'wardrobe_planning' : undefined,
+        user_id: user.id,
+        session_id: currentSessionId || undefined,
       }
 
       const response = await sendChatMessage(userMessage, backendContext)
 
       return {
-        id: response.message_id, // Use message_id from backend
+        id: response.message_id,
         text: response.message,
         isUser: false,
         timestamp: new Date(response.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         quickReplies: response.quick_replies.map((qr) => ({
           id: qr.action || qr.text,
           text: qr.text,
-          emoji: "💬", // Default emoji, can be customized
+          emoji: "💬",
         })),
         showFeedback: true,
       }
     } catch (error: any) {
       console.error("Failed to get AI response from backend:", error)
-      // Handle 401 Unauthorized specifically
       if (error.message && error.message.includes("401")) {
-        redirectToLogin() // Redirect to login if unauthorized
+        redirectToLogin()
         return {
           id: Date.now().toString(),
           text: "Your session has expired. Please log in again.",
@@ -120,7 +149,7 @@ export default function TravelStyleApp() {
     if (tab !== "home" && currentScreen === "chat") {
       setMessages([])
       setChatContext("general")
-      setCurrentSessionId(null) // Clear session when leaving chat
+      setCurrentSessionId(null)
     }
   }
 
@@ -131,14 +160,12 @@ export default function TravelStyleApp() {
       return
     }
 
-    // Create a new chat session when starting a conversation (including currency)
     try {
-      const sessionResponse = await createChatSession() // This calls /chat/start
+      const sessionResponse = await createChatSession()
       setCurrentSessionId(sessionResponse.session_id)
       console.log(`Created new chat session: ${sessionResponse.session_id}`)
     } catch (error) {
       console.error("Failed to create chat session:", error)
-      // Continue without session ID - the backend might handle this gracefully
     }
 
     let context: ChatContext = "general"
@@ -153,7 +180,7 @@ export default function TravelStyleApp() {
         context = "style"
         initialMessage = "I want to learn about style etiquette"
         break
-      case "currency": // Currency converter starts a chat session
+      case "currency":
         context = "currency"
         initialMessage = "I need help with currency conversion"
         break
@@ -210,7 +237,6 @@ export default function TravelStyleApp() {
 
   const handleFeedback = (messageId: string, type: "positive" | "negative") => {
     console.log(`Feedback for message ${messageId}: ${type}`)
-    // Here you would send feedback to your backend
   }
 
   const handleBackToHome = () => {
@@ -218,7 +244,7 @@ export default function TravelStyleApp() {
     setActiveTab("home")
     setMessages([])
     setChatContext("general")
-    setCurrentSessionId(null) // Clear session when going back to home
+    setCurrentSessionId(null)
   }
 
   const getScreenTitle = () => {
@@ -238,13 +264,10 @@ export default function TravelStyleApp() {
     console.log(`Loading chat: ${chatId}`)
     setCurrentScreen("chat")
     setActiveTab("home")
-    setChatContext("general") // Reset context for loaded chat, or infer from chat history
+    setChatContext("general")
     setIsLoading(true)
     try {
-      // In a real scenario, you'd fetch messages for this specific chatId
-      // For now, we'll just simulate loading and clear messages
-      const history = await getChatHistory(user.id) // This would ideally fetch history for a specific conversation ID
-      // For demonstration, let's just clear and add a placeholder
+      const history = await getChatHistory(user.id)
       setMessages([
         {
           id: "loaded-chat-1",
@@ -268,10 +291,9 @@ export default function TravelStyleApp() {
     }
   }
 
-  // Centralized settings navigation handler
   const handleSettingsNavClick = () => {
     setCurrentScreen("settings")
-    setActiveTab("home") // Keep home tab active when in settings
+    setActiveTab("home")
   }
 
   const renderCurrentScreen = () => {
@@ -283,6 +305,7 @@ export default function TravelStyleApp() {
             userName={user.firstName}
             onProfileClick={handleProfileNavClick}
             onSettingsClick={handleSettingsNavClick}
+            sessionGreeting={sessionGreeting}
           />
         )
       case "recent":
@@ -306,7 +329,9 @@ export default function TravelStyleApp() {
           />
         )
       default:
-        return <HomeScreen onActionSelect={handleActionSelect} userName={user.firstName} />
+        return (
+          <HomeScreen onActionSelect={handleActionSelect} userName={user.firstName} sessionGreeting={sessionGreeting} />
+        )
     }
   }
 
@@ -315,28 +340,34 @@ export default function TravelStyleApp() {
     setActiveTab("profile")
   }
 
-  // Pass handleProfileNavClick to HomeScreen
+  // Prevent hydration mismatch by not rendering mobile frame until mounted
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+        <div className="flex flex-col h-full w-full max-w-screen-lg mx-auto bg-[#F8F6FF] rounded-2xl shadow-lg overflow-hidden h-[800px]">
+          <div className="flex-1 overflow-hidden">{renderCurrentScreen()}</div>
+          {currentScreen !== "chat" && currentScreen !== "settings" && (
+            <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       {isMobile ? (
         <MobileFrame>
           <div className="flex flex-col h-full">
-            {/* Main Content */}
             <div className="flex-1 overflow-hidden">{renderCurrentScreen()}</div>
-
-            {/* Bottom Navigation - Only show on main screens, not in chat */}
             {currentScreen !== "chat" && currentScreen !== "settings" && (
               <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
             )}
           </div>
         </MobileFrame>
       ) : (
-        // Desktop view: Render content directly, allowing it to expand
         <div className="flex flex-col h-full w-full max-w-screen-lg mx-auto bg-[#F8F6FF] rounded-2xl shadow-lg overflow-hidden h-[800px]">
-          {/* Main Content */}
           <div className="flex-1 overflow-hidden">{renderCurrentScreen()}</div>
-
-          {/* Bottom Navigation - Only show on main screens, not in chat */}
           {currentScreen !== "chat" && currentScreen !== "settings" && (
             <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
           )}

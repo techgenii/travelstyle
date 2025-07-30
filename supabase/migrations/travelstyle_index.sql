@@ -67,3 +67,7 @@ CREATE INDEX idx_recommendation_history_user_id ON recommendation_history(user_i
 CREATE INDEX idx_recommendation_history_type ON recommendation_history(recommendation_type);
 CREATE INDEX idx_recommendation_history_destination ON recommendation_history(destination);
 CREATE INDEX idx_recommendation_history_created_at ON recommendation_history(created_at DESC);
+
+-- Add indexes for performance
+CREATE INDEX idx_users_subscription_tier ON public.users(subscription_tier);
+CREATE INDEX idx_users_subscription_expires ON public.users(subscription_expires_at);

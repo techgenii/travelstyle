@@ -5,12 +5,14 @@ import { SignupForm } from "@/components/auth/signup-form"
 import { MobileFrame } from "@/components/mobile-frame"
 import { useIsMobile } from "@/hooks/use-is-mobile"
 import { isAuthenticated, redirectToHome } from "@/lib/auth"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 export default function SignupPage() {
   const isMobile = useIsMobile()
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     if (isAuthenticated()) {
       redirectToHome()
     }
@@ -27,6 +29,15 @@ export default function SignupPage() {
       <SignupForm />
     </AuthFormWrapper>
   )
+
+  // Prevent hydration mismatch by not rendering mobile frame until mounted
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">{content}</div>
+      </div>
+    )
+  }
 
   if (isMobile) {
     return <MobileFrame>{content}</MobileFrame>

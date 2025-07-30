@@ -19,13 +19,14 @@ interface ProfileScreenProps {
     lastName?: string | null
     email: string
     profilePictureUrl?: string | null
+    defaultLocation?: string | null // New: Add defaultLocation to user prop
   }
 }
 
 export function ProfileScreen({ onBack, onSettingsClick, user }: ProfileScreenProps) {
   const userFullName = `${user?.firstName || "Guest"} ${user?.lastName || ""}`.trim()
   const userEmail = user?.email || "guest@example.com"
-  const userLocation = "Los Angeles, CA" // Mock location for weather widget, can be dynamic later
+  const userLocation = user?.defaultLocation || "Los Angeles" // Use defaultLocation from user, fallback to Los Angeles
 
   const profileStats = {
     tripsPlanned: 12,
@@ -105,7 +106,6 @@ export function ProfileScreen({ onBack, onSettingsClick, user }: ProfileScreenPr
             Edit Profile
           </Button>
         </Card>
-
         {/* Travel Stats */}
         <Card className="bg-white rounded-2xl shadow-soft border border-gray-100">
           <CardHeader>
@@ -126,10 +126,8 @@ export function ProfileScreen({ onBack, onSettingsClick, user }: ProfileScreenPr
             </div>
           </CardContent>
         </Card>
-
         {/* Weather Widget */}
-        <WeatherWidget location={userLocation} />
-
+        <WeatherWidget location={userLocation} /> {/* Pass userLocation */}
         {/* Menu Items */}
         <Card className="bg-white rounded-2xl shadow-soft border border-gray-100">
           <CardContent className="p-0">
@@ -157,7 +155,6 @@ export function ProfileScreen({ onBack, onSettingsClick, user }: ProfileScreenPr
             })}
           </CardContent>
         </Card>
-
         {/* Logout Button */}
         <div className="p-4">
           <Button
