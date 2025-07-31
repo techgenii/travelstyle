@@ -366,6 +366,28 @@ class DatabaseHelpers:
             logger.error(f"Error deleting conversation: {e}")
             return False
 
+    async def update_user_profile_picture_url(self, user_id: str, profile_picture_url: str) -> bool:
+        """Update just the profile picture URL in the users table."""
+        try:
+            # Update the users table directly
+            response = (
+                self.client.table("users")
+                .update({"profile_picture_url": profile_picture_url})
+                .eq("id", user_id)
+                .execute()
+            )
+
+            if response.data and len(response.data) > 0:
+                logger.info(f"Successfully updated profile picture URL for user {user_id}")
+                return True
+            else:
+                logger.warning(f"No user found for user {user_id}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error updating profile picture URL: {e}")
+            return False
+
 
 # Create a singleton instance
 db_helpers = DatabaseHelpers()

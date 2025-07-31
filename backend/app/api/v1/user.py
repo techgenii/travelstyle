@@ -412,6 +412,46 @@ async def get_initials_avatar(current_user: dict = current_user_dependency):
         ) from e
 
 
+@router.patch("/me/profile-picture-url")
+async def update_profile_picture_url(
+    profile_update: dict, current_user: dict = current_user_dependency
+):
+    """
+    Update just the profile picture URL for the current user.
+    This is a simpler endpoint that doesn't require the full user profile view.
+    """
+    try:
+        user_id = current_user.get("id")
+        if not user_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
+
+        profile_picture_url = profile_update.get("profile_picture_url")
+        if not profile_picture_url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Profile picture URL is required"
+            )
+
+        # Update just the profile picture URL in the users table
+        result = await db_helpers.update_user_profile_picture_url(user_id, profile_picture_url)
+
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update profile picture URL",
+            )
+
+        return {"message": "Profile picture URL updated successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Update profile picture URL error: %s", type(e).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update profile picture URL",
+        ) from e
+
+
 def get_preferences_data(user_id=None):
     """Helper function to get user preferences data."""
     # Try to fetch real preferences if user_id is provided

@@ -558,6 +558,46 @@ class TestUserEndpoints:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "File must be an image" in response.json()["detail"]
 
+    def test_update_profile_picture_url_success(self, authenticated_client):
+        """Test successful profile picture URL update."""
+        with patch("app.api.v1.user.db_helpers.update_user_profile_picture_url") as mock_update:
+            mock_update.return_value = True
+
+            response = authenticated_client.patch(
+                "/api/v1/users/me/profile-picture-url",
+                json={"profile_picture_url": "https://example.com/image.jpg"},
+            )
+
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert "message" in data
+            mock_update.assert_called_once()
+
+    def test_update_profile_picture_url_no_auth(self, client):
+        """Test profile picture URL update without authentication."""
+        response = client.patch(
+            "/api/v1/users/me/profile-picture-url",
+            json={"profile_picture_url": "https://example.com/image.jpg"},
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_update_profile_picture_url_missing_url(self, authenticated_client):
+        """Test profile picture URL update with missing URL."""
+        response = authenticated_client.patch("/api/v1/users/me/profile-picture-url", json={})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_update_profile_picture_url_update_failure(self, authenticated_client):
+        """Test profile picture URL update when database update fails."""
+        with patch("app.api.v1.user.db_helpers.update_user_profile_picture_url") as mock_update:
+            mock_update.return_value = False
+
+            response = authenticated_client.patch(
+                "/api/v1/users/me/profile-picture-url",
+                json={"profile_picture_url": "https://example.com/image.jpg"},
+            )
+
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
 
 class TestGetPreferencesData:
     """Test the get_preferences_data helper function."""
