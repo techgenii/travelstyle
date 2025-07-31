@@ -32,8 +32,10 @@ interface ProfileSectionProps {
   setEmail: (value: string) => void
   defaultLocation: string
   setDefaultLocation: (value: string) => void
-  onPictureUpdate: (newUrl: string) => void
+  onPictureUpdate: (formData: FormData) => void
   onPictureDelete: () => void
+  isUploading?: boolean
+  isDeleting?: boolean
 }
 
 export function ProfileSection({
@@ -48,7 +50,34 @@ export function ProfileSection({
   setDefaultLocation,
   onPictureUpdate,
   onPictureDelete,
+  isUploading = false,
+  isDeleting = false,
 }: ProfileSectionProps) {
+  const formatLastSeen = (lastLogin?: string) => {
+    if (!lastLogin) return "Never"
+
+    const lastLoginDate = new Date(lastLogin)
+    const now = new Date()
+    const diffInMs = now.getTime() - lastLoginDate.getTime()
+    const diffInHours = diffInMs / (1000 * 60 * 60)
+    const diffInDays = diffInHours / 24
+    const diffInMonths = diffInDays / 30
+    const diffInYears = diffInDays / 365
+
+    if (diffInHours < 24) {
+      const hours = Math.floor(diffInHours)
+      return `${hours} hour${hours !== 1 ? 's' : ''} ago`
+    } else if (diffInDays < 30) {
+      const days = Math.floor(diffInDays)
+      return `${days} day${days !== 1 ? 's' : ''} ago`
+    } else if (diffInDays < 365) {
+      const months = Math.floor(diffInMonths)
+      return `${months} month${months !== 1 ? 's' : ''} ago`
+    } else {
+      const years = Math.floor(diffInYears)
+      return `${years} year${years !== 1 ? 's' : ''} ago`
+    }
+  }
   return (
     <Card>
       <CardHeader>
@@ -63,6 +92,8 @@ export function ProfileSection({
           lastName={lastName}
           onPictureUpdate={onPictureUpdate}
           onPictureDelete={onPictureDelete}
+          isUploading={isUploading}
+          isDeleting={isDeleting}
         />
 
         <div className="grid grid-cols-2 gap-4">
@@ -121,7 +152,17 @@ export function ProfileSection({
             <div>
               <span className="text-gray-500">Member Since:</span>
               <span className="ml-2 font-medium">
-                {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "N/A"}
+                {user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: '2-digit'
+                }) : "N/A"}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">Last Seen:</span>
+              <span className="ml-2 font-medium">
+                {formatLastSeen(user.lastLogin)}
               </span>
             </div>
             {user.maxBookmarks && (

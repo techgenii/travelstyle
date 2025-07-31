@@ -15,6 +15,13 @@ interface UpdateUserProfileState {
   error?: string
 }
 
+interface UploadProfilePictureState {
+  success: boolean
+  message: string
+  error?: string
+  profilePictureUrl?: string
+}
+
 export async function getUserProfile(token?: string): Promise<UserProfileState> {
   try {
     if (!token) {
@@ -64,6 +71,98 @@ export async function updateUserProfile(
       success: false,
       message: "",
       error: error.message || "Failed to update profile. Please try again.",
+    }
+  }
+}
+
+// New server action for uploading profile pictures
+export async function uploadProfilePicture(
+  token: string,
+  prevState: UploadProfilePictureState,
+  formData: FormData,
+): Promise<UploadProfilePictureState> {
+  try {
+    if (!token) {
+      return { success: false, message: "", error: "No authentication token provided" }
+    }
+
+    const file = formData.get("file") as File
+    if (!file) {
+      return { success: false, message: "", error: "No file provided" }
+    }
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      return { success: false, message: "", error: "Please select an image file" }
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return { success: false, message: "", error: "File size must be less than 10MB" }
+    }
+
+    // Create a new FormData for the API call
+    const apiFormData = new FormData()
+    apiFormData.append("file", file)
+
+    // Upload to backend which will handle Cloudinary upload
+    const response = await fetchApiServer<{ profile_picture_url: string }>(
+      "/users/me/profile-picture",
+      {
+        method: "POST",
+        body: apiFormData,
+        headers: {
+          // Don't set Content-Type for FormData, let the browser set it with boundary
+        },
+      },
+      token,
+    )
+
+    return {
+      success: true,
+      message: "Profile picture uploaded successfully!",
+      profilePictureUrl: response.profile_picture_url,
+    }
+  } catch (error: any) {
+    console.error("Failed to upload profile picture:", error)
+    return {
+      success: false,
+      message: "",
+      error: error.message || "Failed to upload profile picture. Please try again.",
+    }
+  }
+}
+
+// New server action for deleting profile pictures
+export async function deleteProfilePicture(
+  token: string,
+  prevState: UploadProfilePictureState,
+): Promise<UploadProfilePictureState> {
+  try {
+    if (!token) {
+      return { success: false, message: "", error: "No authentication token provided" }
+    }
+
+    // Call backend to delete profile picture
+    await fetchApiServer(
+      "/users/me/profile-picture",
+      {
+        method: "DELETE",
+      },
+      token,
+    )
+
+    return {
+      success: true,
+      message: "Profile picture deleted successfully!",
+      profilePictureUrl: null,
+    }
+  } catch (error: any) {
+    console.error("Failed to delete profile picture:", error)
+    return {
+      success: false,
+      message: "",
+      error: error.message || "Failed to delete profile picture. Please try again.",
     }
   }
 }

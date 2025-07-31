@@ -38,6 +38,8 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
@@ -56,8 +58,8 @@ export function ChatInterface({
       <Header title={title} showBack onBack={onBack} />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-        {messages.map((msg) => (
-          <div key={msg.id}>
+        {messages.map((msg, index) => (
+          <div key={msg.id || `message-${index}-${Date.now()}`}>
             <ChatBubble message={msg.text} isUser={msg.isUser} timestamp={msg.timestamp} />
             {msg.showFeedback && !msg.isUser && <ResponseFeedback messageId={msg.id} onFeedback={onFeedback} />}
           </div>

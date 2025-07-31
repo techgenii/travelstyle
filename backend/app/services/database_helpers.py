@@ -101,6 +101,36 @@ class DatabaseHelpers:
             Updated profile data or None if error
         """
         try:
+            # First, check if the user exists in the users table
+            user_response = self.client.table("users").select("id").eq("id", user_id).execute()
+
+            if not user_response.data or len(user_response.data) == 0:
+                logger.error(f"User {user_id} not found in users table")
+                return None
+
+            # Ensure user_preferences record exists
+            preferences_response = (
+                self.client.table("user_preferences")
+                .select("user_id")
+                .eq("user_id", user_id)
+                .execute()
+            )
+
+            if not preferences_response.data or len(preferences_response.data) == 0:
+                # Create user_preferences record if it doesn't exist
+                logger.info(f"Creating user_preferences record for user {user_id}")
+                self.client.table("user_preferences").insert(
+                    {
+                        "user_id": user_id,
+                        "style_preferences": {},
+                        "size_info": {},
+                        "travel_patterns": {},
+                        "quick_reply_preferences": {"enabled": True},
+                        "packing_methods": {},
+                        "currency_preferences": {},
+                    }
+                ).execute()
+
             # Update the user_profile_view
             response = (
                 self.client.table("user_profile_view")
@@ -113,7 +143,7 @@ class DatabaseHelpers:
                 logger.info(f"Successfully updated profile for user {user_id}")
                 return response.data[0]
             else:
-                logger.warning(f"No profile found for user {user_id}")
+                logger.warning(f"No profile found for user {user_id} in user_profile_view")
                 return None
 
         except Exception as e:

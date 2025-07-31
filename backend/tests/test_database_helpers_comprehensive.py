@@ -571,7 +571,16 @@ class TestDatabaseHelpersComprehensive:
 
         db = DatabaseHelpers(supabase_client=mock_client)
 
-        # Setup mocks
+        # Setup mocks for the new checks
+        # Mock users table check - user exists
+        users_response = MagicMock()
+        users_response.data = [{"id": "test-user"}]
+
+        # Mock user_preferences table check - preferences exist
+        preferences_response = MagicMock()
+        preferences_response.data = [{"user_id": "test-user"}]
+
+        # Mock user_profile_view update
         update_response = MagicMock()
         update_response.data = [
             {
@@ -593,7 +602,13 @@ class TestDatabaseHelpersComprehensive:
                 "selected_style_names": ["Bohemian", "Minimalist"],
             }
         ]
+
+        # Setup table mock to return different responses based on table name
         table_mock = MagicMock()
+        table_mock.select.return_value.eq.return_value.execute.side_effect = [
+            users_response,  # First call: users table check
+            preferences_response,  # Second call: user_preferences table check
+        ]
         table_mock.update.return_value.eq.return_value.execute.return_value = update_response
         mock_client.table.return_value = table_mock
 
@@ -612,12 +627,24 @@ class TestDatabaseHelpersComprehensive:
 
         db = DatabaseHelpers(supabase_client=mock_client)
 
-        # Mock empty response
+        # Mock users table check - user exists
+        users_response = MagicMock()
+        users_response.data = [{"id": "test-user"}]
+
+        # Mock user_preferences table check - preferences exist
+        preferences_response = MagicMock()
+        preferences_response.data = [{"user_id": "test-user"}]
+
+        # Mock empty response for user_profile_view update
         mock_response = MagicMock()
         mock_response.data = []
 
-        # Setup table mock to return empty response
+        # Setup table mock to return different responses based on table name
         mock_table = MagicMock()
+        mock_table.select.return_value.eq.return_value.execute.side_effect = [
+            users_response,  # First call: users table check
+            preferences_response,  # Second call: user_preferences table check
+        ]
         mock_table.update.return_value.eq.return_value.execute.return_value = mock_response
         mock_client.table.return_value = mock_table
 
@@ -628,6 +655,52 @@ class TestDatabaseHelpersComprehensive:
         assert result is None
 
     @pytest.mark.asyncio
+    async def test_save_user_profile_create_preferences(self):
+        """Test save_user_profile when user_preferences record needs to be created"""
+        mock_client = MagicMock()
+        from app.services.database_helpers import DatabaseHelpers
+
+        db = DatabaseHelpers(supabase_client=mock_client)
+
+        # Mock users table check - user exists
+        users_response = MagicMock()
+        users_response.data = [{"id": "test-user"}]
+
+        # Mock user_preferences table check - preferences don't exist
+        preferences_response = MagicMock()
+        preferences_response.data = []
+
+        # Mock user_profile_view update
+        update_response = MagicMock()
+        update_response.data = [
+            {
+                "id": "test-user",
+                "email": "test@example.com",
+                "first_name": "John",
+                "selected_style_names": ["Bohemian", "Minimalist"],
+            }
+        ]
+
+        # Setup table mock to return different responses based on table name
+        table_mock = MagicMock()
+        table_mock.select.return_value.eq.return_value.execute.side_effect = [
+            users_response,  # First call: users table check
+            preferences_response,  # Second call: user_preferences table check
+        ]
+        table_mock.update.return_value.eq.return_value.execute.return_value = update_response
+        mock_client.table.return_value = table_mock
+
+        profile_data = {
+            "first_name": "John",
+            "selected_style_names": ["Bohemian", "Minimalist"],
+        }
+        result = await db.save_user_profile("test-user", profile_data)
+        assert result["selected_style_names"] == ["Bohemian", "Minimalist"]
+
+        # Verify that insert was called to create user_preferences
+        table_mock.insert.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_save_user_profile_exception(self):
         """Test save_user_profile error handling"""
         mock_client = MagicMock()
@@ -636,6 +709,29 @@ class TestDatabaseHelpersComprehensive:
         from app.services.database_helpers import DatabaseHelpers
 
         db = DatabaseHelpers(supabase_client=mock_client)
+
+        profile_data = {"first_name": "John", "last_name": "Doe"}
+
+        result = await db.save_user_profile("test-user", profile_data)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_save_user_profile_user_not_found(self):
+        """Test save_user_profile when user doesn't exist in users table"""
+        mock_client = MagicMock()
+        from app.services.database_helpers import DatabaseHelpers
+
+        db = DatabaseHelpers(supabase_client=mock_client)
+
+        # Mock users table check - user doesn't exist
+        users_response = MagicMock()
+        users_response.data = []
+
+        # Setup table mock
+        table_mock = MagicMock()
+        table_mock.select.return_value.eq.return_value.execute.return_value = users_response
+        mock_client.table.return_value = table_mock
 
         profile_data = {"first_name": "John", "last_name": "Doe"}
 

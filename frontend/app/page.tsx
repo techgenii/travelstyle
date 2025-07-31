@@ -62,6 +62,12 @@ export default function TravelStyleApp() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [sessionGreeting, setSessionGreeting] = useState<string | null>(null) // New state for session greeting
   const hasSetSessionGreeting = useRef(false) // Ref to ensure greeting is set only once
+  const messageIdCounterRef = useRef(0)
+
+  const generateMessageId = () => {
+    messageIdCounterRef.current += 1
+    return `${Date.now()}-${messageIdCounterRef.current}`
+  }
 
   const isMobile = useIsMobile()
 
@@ -106,8 +112,11 @@ export default function TravelStyleApp() {
 
       const response = await sendChatMessage(userMessage, backendContext)
 
+      console.log('Backend response:', response)
+      console.log('Response message_id:', response.message_id)
+
       return {
-        id: response.message_id,
+        id: response.message_id || generateMessageId(),
         text: response.message,
         isUser: false,
         timestamp: new Date(response.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -123,7 +132,7 @@ export default function TravelStyleApp() {
       if (error.message && error.message.includes("401")) {
         redirectToLogin()
         return {
-          id: Date.now().toString(),
+          id: generateMessageId(),
           text: "Your session has expired. Please log in again.",
           isUser: false,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -132,7 +141,7 @@ export default function TravelStyleApp() {
         }
       }
       return {
-        id: Date.now().toString(),
+        id: generateMessageId(),
         text: "I'm sorry, I couldn't connect to the AI service. Please try again later.",
         isUser: false,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -199,7 +208,7 @@ export default function TravelStyleApp() {
     setActiveTab("home")
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: generateMessageId(),
       text: initialMessage,
       isUser: true,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -216,7 +225,7 @@ export default function TravelStyleApp() {
 
   const handleSendMessage = (message: string) => {
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: generateMessageId(),
       text: message,
       isUser: true,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -274,7 +283,7 @@ export default function TravelStyleApp() {
       const history = await getChatHistory(user.id)
       setMessages([
         {
-          id: "loaded-chat-1",
+          id: generateMessageId(),
           text: `Welcome back to chat ${chatId}!`,
           isUser: false,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -284,7 +293,7 @@ export default function TravelStyleApp() {
       console.error("Failed to load chat history:", error)
       setMessages([
         {
-          id: "error-load",
+          id: generateMessageId(),
           text: "Failed to load chat history. Please try again.",
           isUser: false,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),

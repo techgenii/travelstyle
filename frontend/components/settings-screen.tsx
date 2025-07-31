@@ -74,6 +74,12 @@ export function SettingsScreen({ onBack, user }: SettingsScreenProps) {
     toggleItem,
     updateState,
     isUpdating,
+    uploadAction,
+    deleteAction,
+    uploadState,
+    deleteState,
+    isUploading,
+    isDeleting,
   } = useSettingsForm(user)
 
   const renderCurrentSection = () => {
@@ -90,6 +96,10 @@ export function SettingsScreen({ onBack, user }: SettingsScreenProps) {
             setEmail={setEmail}
             defaultLocation={defaultLocation} // New: Pass defaultLocation
             setDefaultLocation={setDefaultLocation} // New: Pass setDefaultLocation
+            onPictureUpdate={uploadAction}
+            onPictureDelete={deleteAction}
+            isUploading={isUploading}
+            isDeleting={isDeleting}
           />
         )
       case "style":
@@ -144,6 +154,10 @@ export function SettingsScreen({ onBack, user }: SettingsScreenProps) {
             setEmail={setEmail}
             defaultLocation={defaultLocation}
             setDefaultLocation={setDefaultLocation}
+            onPictureUpdate={uploadAction}
+            onPictureDelete={deleteAction}
+            isUploading={isUploading}
+            isDeleting={isDeleting}
           />
         )
     }

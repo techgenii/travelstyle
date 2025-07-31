@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Send, Mic } from "lucide-react"
+import { Send } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ChatInputProps {
@@ -47,16 +47,6 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
         disabled={isLoading}
       >
         <Send className="h-5 w-5 text-white" />
-      </Button>
-      <Button
-        type="button"
-        size="icon"
-        variant="ghost"
-        className="ml-2 rounded-full w-10 h-10 text-gray-600 hover:bg-gray-100"
-        onClick={() => console.log("Voice input")}
-        disabled={isLoading}
-      >
-        <Mic className="h-5 w-5" />
       </Button>
     </form>
   )

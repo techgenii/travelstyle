@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, startTransition } from "react"
 import { useActionState } from "react"
-import { updateUserProfile } from "@/actions/user" // Only import updateUserProfile
+import { updateUserProfile, uploadProfilePicture, deleteProfilePicture } from "@/actions/user"
 import { getAuthToken, setUserData, getUserData } from "@/lib/auth"
 import type { UserOut } from "@/lib/types/api" // Import UserOut for the payload type
 
@@ -63,7 +63,37 @@ export function useSettingsForm(user: User) {
     return updateUserProfile(token, prevState, payload)
   }
 
+  // Action for profile picture upload
+  const uploadProfilePictureAction = async (prevState: any, formData: FormData) => {
+    const token = getAuthToken()
+    if (!token) {
+      return { success: false, message: "", error: "No authentication token found" }
+    }
+    return uploadProfilePicture(token, prevState, formData)
+  }
+
+  // Action for profile picture deletion
+  const deleteProfilePictureAction = async (prevState: any) => {
+    const token = getAuthToken()
+    if (!token) {
+      return { success: false, message: "", error: "No authentication token found" }
+    }
+    return deleteProfilePicture(token, prevState)
+  }
+
   const [updateState, formAction, isUpdating] = useActionState(updateProfileAndPreferencesAction, {
+    success: false,
+    message: "",
+    error: "",
+  })
+
+  const [uploadState, uploadAction, isUploading] = useActionState(uploadProfilePictureAction, {
+    success: false,
+    message: "",
+    error: "",
+  })
+
+  const [deleteState, deleteAction, isDeleting] = useActionState(deleteProfilePictureAction, {
     success: false,
     message: "",
     error: "",
@@ -189,5 +219,13 @@ export function useSettingsForm(user: User) {
     toggleItem,
     updateState, // This now reflects the single action's state
     isUpdating, // This now reflects the single action's pending status
+
+    // Profile picture actions
+    uploadAction,
+    deleteAction,
+    uploadState,
+    deleteState,
+    isUploading,
+    isDeleting,
   }
 }
