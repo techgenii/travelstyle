@@ -15,6 +15,8 @@ interface QuickReplyButtonsProps {
 }
 
 export function QuickReplyButtons({ buttons, onQuickReply }: QuickReplyButtonsProps) {
+  console.log('QuickReplyButtons received buttons:', buttons)
+
   return (
     <div className="flex flex-wrap gap-2 p-4 justify-center">
       {buttons.map((button) => (

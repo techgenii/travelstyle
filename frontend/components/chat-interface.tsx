@@ -53,6 +53,9 @@ export function ChatInterface({
     .reverse()
     .find((m) => !m.isUser)
 
+  console.log('Last AI message:', lastAIMessage)
+  console.log('Last AI message quick replies:', lastAIMessage?.quickReplies)
+
   return (
     <div className="flex flex-col h-full bg-[#F8F6FF]">
       <Header title={title} showBack onBack={onBack} />

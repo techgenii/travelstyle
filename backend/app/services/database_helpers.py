@@ -170,8 +170,8 @@ class DatabaseHelpers:
                     "title": user_message[:50] + "..." if len(user_message) > 50 else user_message,
                     "messages": 1,
                     "conversation_type": conversation_type,
-                    "created_at": datetime.now(UTC),
-                    "updated_at": datetime.now(UTC),
+                    "created_at": datetime.now(UTC).isoformat(),
+                    "updated_at": datetime.now(UTC).isoformat(),
                 }
 
                 self.client.table("conversations").insert(conversation_data).execute()
@@ -182,7 +182,7 @@ class DatabaseHelpers:
                         "messages": self.client.rpc(
                             "increment_messages", {"conv_id": conversation_id}
                         ),
-                        "updated_at": datetime.now(UTC),
+                        "updated_at": datetime.now(UTC).isoformat(),
                     }
                 ).eq("id", conversation_id).execute()
 
@@ -192,7 +192,7 @@ class DatabaseHelpers:
                 "user_message": user_message,
                 "ai_response": ai_response,
                 "message_metadata": message_metadata or {},
-                "created_at": datetime.now(UTC),
+                "created_at": datetime.now(UTC).isoformat(),
             }
 
             self.client.table("conversation_messages").insert(message_data).execute()

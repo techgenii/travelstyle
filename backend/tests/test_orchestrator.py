@@ -446,9 +446,9 @@ async def test_generate_travel_recommendations_currency_request_with_amount():
             currency_conversion_service,
             "handle_currency_request",
             return_value={
-                "type": "currency_rate",
-                "message": "1 USD = 0.85 EUR",
-                "amount": 100.0,
+                "original": {"amount": 100.0, "currency": "USD"},
+                "converted": {"amount": 85.0, "currency": "EUR"},
+                "rate": 0.85,
             },
         ),
     ):
@@ -465,7 +465,7 @@ async def test_generate_travel_recommendations_currency_request_with_amount():
         )
 
         assert result.confidence_score == 0.9
-        assert "1 USD = 0.85 EUR" in result.message
+        assert "100.00 USD = 85.00 EUR" in result.message
         assert len(result.quick_replies) == 3
 
         # Check that the "Show rate only" quick reply was added first (amount > 0)
@@ -484,9 +484,9 @@ async def test_generate_travel_recommendations_currency_request_without_amount()
             currency_conversion_service,
             "handle_currency_request",
             return_value={
-                "type": "currency_rate",
-                "message": "1 USD = 0.85 EUR",
-                "amount": 0.0,
+                "original": {"amount": 0.0, "currency": "USD"},
+                "converted": {"amount": 0.0, "currency": "EUR"},
+                "rate": 0.85,
             },
         ),
     ):
@@ -503,7 +503,7 @@ async def test_generate_travel_recommendations_currency_request_without_amount()
         )
 
         assert result.confidence_score == 0.9
-        assert "1 USD = 0.85 EUR" in result.message
+        assert "0.00 USD = 0.00 EUR" in result.message
         assert len(result.quick_replies) == 2
 
         # Check that the "Show rate only" quick reply was NOT added (amount = 0)
@@ -521,10 +521,7 @@ async def test_generate_travel_recommendations_currency_request_non_rate_type():
         patch.object(
             currency_conversion_service,
             "handle_currency_request",
-            return_value={
-                "type": "currency_list",
-                "message": "Here are available currencies",
-            },
+            return_value=None,  # Return None to simulate parsing failure
         ),
     ):
         result = await orchestrator_service.generate_travel_recommendations(
@@ -540,7 +537,7 @@ async def test_generate_travel_recommendations_currency_request_non_rate_type():
         )
 
         assert result.confidence_score == 0.0
-        assert "Here are available currencies" in result.message
+        assert "I couldn't understand the currency conversion request" in result.message
 
 
 @pytest.mark.asyncio

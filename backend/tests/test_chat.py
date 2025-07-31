@@ -248,50 +248,6 @@ class TestChatEndpoints:
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
             assert "Failed to start conversation" in response.json()["detail"]
 
-    def test_create_session_success(self, authenticated_client):
-        """Test successful session creation."""
-        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
-            mock_create.return_value = {"id": "test-session", "conversation_id": "test-conv-123"}
-            response = authenticated_client.post(
-                "/api/v1/chat/sessions/create",
-                json={"destination": "Paris", "conversation_id": "custom-conv-123"},
-            )
-            assert response.status_code == status.HTTP_200_OK
-            data = response.json()
-            assert "session" in data
-            assert "conversation_id" in data
-
-    def test_create_session_no_auth(self, client):
-        """Test session creation without authentication."""
-        response = client.post("/api/v1/chat/sessions/create", json={"destination": "Paris"})
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    def test_create_session_empty_data(self, authenticated_client):
-        """Test session creation with empty data."""
-        response = authenticated_client.post("/api/v1/chat/sessions/create", json={})
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Session data is required" in response.json()["detail"]
-
-    def test_create_session_missing_required_field(self, authenticated_client):
-        """Test session creation with missing required field."""
-        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
-            mock_create.side_effect = KeyError("missing_field")
-            response = authenticated_client.post(
-                "/api/v1/chat/sessions/create", json={"destination": "Paris"}
-            )
-            assert response.status_code == status.HTTP_400_BAD_REQUEST
-            assert "Missing required field" in response.json()["detail"]
-
-    def test_create_session_error(self, authenticated_client):
-        """Test session creation when exception occurs."""
-        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
-            mock_create.side_effect = Exception("Database error")
-            response = authenticated_client.post(
-                "/api/v1/chat/sessions/create", json={"destination": "Paris"}
-            )
-            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-            assert "Failed to create session" in response.json()["detail"]
-
     def test_save_feedback_success(self, authenticated_client):
         """Test successful feedback saving."""
         with patch("app.api.v1.chat.db_helpers.save_recommendation_feedback") as mock_save:
@@ -373,20 +329,6 @@ class TestChatEndpoints:
 
             response = authenticated_client.post(
                 "/api/v1/chat/start", json={"destination": "Paris"}
-            )
-            assert response.status_code == status.HTTP_400_BAD_REQUEST
-            assert "Bad request" in response.json()["detail"]
-
-    def test_create_session_http_exception(self, authenticated_client):
-        """Test create session when HTTPException is raised."""
-        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
-            # Mock the function to raise an HTTPException
-            from fastapi import HTTPException
-
-            mock_create.side_effect = HTTPException(status_code=400, detail="Bad request")
-
-            response = authenticated_client.post(
-                "/api/v1/chat/sessions/create", json={"destination": "Paris"}
             )
             assert response.status_code == status.HTTP_400_BAD_REQUEST
             assert "Bad request" in response.json()["detail"]

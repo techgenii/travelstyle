@@ -66,6 +66,10 @@ async def chat(
             user_profile=user_profile,
         )
 
+        # Add message_id and conversation_id to response
+        response.message_id = str(uuid.uuid4())
+        response.conversation_id = request.conversation_id
+
         # Save conversation in background
         background_tasks.add_task(
             db_helpers.save_conversation_message,
@@ -174,38 +178,6 @@ async def start_conversation_endpoint(
     except Exception as e:
         logger.error("Start conversation error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to start conversation") from e
-
-
-@router.post("/sessions/create")
-async def create_session_endpoint(session_data: dict, current_user: dict = current_user_dependency):
-    """Create a new chat session
-
-    If conversation_id is not provided, one will be auto-generated.
-    Returns the created session along with the conversation_id.
-    """
-    try:
-        # Validate required fields
-        if not session_data:
-            raise HTTPException(status_code=400, detail="Session data is required")
-
-        # Auto-generate conversation_id if not provided
-        conversation_id = session_data.get("conversation_id") or str(uuid.uuid4())
-
-        session = await db_helpers.create_chat_session(
-            user_id=current_user["id"],
-            conversation_id=conversation_id,
-            destination=session_data.get("destination"),
-        )
-        return {"session": session, "conversation_id": conversation_id}
-    except HTTPException:
-        raise
-    except KeyError as e:
-        # Convert KeyError to proper HTTP error
-        logger.error("Create session KeyError: %s", e)
-        raise HTTPException(status_code=400, detail=f"Missing required field: {e}") from e
-    except Exception as e:
-        logger.error("Create session error: %s", type(e).__name__)
-        raise HTTPException(status_code=500, detail="Failed to create session") from e
 
 
 @router.post("/feedback")

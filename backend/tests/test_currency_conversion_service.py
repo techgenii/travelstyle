@@ -417,9 +417,8 @@ class TestParseCurrencyRequest:
 
             result = await currency_conversion_service.parse_currency_request("convert something")
 
-            assert result["first_country"] == ""  # Should be empty string
-            assert result["second_country"] == ""  # Should be empty string
-            assert result["amount"] == 100.0
+            # The function should return None when currency codes are missing
+            assert result is None
 
     @pytest.mark.asyncio
     async def test_parse_currency_request_with_non_numeric_amount(self):

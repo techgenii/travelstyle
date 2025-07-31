@@ -109,17 +109,22 @@ export default function TravelStyleApp() {
 
       console.log('Backend response:', response)
       console.log('Response message_id:', response.message_id)
+      console.log('Quick replies from backend:', response.quick_replies)
+
+      const processedQuickReplies = response.quick_replies.map((qr) => ({
+        id: qr.action || qr.text,
+        text: qr.text,
+        emoji: "💬",
+      }))
+
+      console.log('Processed quick replies:', processedQuickReplies)
 
       return {
         id: response.message_id || generateMessageId(),
         text: response.message,
         isUser: false,
         timestamp: new Date(response.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        quickReplies: response.quick_replies.map((qr) => ({
-          id: qr.action || qr.text,
-          text: qr.text,
-          emoji: "💬",
-        })),
+        quickReplies: processedQuickReplies,
         showFeedback: true,
       }
     } catch (error: any) {
@@ -165,7 +170,32 @@ export default function TravelStyleApp() {
     }
 
     try {
-      const sessionResponse = await createChatSession()
+      let sessionOptions = {}
+
+      switch (actionId) {
+        case "currency":
+          sessionOptions = {
+            destination: "Currency Converter",
+            context: "currency"
+          }
+          break
+        case "wardrobe":
+          sessionOptions = {
+            destination: "Wardrobe Planning",
+            context: "wardrobe"
+          }
+          break
+        case "style":
+          sessionOptions = {
+            destination: "Style Etiquette",
+            context: "style"
+          }
+          break
+        default:
+          sessionOptions = {}
+      }
+
+      const sessionResponse = await createChatSession(sessionOptions)
       setCurrentSessionId(sessionResponse.session_id)
       console.log(`Created new chat session: ${sessionResponse.session_id}`)
     } catch (error) {

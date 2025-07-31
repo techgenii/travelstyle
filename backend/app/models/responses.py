@@ -41,6 +41,8 @@ class ChatResponse(BaseModel):
     suggestions: list[str] = []
     confidence_score: float = Field(default=0.8, ge=0.0, le=1.0)
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    message_id: str | None = None
+    conversation_id: str | None = None
 
 
 class ConversationContext(BaseModel):

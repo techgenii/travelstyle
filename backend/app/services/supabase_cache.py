@@ -204,6 +204,8 @@ class SupabaseCacheService:
                 "api_source": "exchangerate-api",
                 # created_at and updated_at are auto-set by the DB
             }
+
+            # Use upsert to handle unique constraint
             self.client.table("currency_rates_cache").upsert(cache_data).execute()
             return True
         except Exception as e:  # pylint: disable=broad-except
