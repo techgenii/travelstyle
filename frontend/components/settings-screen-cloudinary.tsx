@@ -45,9 +45,10 @@ interface User {
 interface SettingsScreenCloudinaryProps {
     onBack: () => void
     user: User
+    onUserUpdate?: (updatedUser: User) => void
 }
 
-export function SettingsScreenCloudinary({ onBack, user }: SettingsScreenCloudinaryProps) {
+export function SettingsScreenCloudinary({ onBack, user, onUserUpdate }: SettingsScreenCloudinaryProps) {
     const { activeSection, setActiveSection, settingSections } = useSettingsNavigation()
 
     const {
@@ -81,7 +82,7 @@ export function SettingsScreenCloudinary({ onBack, user }: SettingsScreenCloudin
         isDeleting,
         pictureUrlState,
         isUpdatingPicture,
-    } = useSettingsFormCloudinary(user)
+    } = useSettingsFormCloudinary({ user, onUserUpdate })
 
     const renderCurrentSection = () => {
         switch (activeSection) {

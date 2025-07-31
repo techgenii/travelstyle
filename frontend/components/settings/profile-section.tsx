@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ProfilePictureUpload } from "@/components/profile-picture-upload"
+import { ReactNode } from "react"
 
 interface ProfileSectionProps {
   user: {
@@ -32,10 +33,11 @@ interface ProfileSectionProps {
   setEmail: (value: string) => void
   defaultLocation: string
   setDefaultLocation: (value: string) => void
-  onPictureUpdate: (formData: FormData) => void
-  onPictureDelete: () => void
+  onPictureUpdate?: (formData: FormData) => void
+  onPictureDelete?: () => void
   isUploading?: boolean
   isDeleting?: boolean
+  profilePictureComponent?: ReactNode
 }
 
 export function ProfileSection({
@@ -52,6 +54,7 @@ export function ProfileSection({
   onPictureDelete,
   isUploading = false,
   isDeleting = false,
+  profilePictureComponent,
 }: ProfileSectionProps) {
   const formatLastSeen = (lastLogin?: string) => {
     if (!lastLogin) return "Never"
@@ -86,15 +89,19 @@ export function ProfileSection({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <ProfilePictureUpload
-          currentPictureUrl={user.profilePictureUrl}
-          firstName={firstName}
-          lastName={lastName}
-          onPictureUpdate={onPictureUpdate}
-          onPictureDelete={onPictureDelete}
-          isUploading={isUploading}
-          isDeleting={isDeleting}
-        />
+        {profilePictureComponent || (
+          onPictureUpdate && onPictureDelete ? (
+            <ProfilePictureUpload
+              currentPictureUrl={user.profilePictureUrl}
+              firstName={firstName}
+              lastName={lastName}
+              onPictureUpdate={onPictureUpdate}
+              onPictureDelete={onPictureDelete}
+              isUploading={isUploading}
+              isDeleting={isDeleting}
+            />
+          ) : null
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div>

@@ -6,11 +6,11 @@ import { HomeScreen } from "@/components/home-screen"
 import { ChatInterface } from "@/components/chat-interface"
 import { RecentChatsScreen } from "@/components/recent-chats-screen"
 import { ProfileScreen } from "@/components/profile-screen"
-import { SettingsScreen } from "@/components/settings-screen"
+import { SettingsScreenCloudinary } from "@/components/settings-screen-cloudinary"
 import { BottomNavigation } from "@/components/bottom-navigation"
 import { sendChatMessage, getChatHistory, createChatSession } from "@/lib/services/chat"
 import type { ConversationContext as BackendConversationContext } from "@/lib/services/chat"
-import { checkAuthStatus, redirectToLogin } from "@/lib/auth"
+import { checkAuthStatus, redirectToLogin, type UserData } from "@/lib/auth"
 import { useIsMobile } from "@/hooks/use-is-mobile"
 
 type AppScreen = "home" | "chat" | "recent" | "profile" | "settings"
@@ -53,12 +53,7 @@ export default function TravelStyleApp() {
   const [isLoading, setIsLoading] = useState(false)
   const [isAuthChecked, setIsAuthChecked] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const [user, setUser] = useState<{
-    id: string
-    firstName: string
-    email: string
-    defaultLocation?: string | null
-  } | null>(null) // New: Add defaultLocation to user state
+  const [user, setUser] = useState<UserData | null>(null)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [sessionGreeting, setSessionGreeting] = useState<string | null>(null) // New state for session greeting
   const hasSetSessionGreeting = useRef(false) // Ref to ensure greeting is set only once
@@ -328,7 +323,13 @@ export default function TravelStyleApp() {
           <ProfileScreen onBack={() => handleTabChange("home")} onSettingsClick={handleSettingsNavClick} user={user} />
         )
       case "settings":
-        return <SettingsScreen onBack={() => setCurrentScreen("home")} user={user} />
+        return (
+          <SettingsScreenCloudinary
+            onBack={() => setCurrentScreen("home")}
+            user={user}
+            onUserUpdate={(updatedUser) => setUser(updatedUser)}
+          />
+        )
       case "chat":
         return (
           <ChatInterface

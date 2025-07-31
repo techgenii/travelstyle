@@ -55,23 +55,33 @@ class TravelOrchestratorService:
             if currency_conversion_service.is_currency_request(user_message):
                 result = await currency_conversion_service.handle_currency_request(user_message)
 
-                if result["type"] == "currency_rate":
+                if result and "rate" in result:
+                    # Format the response message
+                    original = result["original"]
+                    converted = result["converted"]
+                    rate = result["rate"]
+
+                    message = f"{original['amount']:.2f} {original['currency']} = {converted['amount']:.2f} {converted['currency']} (Rate: {rate:.4f})"
+
                     quick_replies = [
                         QuickReply(text="Convert different amount", action="currency_convert"),
                         QuickReply(text="Other currencies", action="currency_list"),
                     ]
 
                     # Add specific quick reply if amount was provided
-                    if result.get("amount", 0) > 0:
+                    if original.get("amount", 0) > 0:
                         quick_replies.insert(
                             0, QuickReply(text="Show rate only", action="currency_rate_only")
                         )
 
                     return ChatResponse(
-                        message=result["message"], confidence_score=0.9, quick_replies=quick_replies
+                        message=message, confidence_score=0.9, quick_replies=quick_replies
                     )
                 else:
-                    return ChatResponse(message=result["message"], confidence_score=0.0)
+                    return ChatResponse(
+                        message="I couldn't understand the currency conversion request. Please specify the currencies and amount clearly.",
+                        confidence_score=0.0,
+                    )
 
             # Parse context for API calls
             trip_context = self._parse_trip_context(user_message, context)

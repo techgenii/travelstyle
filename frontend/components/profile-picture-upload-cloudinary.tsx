@@ -98,7 +98,6 @@ export function ProfilePictureUploadCloudinary({
                         }
                     }}
                     onOpen={() => handleUploadStart()}
-                    signatureEndpoint="/api/sign-cloudinary-params"
                     uploadPreset="travelstyle-profile-pictures"
                     options={{
                         maxFiles: 1,

@@ -139,7 +139,18 @@ export async function forgotPassword(prevState: AuthState, formData: FormData): 
   }
 }
 
-export async function logout(): Promise<void> {
-  // This will be handled client-side now
-  redirect("/login")
+export async function logout(): Promise<AuthState> {
+  try {
+    // Call the logout endpoint to revoke tokens
+    await fetchApiServer<MessageResponse>("/auth/logout", {
+      method: "POST",
+      body: JSON.stringify({}),
+    })
+
+    return { success: true, message: "Logged out successfully" }
+  } catch (error: any) {
+    console.error("Logout failed:", error)
+    // Even if the API call fails, we should still log out locally
+    return { success: true, message: "Logged out successfully" }
+  }
 }

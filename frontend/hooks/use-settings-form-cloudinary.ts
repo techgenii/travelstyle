@@ -29,7 +29,12 @@ interface User {
     isPremium?: boolean
 }
 
-export function useSettingsFormCloudinary(user: User) {
+interface UseSettingsFormCloudinaryProps {
+    user: User
+    onUserUpdate?: (updatedUser: User) => void
+}
+
+export function useSettingsFormCloudinary({ user, onUserUpdate }: UseSettingsFormCloudinaryProps) {
     // General profile fields
     const [firstName, setFirstName] = useState(user.firstName || "")
     const [lastName, setLastName] = useState(user.lastName || "")
@@ -121,6 +126,23 @@ export function useSettingsFormCloudinary(user: User) {
             }
         }
     }, [updateState, firstName, lastName, email, defaultLocation, selectedStyles, selectedPackingMethods, selectedCurrencies, selectedTravelPatterns, sizeInfo, quickReplyPreferences])
+
+    // Handle successful profile picture URL update
+    useEffect(() => {
+        if (pictureUrlState?.success) {
+            // Update local storage user data with the new profile picture URL
+            const currentUserData = getUserData()
+            if (currentUserData) {
+                console.log("Profile picture URL updated successfully, updating local storage")
+                // Notify parent component to refresh user data
+                if (onUserUpdate) {
+                    // We need to get the updated profile picture URL
+                    // For now, we'll trigger a refresh by calling the callback
+                    onUserUpdate(user)
+                }
+            }
+        }
+    }, [pictureUrlState, onUserUpdate, user])
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()

@@ -8,7 +8,7 @@ import { Crown, Settings, HelpCircle, History, Bookmark, ChevronRight, LogOut } 
 import { WeatherWidget } from "./weather-widget"
 import { cn } from "@/lib/utils"
 import { colors } from "@/lib/design-system"
-import { removeAuthToken, removeUserData, redirectToLogin } from "@/lib/auth"
+import { logout } from "@/lib/auth"
 
 interface ProfileScreenProps {
   onBack?: () => void
@@ -73,11 +73,16 @@ export function ProfileScreen({ onBack, onSettingsClick, user }: ProfileScreenPr
     }
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     console.log("[ProfileScreen] Logging out...")
-    removeAuthToken()
-    removeUserData()
-    redirectToLogin()
+
+    try {
+      // Call the logout function which handles both server and client cleanup
+      await logout()
+      console.log("[ProfileScreen] Logout successful")
+    } catch (error) {
+      console.error("[ProfileScreen] Logout error:", error)
+    }
   }
 
   return (

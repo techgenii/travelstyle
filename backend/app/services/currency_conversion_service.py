@@ -337,13 +337,16 @@ Rules:
     "amount": <float with 2 decimal places>
   }}
 
+IMPORTANT: If you cannot determine both currencies clearly, return empty strings for both currencies.
+If you cannot determine the amount, return 0.0 for amount.
+
 Do not include any explanation. Return JSON only.
 
 User message: {user_message}
 """
 
             response = await openai_service.client.chat.completions.create(
-                model="gpt-4.1-nano",
+                model="gpt-4o-mini",  # Use the correct model name
                 messages=[
                     {
                         "role": "system",
@@ -351,7 +354,7 @@ User message: {user_message}
                     },
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.2,
+                temperature=0.1,  # Lower temperature for more consistent parsing
                 max_tokens=150,
             )
 
@@ -360,14 +363,28 @@ User message: {user_message}
 
             try:
                 parsed_data = json.loads(content)
-                return self._clean_parsed_data(parsed_data)
+                cleaned_data = self._clean_parsed_data(parsed_data)
+
+                # Additional validation
+                if not cleaned_data["first_country"] or not cleaned_data["second_country"]:
+                    logger.warning("Missing currency codes in parsed data")
+                    return None
+
+                return cleaned_data
             except json.JSONDecodeError:
                 logger.warning("JSON parse failed, trying regex fallback")
                 json_str = self._extract_json_from_text(content)
                 if json_str:
                     try:
                         parsed_data = json.loads(json_str)
-                        return self._clean_parsed_data(parsed_data)
+                        cleaned_data = self._clean_parsed_data(parsed_data)
+
+                        # Additional validation
+                        if not cleaned_data["first_country"] or not cleaned_data["second_country"]:
+                            logger.warning("Missing currency codes in fallback parsed data")
+                            return None
+
+                        return cleaned_data
                     except json.JSONDecodeError:
                         pass
 
@@ -393,13 +410,22 @@ User message: {user_message}
 
     async def handle_currency_request(self, user_message: str) -> dict[str, any]:
         try:
+            logger.info(f"Processing currency request: {user_message}")
             parsed = await self.parse_currency_request(user_message)
             if not parsed:
+                logger.warning("Failed to parse currency request")
                 return None
 
             from_currency = parsed.get("first_country", "")
             to_currency = parsed.get("second_country", "")
             amount = parsed.get("amount", 0.0)
+
+            logger.info(f"Parsed currencies: {from_currency} -> {to_currency}, amount: {amount}")
+
+            # Check for empty currency codes
+            if not from_currency or not to_currency:
+                logger.warning(f"Empty currency codes: from='{from_currency}', to='{to_currency}'")
+                return None
 
             if not self.validate_currency_code(from_currency) or not self.validate_currency_code(
                 to_currency
@@ -407,6 +433,7 @@ User message: {user_message}
                 logger.error(f"Invalid currency code: {from_currency} or {to_currency}")
                 return None
 
+            logger.info(f"Converting {amount} {from_currency} to {to_currency}")
             # Use the direct conversion method instead of getting rate separately
             conversion_result = await currency_service.convert_currency(
                 amount, from_currency, to_currency
@@ -415,6 +442,8 @@ User message: {user_message}
                 logger.error(f"No conversion result returned for {from_currency} to {to_currency}")
                 return None
 
+            logger.info(f"Conversion successful: {conversion_result}")
+            # Return the original format expected by the conversational endpoint
             return conversion_result
 
         except Exception as e:
