@@ -407,12 +407,6 @@ User message: {user_message}
                 logger.error(f"Invalid currency code: {from_currency} or {to_currency}")
                 return None
 
-            if not self.validate_currency_code(from_currency) or not self.validate_currency_code(
-                to_currency
-            ):
-                logger.error(f"Invalid currency code: {from_currency} or {to_currency}")
-                return None
-
             # Use the direct conversion method instead of getting rate separately
             conversion_result = await currency_service.convert_currency(
                 amount, from_currency, to_currency

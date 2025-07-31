@@ -47,6 +47,13 @@ export function ActionCards({ onActionSelect }: ActionCardsProps) {
       emoji: "💬",
       gradient: colors.gradients.actionCard4,
     },
+    {
+      id: "currency_quick",
+      title: "Quick Currency",
+      description: "Ask me about exchange rates and conversions",
+      emoji: "💰",
+      gradient: colors.gradients.actionCard1,
+    },
   ]
 
   return (

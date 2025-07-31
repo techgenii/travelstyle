@@ -116,6 +116,296 @@ class TestChatEndpoints:
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
             assert "Failed to process chat request" in response.json()["detail"]
 
+    # Additional tests for missing endpoints
+    def test_get_user_conversations_success(self, authenticated_client):
+        """Test successful user conversations retrieval."""
+        response = authenticated_client.get("/api/v1/chat/dialog")
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "conversations" in data
+
+    def test_get_user_conversations_no_auth(self, client):
+        """Test user conversations without authentication."""
+        response = client.get("/api/v1/chat/dialog")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_get_user_conversations_error(self, authenticated_client):
+        """Test user conversations when database fails."""
+        with patch("app.api.v1.chat.db_helpers.get_user_conversations") as mock_get_conversations:
+            # Mock the function to raise an exception
+            mock_get_conversations.side_effect = Exception("Database connection failed")
+
+            response = authenticated_client.get("/api/v1/chat/dialog")
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to retrieve conversations" in response.json()["detail"]
+
+    def test_delete_conversation_success(self, authenticated_client):
+        """Test successful conversation deletion."""
+        with patch("app.api.v1.chat.db_helpers.delete_conversation") as mock_delete:
+            mock_delete.return_value = True
+            response = authenticated_client.delete("/api/v1/chat/dialog/test-conversation-123")
+            assert response.status_code == status.HTTP_200_OK
+            assert "Conversation deleted successfully" in response.json()["message"]
+
+    def test_delete_conversation_no_auth(self, client):
+        """Test conversation deletion without authentication."""
+        response = client.delete("/api/v1/chat/dialog/test-conversation-123")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_delete_conversation_failure(self, authenticated_client):
+        """Test conversation deletion when database fails."""
+        with patch("app.api.v1.chat.db_helpers.delete_conversation") as mock_delete:
+            mock_delete.return_value = False
+            response = authenticated_client.delete("/api/v1/chat/dialog/test-conversation-123")
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to delete conversation" in response.json()["detail"]
+
+    def test_delete_conversation_error(self, authenticated_client):
+        """Test conversation deletion when exception occurs."""
+        with patch("app.api.v1.chat.db_helpers.delete_conversation") as mock_delete:
+            mock_delete.side_effect = Exception("Database error")
+            response = authenticated_client.delete("/api/v1/chat/dialog/test-conversation-123")
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to delete conversation" in response.json()["detail"]
+
+    def test_archive_conversation_success(self, authenticated_client):
+        """Test successful conversation archiving."""
+        with patch("app.api.v1.chat.db_helpers.archive_conversation") as mock_archive:
+            mock_archive.return_value = True
+            response = authenticated_client.put("/api/v1/chat/dialog/test-conversation-123/archive")
+            assert response.status_code == status.HTTP_200_OK
+            assert "Conversation archived successfully" in response.json()["message"]
+
+    def test_archive_conversation_no_auth(self, client):
+        """Test conversation archiving without authentication."""
+        response = client.put("/api/v1/chat/dialog/test-conversation-123/archive")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_archive_conversation_failure(self, authenticated_client):
+        """Test conversation archiving when database fails."""
+        with patch("app.api.v1.chat.db_helpers.archive_conversation") as mock_archive:
+            mock_archive.return_value = False
+            response = authenticated_client.put("/api/v1/chat/dialog/test-conversation-123/archive")
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to archive conversation" in response.json()["detail"]
+
+    def test_archive_conversation_error(self, authenticated_client):
+        """Test conversation archiving when exception occurs."""
+        with patch("app.api.v1.chat.db_helpers.archive_conversation") as mock_archive:
+            mock_archive.side_effect = Exception("Database error")
+            response = authenticated_client.put("/api/v1/chat/dialog/test-conversation-123/archive")
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to archive conversation" in response.json()["detail"]
+
+    def test_start_conversation_success(self, authenticated_client):
+        """Test successful conversation start."""
+        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
+            mock_create.return_value = {"id": "test-session", "conversation_id": "test-conv-123"}
+            response = authenticated_client.post(
+                "/api/v1/chat/start", json={"destination": "Paris"}
+            )
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert "conversation_id" in data
+            assert "conversation" in data
+            assert "message" in data
+
+    def test_start_conversation_no_data(self, authenticated_client):
+        """Test conversation start with no data (None)."""
+        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
+            mock_create.return_value = {"id": "test-session", "conversation_id": "test-conv-123"}
+            response = authenticated_client.post("/api/v1/chat/start", json=None)
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert "conversation_id" in data
+            assert "conversation" in data
+            assert "message" in data
+
+    def test_start_conversation_no_auth(self, client):
+        """Test conversation start without authentication."""
+        response = client.post("/api/v1/chat/start", json={"destination": "Paris"})
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_start_conversation_with_conversation_id(self, authenticated_client):
+        """Test conversation start with provided conversation_id."""
+        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
+            mock_create.return_value = {"id": "test-session", "conversation_id": "custom-conv-123"}
+            response = authenticated_client.post(
+                "/api/v1/chat/start",
+                json={"conversation_id": "custom-conv-123", "destination": "Paris"},
+            )
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert data["conversation_id"] == "custom-conv-123"
+
+    def test_start_conversation_error(self, authenticated_client):
+        """Test conversation start when exception occurs."""
+        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
+            mock_create.side_effect = Exception("Database error")
+            response = authenticated_client.post(
+                "/api/v1/chat/start", json={"destination": "Paris"}
+            )
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to start conversation" in response.json()["detail"]
+
+    def test_create_session_success(self, authenticated_client):
+        """Test successful session creation."""
+        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
+            mock_create.return_value = {"id": "test-session", "conversation_id": "test-conv-123"}
+            response = authenticated_client.post(
+                "/api/v1/chat/sessions/create",
+                json={"destination": "Paris", "conversation_id": "custom-conv-123"},
+            )
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert "session" in data
+            assert "conversation_id" in data
+
+    def test_create_session_no_auth(self, client):
+        """Test session creation without authentication."""
+        response = client.post("/api/v1/chat/sessions/create", json={"destination": "Paris"})
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_create_session_empty_data(self, authenticated_client):
+        """Test session creation with empty data."""
+        response = authenticated_client.post("/api/v1/chat/sessions/create", json={})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Session data is required" in response.json()["detail"]
+
+    def test_create_session_missing_required_field(self, authenticated_client):
+        """Test session creation with missing required field."""
+        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
+            mock_create.side_effect = KeyError("missing_field")
+            response = authenticated_client.post(
+                "/api/v1/chat/sessions/create", json={"destination": "Paris"}
+            )
+            assert response.status_code == status.HTTP_400_BAD_REQUEST
+            assert "Missing required field" in response.json()["detail"]
+
+    def test_create_session_error(self, authenticated_client):
+        """Test session creation when exception occurs."""
+        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
+            mock_create.side_effect = Exception("Database error")
+            response = authenticated_client.post(
+                "/api/v1/chat/sessions/create", json={"destination": "Paris"}
+            )
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to create session" in response.json()["detail"]
+
+    def test_save_feedback_success(self, authenticated_client):
+        """Test successful feedback saving."""
+        with patch("app.api.v1.chat.db_helpers.save_recommendation_feedback") as mock_save:
+            mock_save.return_value = True
+            feedback_data = {
+                "conversation_id": "test-conv-123",
+                "message_id": "test-msg-123",
+                "feedback_type": "positive",
+                "feedback_text": "Great recommendation!",
+                "ai_response_content": "Here's your recommendation",
+            }
+            response = authenticated_client.post("/api/v1/chat/feedback", json=feedback_data)
+            assert response.status_code == status.HTTP_200_OK
+            assert "Feedback saved successfully" in response.json()["message"]
+
+    def test_save_feedback_no_auth(self, client):
+        """Test feedback saving without authentication."""
+        feedback_data = {
+            "conversation_id": "test-conv-123",
+            "message_id": "test-msg-123",
+            "feedback_type": "positive",
+        }
+        response = client.post("/api/v1/chat/feedback", json=feedback_data)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_save_feedback_missing_fields(self, authenticated_client):
+        """Test feedback saving with missing required fields."""
+        # Missing conversation_id
+        feedback_data = {"message_id": "test-msg-123", "feedback_type": "positive"}
+        response = authenticated_client.post("/api/v1/chat/feedback", json=feedback_data)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Missing required fields" in response.json()["detail"]
+
+        # Missing message_id
+        feedback_data = {"conversation_id": "test-conv-123", "feedback_type": "positive"}
+        response = authenticated_client.post("/api/v1/chat/feedback", json=feedback_data)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Missing required fields" in response.json()["detail"]
+
+        # Missing feedback_type
+        feedback_data = {"conversation_id": "test-conv-123", "message_id": "test-msg-123"}
+        response = authenticated_client.post("/api/v1/chat/feedback", json=feedback_data)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Missing required fields" in response.json()["detail"]
+
+    def test_save_feedback_failure(self, authenticated_client):
+        """Test feedback saving when database fails."""
+        with patch("app.api.v1.chat.db_helpers.save_recommendation_feedback") as mock_save:
+            mock_save.return_value = False
+            feedback_data = {
+                "conversation_id": "test-conv-123",
+                "message_id": "test-msg-123",
+                "feedback_type": "positive",
+            }
+            response = authenticated_client.post("/api/v1/chat/feedback", json=feedback_data)
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to save feedback" in response.json()["detail"]
+
+    def test_save_feedback_error(self, authenticated_client):
+        """Test feedback saving when exception occurs."""
+        with patch("app.api.v1.chat.db_helpers.save_recommendation_feedback") as mock_save:
+            mock_save.side_effect = Exception("Database error")
+            feedback_data = {
+                "conversation_id": "test-conv-123",
+                "message_id": "test-msg-123",
+                "feedback_type": "positive",
+            }
+            response = authenticated_client.post("/api/v1/chat/feedback", json=feedback_data)
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Failed to save feedback" in response.json()["detail"]
+
+    def test_start_conversation_http_exception(self, authenticated_client):
+        """Test start conversation when HTTPException is raised."""
+        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
+            # Mock the function to raise an HTTPException
+            from fastapi import HTTPException
+
+            mock_create.side_effect = HTTPException(status_code=400, detail="Bad request")
+
+            response = authenticated_client.post(
+                "/api/v1/chat/start", json={"destination": "Paris"}
+            )
+            assert response.status_code == status.HTTP_400_BAD_REQUEST
+            assert "Bad request" in response.json()["detail"]
+
+    def test_create_session_http_exception(self, authenticated_client):
+        """Test create session when HTTPException is raised."""
+        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
+            # Mock the function to raise an HTTPException
+            from fastapi import HTTPException
+
+            mock_create.side_effect = HTTPException(status_code=400, detail="Bad request")
+
+            response = authenticated_client.post(
+                "/api/v1/chat/sessions/create", json={"destination": "Paris"}
+            )
+            assert response.status_code == status.HTTP_400_BAD_REQUEST
+            assert "Bad request" in response.json()["detail"]
+
+    def test_start_conversation_http_exception_from_within(self, authenticated_client):
+        """Test start conversation when HTTPException is raised from within the function."""
+        # This test specifically targets line 155 by mocking the function to raise an HTTPException
+        with patch("app.api.v1.chat.db_helpers.create_chat_session") as mock_create:
+            from fastapi import HTTPException
+
+            # Mock to raise HTTPException which should be re-raised by the except block
+            mock_create.side_effect = HTTPException(status_code=422, detail="Validation error")
+
+            response = authenticated_client.post(
+                "/api/v1/chat/start", json={"destination": "Paris"}
+            )
+            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+            assert "Validation error" in response.json()["detail"]
+
 
 @pytest.mark.asyncio
 async def test_generate_response_success():

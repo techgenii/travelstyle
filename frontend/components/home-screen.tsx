@@ -25,6 +25,9 @@ const proTips = [
   "Pack a small first-aid kit with essentials like pain relievers and band-aids.",
   "Take advantage of free walking tours to get acquainted with a new city.",
   "Leave some space in your luggage for souvenirs and new purchases!",
+  "Ask me about exchange rates! Try: 'How much is 50 dollars in euros?'",
+  "Get real-time currency conversions for your travel budget planning.",
+  "Check exchange rates before making large purchases abroad.",
 ]
 
 interface HomeScreenProps {

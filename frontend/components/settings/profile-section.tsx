@@ -4,8 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Camera } from "lucide-react"
+import { ProfilePictureUpload } from "@/components/profile-picture-upload"
 
 interface ProfileSectionProps {
   user: {
@@ -31,8 +30,10 @@ interface ProfileSectionProps {
   setLastName: (value: string) => void
   email: string
   setEmail: (value: string) => void
-  defaultLocation: string // New: Add defaultLocation state
-  setDefaultLocation: (value: string) => void // New: Add setDefaultLocation setter
+  defaultLocation: string
+  setDefaultLocation: (value: string) => void
+  onPictureUpdate: (newUrl: string) => void
+  onPictureDelete: () => void
 }
 
 export function ProfileSection({
@@ -43,51 +44,26 @@ export function ProfileSection({
   setLastName,
   email,
   setEmail,
-  defaultLocation, // Destructure new props
-  setDefaultLocation, // Destructure new props
+  defaultLocation,
+  setDefaultLocation,
+  onPictureUpdate,
+  onPictureDelete,
 }: ProfileSectionProps) {
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "Not available"
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
-  }
-
-  const formatDateTime = (dateString?: string) => {
-    if (!dateString) return "Not available"
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Camera className="h-5 w-5" />
+        <CardTitle className="text-lg font-semibold text-gray-800">
           Personal Information
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-4">
-          <Avatar className="w-20 h-20">
-            <AvatarImage src={user.profilePictureUrl || "/placeholder.svg?height=80&width=80&text=User"} />
-            <AvatarFallback className="bg-purple-500 text-white text-2xl">
-              {firstName.charAt(0)}
-              {lastName.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
-          <Button variant="outline" size="sm" className="flex items-center gap-2 bg-transparent">
-            <Camera className="h-4 w-4" />
-            Change Photo
-          </Button>
-        </div>
+        <ProfilePictureUpload
+          currentPictureUrl={user.profilePictureUrl}
+          firstName={firstName}
+          lastName={lastName}
+          onPictureUpdate={onPictureUpdate}
+          onPictureDelete={onPictureDelete}
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -122,7 +98,6 @@ export function ProfileSection({
           />
         </div>
 
-        {/* New: Default Location Input */}
         <div>
           <Label htmlFor="default-location">Default Weather Location</Label>
           <Input
@@ -135,45 +110,32 @@ export function ProfileSection({
 
         {/* Account Information */}
         <div className="pt-4 border-t">
-          <h4 className="font-medium mb-3 text-gray-800">Account Information</h4>
-          <div className="grid grid-cols-1 gap-3 text-sm">
-            <div className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
-              <span className="text-gray-600">Member since:</span>
-              <span className="font-medium text-gray-800">{formatDate(user.createdAt)}</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
-              <span className="text-gray-600">Last updated:</span>
-              <span className="font-medium text-gray-800">{formatDate(user.updatedAt)}</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
-              <span className="text-gray-600">Last login:</span>
-              <span className="font-medium text-gray-800">{formatDateTime(user.lastLogin)}</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
-              <span className="text-gray-600">Profile completed:</span>
-              <span className={`font-medium ${user.profileCompleted ? "text-green-600" : "text-orange-600"}`}>
-                {user.profileCompleted ? "Yes" : "No"}
+          <h4 className="font-medium text-gray-700 mb-2">Account Information</h4>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-gray-500">Account Type:</span>
+              <span className="ml-2 font-medium">
+                {user.isPremium ? "Premium" : "Free"}
               </span>
             </div>
-          </div>
-        </div>
-
-        {/* Account Limits */}
-        <div className="pt-4 border-t">
-          <h4 className="font-medium mb-3 text-gray-800">Account Limits</h4>
-          <div className="grid grid-cols-1 gap-3 text-sm">
-            <div className="flex justify-between items-center p-2 bg-purple-50 rounded-lg">
-              <span className="text-gray-600">Max Bookmarks:</span>
-              <span className="font-medium text-purple-800">
-                {user.maxBookmarks || 50} ({user.subscriptionTier || 'free'})
+            <div>
+              <span className="text-gray-500">Member Since:</span>
+              <span className="ml-2 font-medium">
+                {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "N/A"}
               </span>
             </div>
-            <div className="flex justify-between items-center p-2 bg-purple-50 rounded-lg">
-              <span className="text-gray-600">Max Conversations:</span>
-              <span className="font-medium text-purple-800">
-                {user.maxConversations || 100} ({user.subscriptionTier || 'free'})
-              </span>
-            </div>
+            {user.maxBookmarks && (
+              <div>
+                <span className="text-gray-500">Bookmarks Limit:</span>
+                <span className="ml-2 font-medium">{user.maxBookmarks}</span>
+              </div>
+            )}
+            {user.maxConversations && (
+              <div>
+                <span className="text-gray-500">Conversations Limit:</span>
+                <span className="ml-2 font-medium">{user.maxConversations}</span>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>

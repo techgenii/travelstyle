@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
 
+    # Cloudinary Configuration
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
+
     # API URLs
     QLOO_BASE_URL: str = "https://hackathon.api.qloo.com/v2/"
     OPENWEATHER_BASE_URL: str = "https://api.openweathermap.org/"

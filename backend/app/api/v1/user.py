@@ -23,10 +23,12 @@ Handles user profiles, preferences, and saved destinations.
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import JSONResponse
 
 from app.api.deps import get_current_user
 from app.models.user import UserProfileBase, UserProfileResponse
+from app.services.cloudinary_service import CloudinaryService
 from app.services.database_helpers import db_helpers
 
 router = APIRouter()
@@ -34,6 +36,9 @@ logger = logging.getLogger(__name__)
 
 # Local dependency to avoid linter warnings
 current_user_dependency = Depends(get_current_user)
+
+# Create a single instance of CloudinaryService to reuse across endpoints
+cloudinary_service = CloudinaryService()
 
 
 @router.get("/me", response_model=UserProfileResponse)
@@ -241,6 +246,169 @@ async def save_destination_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save destination",
+        ) from e
+
+
+@router.post("/me/profile-picture")
+async def upload_profile_picture(
+    file: UploadFile = File(...), current_user: dict = current_user_dependency
+):
+    """
+    Upload a profile picture for the current user.
+
+    Accepts image files (JPEG, PNG, GIF) and automatically resizes them to 300x300 using Cloudinary.
+    Returns the public URL of the uploaded image.
+    """
+    try:
+        user_id = current_user.get("id")
+        if not user_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
+
+        # Validate file type
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File must be an image (JPEG, PNG, GIF)",
+            )
+
+        # Validate file size (max 10MB for original upload, will be optimized by Cloudinary)
+        file_content = await file.read()
+        if len(file_content) > 10 * 1024 * 1024:  # 10MB
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="File size must be less than 10MB"
+            )
+
+        # Upload file using Cloudinary (automatically resizes to 300x300)
+        public_url = await cloudinary_service.upload_profile_picture(
+            user_id, file_content, file.filename
+        )
+
+        if not public_url:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to upload profile picture",
+            )
+
+        # Update user profile with new picture URL
+        update_data = {"profile_picture_url": public_url}
+        result = await db_helpers.save_user_profile(user_id, update_data)
+
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update profile with new picture URL",
+            )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Profile picture uploaded and automatically resized to 300x300",
+                "profile_picture_url": public_url,
+                "image_size": "300x300",
+                "processor": "Cloudinary",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Upload profile picture error: %s", type(e).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload profile picture",
+        ) from e
+
+
+@router.delete("/me/profile-picture")
+async def delete_profile_picture(current_user: dict = current_user_dependency):
+    """
+    Delete the current user's profile picture.
+
+    Removes the file from Supabase Storage and clears the profile_picture_url.
+    """
+    try:
+        user_id = current_user.get("id")
+        if not user_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
+
+        # Get current profile to find existing picture URL
+        profile = await db_helpers.get_user_profile(user_id)
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found"
+            )
+
+        current_picture_url = profile.get("profile_picture_url")
+
+        if current_picture_url:
+            # Delete from Cloudinary
+            await cloudinary_service.delete_profile_picture(current_picture_url)
+
+        # Clear the profile picture URL
+        update_data = {"profile_picture_url": None}
+        result = await db_helpers.save_user_profile(user_id, update_data)
+
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to clear profile picture URL",
+            )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"message": "Profile picture deleted successfully"},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Delete profile picture error: %s", type(e).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete profile picture",
+        ) from e
+
+
+@router.get("/me/profile-picture/initials")
+async def get_initials_avatar(current_user: dict = current_user_dependency):
+    """
+    Generate an initials avatar for the current user.
+
+    Returns a base64 encoded image with the user's initials.
+    """
+    try:
+        user_id = current_user.get("id")
+        if not user_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
+
+        # Get user profile
+        profile = await db_helpers.get_user_profile(user_id)
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found"
+            )
+
+        first_name = profile.get("first_name", "")
+        last_name = profile.get("last_name", "")
+
+        # Generate initials avatar
+        initials_avatar = cloudinary_service.generate_initials_avatar(first_name, last_name)
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "initials_avatar": initials_avatar,
+                "initials": f"{first_name[0] if first_name else ''}{last_name[0] if last_name else ''}",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Get initials avatar error: %s", type(e).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate initials avatar",
         ) from e
 
 

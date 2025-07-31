@@ -184,6 +184,10 @@ export default function TravelStyleApp() {
         context = "currency"
         initialMessage = "I need help with currency conversion"
         break
+      case "currency_quick":
+        context = "currency"
+        initialMessage = "What's the current exchange rate?"
+        break
       case "chat":
         context = "general"
         initialMessage = "Hi! I'd like to start a conversation"
