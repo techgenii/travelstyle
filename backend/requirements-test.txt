@@ -1,11 +1,11 @@
 # Development and testing dependencies
-uvicorn[standard]
+uvicorn[standard]>=0.32.0
 
-pytest
-pytest-asyncio
-pytest-cov
-pytest-mock
-pytest-xdist
+pytest>=8.4.1
+pytest-asyncio>=0.24.0
+pytest-cov>=6.2.1
+pytest-mock>=3.14.1
+pytest-xdist>=3.6.1
 
-ruff
-bandit
+ruff>=0.3.0
+bandit>=1.7.8
