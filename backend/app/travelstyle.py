@@ -57,6 +57,9 @@ travelstyle_app = FastAPI(
     lifespan=lifespan,
 )
 
+# Create app variable for uvicorn
+app = travelstyle_app
+
 # Middleware
 travelstyle_app.add_middleware(
     CORSMiddleware,

@@ -264,6 +264,19 @@ class CurrencyConversionService:
             "currency",
             "convert",
             "money exchange",
+            "currency help",
+            "rate only",
+            "what is the rate",
+            "show rate",
+            "currency rate",
+            "exchange",
+            "money",
+            "bucks",
+            "dollars",
+            "euros",
+            "pounds",
+            "yen",
+            "yuan",
         ]
         currency_codes = [code.lower() for code in SUPPORTED_CURRENCIES]
         country_names = [
@@ -463,6 +476,39 @@ User message: {user_message}
     ) -> str:
         """Format currency conversion response."""
         return f"{amount:.2f} {from_currency} = {converted_amount:.2f} {to_currency} (Rate: {rate:.4f})"
+
+    async def handle_currency_help_request(self, user_message: str) -> dict[str, any] | None:
+        """Handle currency help and rate-only requests"""
+        input_lower = user_message.lower()
+
+        if "help" in input_lower and "currency" in input_lower:
+            return {
+                "type": "currency_help",
+                "message": "I can help you with currency conversion! Here's what I can do:\n\n"
+                "• Convert between currencies (e.g., 'convert 100 USD to EUR')\n"
+                "• Show exchange rates (e.g., 'what's the USD to EUR rate?')\n"
+                "• List supported currencies (e.g., 'show available currencies')\n\n"
+                "Just tell me what you'd like to convert!",
+                "quick_replies": [
+                    {"text": "Convert USD to EUR", "action": "currency_convert"},
+                    {"text": "Show available currencies", "action": "currency_list"},
+                    {"text": "What's the USD to EUR rate?", "action": "currency_rate"},
+                ],
+            }
+
+        if "rate only" in input_lower or "what is the rate" in input_lower:
+            return {
+                "type": "currency_rate_only",
+                "message": "To show you the exchange rate, I need to know which currencies you're interested in. "
+                "For example: 'What's the USD to EUR rate?' or 'Show me the rate for USD to JPY'",
+                "quick_replies": [
+                    {"text": "USD to EUR rate", "action": "currency_rate"},
+                    {"text": "USD to JPY rate", "action": "currency_rate"},
+                    {"text": "EUR to USD rate", "action": "currency_rate"},
+                ],
+            }
+
+        return None
 
 
 # Singleton instance

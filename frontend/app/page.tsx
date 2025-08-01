@@ -7,6 +7,7 @@ import { ChatInterface } from "@/components/chat-interface"
 import { RecentChatsScreen } from "@/components/recent-chats-screen"
 import { ProfileScreen } from "@/components/profile-screen"
 import { SettingsScreenCloudinary } from "@/components/settings-screen-cloudinary"
+
 import { BottomNavigation } from "@/components/bottom-navigation"
 import { sendChatMessage, getChatHistory, createChatSession } from "@/lib/services/chat"
 import type { ConversationContext as BackendConversationContext } from "@/lib/services/chat"
@@ -206,6 +207,10 @@ export default function TravelStyleApp() {
     let initialMessage = ""
 
     switch (actionId) {
+      case "currency":
+        context = "currency"
+        initialMessage = "I need help with currency conversion"
+        break
       case "wardrobe":
         context = "wardrobe"
         initialMessage = "I'd like help planning my travel wardrobe"
@@ -213,10 +218,6 @@ export default function TravelStyleApp() {
       case "style":
         context = "style"
         initialMessage = "I want to learn about style etiquette"
-        break
-      case "currency":
-        context = "currency"
-        initialMessage = "I need help with currency conversion"
         break
       case "currency_quick":
         context = "currency"
@@ -266,6 +267,22 @@ export default function TravelStyleApp() {
   }
 
   const handleQuickReply = (buttonId: string, text: string) => {
+    // Handle currency-specific actions
+    if (buttonId === "currency_rate_only") {
+      handleSendMessage("Show me the current exchange rate")
+      return
+    }
+
+    if (buttonId === "currency_rate") {
+      handleSendMessage("What's the USD to EUR rate?")
+      return
+    }
+
+    if (buttonId === "currency_list") {
+      handleSendMessage("Show me available currencies")
+      return
+    }
+
     if (["wardrobe", "style", "currency"].includes(buttonId)) {
       setChatContext(buttonId as ChatContext)
     }
@@ -360,6 +377,7 @@ export default function TravelStyleApp() {
             onUserUpdate={(updatedUser) => setUser(updatedUser)}
           />
         )
+
       case "chat":
         return (
           <ChatInterface

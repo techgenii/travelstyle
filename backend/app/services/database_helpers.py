@@ -169,7 +169,7 @@ class DatabaseHelpers:
                     "user_id": user_id,
                     "title": user_message[:50] + "..." if len(user_message) > 50 else user_message,
                     "messages": 1,
-                    "conversation_type": conversation_type,
+                    "type": conversation_type,
                     "created_at": datetime.now(UTC).isoformat(),
                     "updated_at": datetime.now(UTC).isoformat(),
                 }

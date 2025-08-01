@@ -53,6 +53,25 @@ class TravelOrchestratorService:
         try:
             # Check if this is a currency request first
             if currency_conversion_service.is_currency_request(user_message):
+                # Check for currency help requests first
+                help_response = await currency_conversion_service.handle_currency_help_request(
+                    user_message
+                )
+                if help_response:
+                    quick_replies = []
+                    if "quick_replies" in help_response:
+                        quick_replies = [
+                            QuickReply(text=qr["text"], action=qr["action"])
+                            for qr in help_response["quick_replies"]
+                        ]
+
+                    return ChatResponse(
+                        message=help_response["message"],
+                        confidence_score=0.9,
+                        quick_replies=quick_replies,
+                    )
+
+                # Continue with normal currency processing...
                 result = await currency_conversion_service.handle_currency_request(user_message)
 
                 if result and "rate" in result:
