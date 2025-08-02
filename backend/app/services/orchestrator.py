@@ -79,8 +79,8 @@ class TravelOrchestratorService:
 
                     if request_type == "rate":
                         # Handle rate request
-                        base_currency = data.get("base_currency", "USD")
-                        target_currency = data.get("target_currency", "EUR")
+                        base_currency = data.get("base_code", "USD")
+                        target_currency = data.get("target_code", "EUR")
                         rate = data.get("rate", 0.0)
 
                         message = f"Exchange rate: 1 {base_currency} = {rate:.4f} {target_currency}"

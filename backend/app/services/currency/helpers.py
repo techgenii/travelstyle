@@ -174,10 +174,10 @@ class CurrencyService:
                     }
 
                 response = self.format_exchange_rate_response(
-                    rate_data["base_currency"],
-                    rate_data["target_currency"],
+                    rate_data["base_code"],
+                    rate_data["target_code"],
                     rate_data["rate"],
-                    rate_data.get("last_updated"),
+                    rate_data.get("last_updated_utc"),
                 )
 
                 return {

@@ -463,8 +463,8 @@ class TestHandleCurrencyRequest:
                 currency_conversion_service, "get_pair_exchange_rate", new=AsyncMock()
             ) as mock_rate:
                 mock_rate.return_value = {
-                    "base_currency": "USD",
-                    "target_currency": "EUR",
+                    "base_code": "USD",
+                    "target_code": "EUR",
                     "rate": 0.85,
                 }
 
