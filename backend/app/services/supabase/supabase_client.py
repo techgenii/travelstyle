@@ -80,14 +80,18 @@ class SupabaseClientManager:
         current_time = time.time()
         if current_time - cls._last_health_check > cls._health_check_interval:
             try:
-                # Simple health check - try to access a system table
-                cls._instance.table("_supabase_migrations").select("id").limit(1).execute()
+                # Simple health check - try to access a user table that should exist
+                # Use a more reliable health check that doesn't depend on system tables
+                cls._instance.table("users").select("id").limit(1).execute()
                 cls._last_health_check = current_time
                 logger.debug("Supabase connection health check passed")
             except Exception as e:
-                logger.warning(f"Supabase connection health check failed: {e}")
-                # Reset the client to force reconnection
-                cls.reset_client()
+                # Only log as warning if it's not a missing table error
+                if "does not exist" not in str(e):
+                    logger.warning(f"Supabase connection health check failed: {e}")
+                # Don't reset client for missing table errors - this is normal
+                if "does not exist" not in str(e):
+                    cls.reset_client()
 
     @classmethod
     def reset_client(cls) -> None:
@@ -109,10 +113,12 @@ class SupabaseClientManager:
         try:
             client = cls.get_client()
             # Try a simple query to test the connection
-            client.table("_supabase_migrations").select("id").limit(1).execute()
+            client.table("users").select("id").limit(1).execute()
             return True
         except Exception as e:
-            logger.error(f"Supabase connection test failed: {e}")
+            # Only log as error if it's not a missing table error
+            if "does not exist" not in str(e):
+                logger.error(f"Supabase connection test failed: {e}")
             return False
 
 
