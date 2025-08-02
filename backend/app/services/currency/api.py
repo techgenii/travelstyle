@@ -47,7 +47,7 @@ class CurrencyAPI:
         self.timeout = DEFAULT_TIMEOUT
 
     async def get_exchange_rates(
-        self, base_currency: str = DEFAULT_BASE_CURRENCY
+        self, base_currency: str = DEFAULT_BASE_CURRENCY, force_refresh: bool = False
     ) -> dict[str, Any] | None:
         """Get current exchange rates.
 
@@ -61,10 +61,12 @@ class CurrencyAPI:
             # Normalize and validate currency code
             normalized_currency = normalize_currency_code(base_currency)
 
-            # Check cache first
-            cached_data = await enhanced_supabase_cache.get_currency_cache(normalized_currency)
-            if cached_data:
-                return cached_data
+            # Check cache first (unless force refresh)
+            if not force_refresh:
+                cached_data = await enhanced_supabase_cache.get_currency_cache(normalized_currency)
+                if cached_data:
+                    logger.info(f"Using cached data for {normalized_currency}: {cached_data}")
+                    return cached_data
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 # Ensure no double slashes
@@ -79,7 +81,13 @@ class CurrencyAPI:
                     return None
 
                 logger.debug("Currency exchange rate API response: %s", data)
+                logger.info(f"API Response for {normalized_currency}: {data}")
                 if not isinstance(data, dict):
+                    return None
+
+                # Check if API response is successful
+                if data.get("result") != "success":
+                    logger.error(f"API returned error: {data}")
                     return None
 
                 rates_data = {
@@ -134,17 +142,34 @@ class CurrencyAPI:
             from_curr = normalize_currency_code(from_currency)
             to_curr = normalize_currency_code(to_currency)
 
-            # Get exchange rates
+            # Get exchange rates using the latest endpoint
             rates_data = await self.get_exchange_rates(from_curr)
             if not rates_data:
-                return None
+                # Try force refresh if first attempt failed
+                rates_data = await self.get_exchange_rates(from_curr, force_refresh=True)
+                if not rates_data:
+                    return None
 
             conversion_rates = rates_data.get("conversion_rates", {})
+            logger.info(f"Conversion rates for {from_curr}: {conversion_rates}")
             if to_curr not in conversion_rates:
                 logger.error(f"Target currency {to_curr} not found in conversion rates")
                 return None
 
             rate = conversion_rates[to_curr]
+            logger.info(f"Rate for {from_curr} to {to_curr}: {rate}")
+
+            # Validate that the rate is reasonable (between 0.01 and 1000)
+            if not (0.01 <= rate <= 1000):
+                logger.warning(f"Suspicious rate detected: {rate} for {from_curr} to {to_curr}")
+                # Try force refresh to get fresh data
+                rates_data = await self.get_exchange_rates(from_curr, force_refresh=True)
+                if rates_data:
+                    conversion_rates = rates_data.get("conversion_rates", {})
+                    if to_curr in conversion_rates:
+                        rate = conversion_rates[to_curr]
+                        logger.info(f"Fresh rate for {from_curr} to {to_curr}: {rate}")
+
             converted_amount = amount * rate
 
             return {
@@ -181,7 +206,7 @@ class CurrencyAPI:
             base_curr = normalize_currency_code(base_currency)
             target_curr = normalize_currency_code(target_currency)
 
-            # Get exchange rates
+            # Get exchange rates using the latest endpoint
             rates_data = await self.get_exchange_rates(base_curr)
             if not rates_data:
                 return None

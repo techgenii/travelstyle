@@ -77,6 +77,14 @@ class TravelOrchestratorService:
                     data = result["data"]
                     request_type = result.get("request_type", "conversion")
 
+                    # Defensive programming - ensure data is a dict
+                    if not isinstance(data, dict):
+                        logger.error(f"Invalid data format from currency service: {type(data)}")
+                        return ChatResponse(
+                            message="Sorry, I couldn't process that currency conversion request.",
+                            confidence_score=0.0,
+                        )
+
                     if request_type == "rate":
                         # Handle rate request
                         base_currency = data.get("base_code", "USD")
@@ -194,6 +202,10 @@ class TravelOrchestratorService:
 
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Orchestration error: %s", type(e).__name__)
+            logger.error("Error details: %s", str(e))
+            import traceback
+
+            logger.error("Traceback: %s", traceback.format_exc())
             return ChatResponse(
                 message=(
                     "I apologize, but I'm having trouble processing your request right now. "

@@ -173,10 +173,29 @@ class CurrencyService:
                         "message": self.format_error_response("Could not fetch exchange rate"),
                     }
 
+                # Defensive programming - check if required fields exist
+                if not isinstance(rate_data, dict):
+                    logger.error(f"Invalid rate_data format: {type(rate_data)}")
+                    return {
+                        "success": False,
+                        "message": self.format_error_response("Invalid API response format"),
+                    }
+
+                base_code = rate_data.get("base_code")
+                target_code = rate_data.get("target_code")
+                rate = rate_data.get("rate")
+
+                if not all([base_code, target_code, rate is not None]):
+                    logger.error(f"Missing required fields in rate_data: {rate_data}")
+                    return {
+                        "success": False,
+                        "message": self.format_error_response("Invalid API response format"),
+                    }
+
                 response = self.format_exchange_rate_response(
-                    rate_data["base_code"],
-                    rate_data["target_code"],
-                    rate_data["rate"],
+                    base_code,
+                    target_code,
+                    rate,
                     rate_data.get("last_updated_utc"),
                 )
 
@@ -206,17 +225,37 @@ class CurrencyService:
                         "message": "Exchange rate not available",
                     }
 
+                # Defensive programming - check if required fields exist
+                if not isinstance(conversion_data, dict):
+                    logger.error(f"Invalid conversion_data format: {type(conversion_data)}")
+                    return {
+                        "success": False,
+                        "message": "Invalid API response format",
+                    }
+
                 # Check if rate is present in response
                 if "rate" not in conversion_data:
+                    logger.error(f"Missing rate in conversion_data: {conversion_data}")
                     return {
                         "success": False,
                         "message": "Invalid response format",
                     }
 
+                original = conversion_data.get("original", {})
+                converted = conversion_data.get("converted", {})
+                rate = conversion_data.get("rate")
+
+                if not all([original, converted, rate is not None]):
+                    logger.error(f"Missing required fields in conversion_data: {conversion_data}")
+                    return {
+                        "success": False,
+                        "message": "Invalid API response format",
+                    }
+
                 response = self.format_currency_response(
-                    conversion_data["original"],
-                    conversion_data["converted"],
-                    conversion_data["rate"],
+                    original,
+                    converted,
+                    rate,
                 )
 
                 return {
@@ -242,6 +281,11 @@ class CurrencyService:
             return {"success": False, "message": error_message}
         except Exception as e:
             logger.error(f"Unexpected error in handle_currency_request: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error details: {str(e)}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return {
                 "success": False,
                 "message": "Error processing currency request",

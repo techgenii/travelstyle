@@ -62,5 +62,10 @@ CurrencyConversionService = CurrencyService
 from app.services.currency_service import currency_service  # noqa: E402
 from app.services.openai.openai_service import openai_service  # noqa: E402
 
+# Ensure the currency service has all required components
 currency_conversion_service.openai_service = openai_service
 currency_conversion_service.currency_service = currency_service
+
+# Ensure the parser has access to openai_service
+if hasattr(currency_conversion_service, "parser"):
+    currency_conversion_service.parser.openai_service = openai_service
