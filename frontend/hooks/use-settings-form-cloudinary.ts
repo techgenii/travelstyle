@@ -1,37 +1,16 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, startTransition } from "react"
-import { useActionState } from "react"
-import { updateUserProfile, deleteProfilePicture } from "@/actions/user"
-import { updateProfilePictureUrl } from "@/actions/user-cloudinary"
+import { useState, useEffect, startTransition, useRef } from "react"
+import { useActionState, useTransition } from "react"
+import { updateUserProfile, updateProfilePictureUrl, getUserProfile } from "@/actions/user"
 import { getAuthToken, setUserData, getUserData } from "@/lib/auth"
 import type { UserOut } from "@/lib/types/api"
-
-interface User {
-    id: string
-    firstName: string
-    lastName?: string | null
-    email: string
-    profilePictureUrl?: string | null
-    profileCompleted?: boolean
-    stylePreferences?: Record<string, any>
-    sizeInfo?: Record<string, any>
-    travelPatterns?: Record<string, any>
-    quickReplyPreferences?: Record<string, any>
-    packingMethods?: Record<string, any>
-    currencyPreferences?: Record<string, any>
-    selectedStyleNames?: string[]
-    defaultLocation?: string | null
-    createdAt?: string
-    updatedAt?: string
-    lastLogin?: string
-    isPremium?: boolean
-}
+import type { UserData } from "@/lib/auth"
 
 interface UseSettingsFormCloudinaryProps {
-    user: User
-    onUserUpdate?: (updatedUser: User) => void
+    user: UserData
+    onUserUpdate?: (updatedUser: UserData) => void
 }
 
 export function useSettingsFormCloudinary({ user, onUserUpdate }: UseSettingsFormCloudinaryProps) {
@@ -68,13 +47,13 @@ export function useSettingsFormCloudinary({ user, onUserUpdate }: UseSettingsFor
         return updateUserProfile(token, prevState, payload)
     }
 
-    // Action for profile picture deletion
-    const deleteProfilePictureAction = async (prevState: any) => {
+    // Action specifically for profile picture updates
+    const updateProfilePictureAction = async (prevState: any, profilePictureUrl: string) => {
         const token = getAuthToken()
         if (!token) {
             return { success: false, message: "", error: "No authentication token found" }
         }
-        return deleteProfilePicture(token, prevState)
+        return updateProfilePictureUrl(token, prevState, profilePictureUrl)
     }
 
     const [updateState, formAction, isUpdating] = useActionState(updateProfileAndPreferencesAction, {
@@ -83,22 +62,7 @@ export function useSettingsFormCloudinary({ user, onUserUpdate }: UseSettingsFor
         error: "",
     })
 
-    const [deleteState, deleteAction, isDeleting] = useActionState(deleteProfilePictureAction, {
-        success: false,
-        message: "",
-        error: "",
-    })
-
-    // Action for simple profile picture URL update
-    const updateProfilePictureUrlAction = async (prevState: any, profilePictureUrl: string) => {
-        const token = getAuthToken()
-        if (!token) {
-            return { success: false, message: "", error: "No authentication token found" }
-        }
-        return updateProfilePictureUrl(token, prevState, profilePictureUrl)
-    }
-
-    const [pictureUrlState, pictureUrlAction, isUpdatingPicture] = useActionState(updateProfilePictureUrlAction, {
+    const [pictureUpdateState, pictureUpdateAction, isUpdatingPicture] = useActionState(updateProfilePictureAction, {
         success: false,
         message: "",
         error: "",
@@ -106,11 +70,13 @@ export function useSettingsFormCloudinary({ user, onUserUpdate }: UseSettingsFor
 
     // Handle successful profile update
     useEffect(() => {
+        console.log("Profile update effect triggered, updateState:", updateState)
         if (updateState?.success) {
+            console.log("Profile update successful, updating local storage")
             // Update local storage user data with the new comprehensive preferences
             const currentUserData = getUserData()
             if (currentUserData) {
-                setUserData({
+                const updatedUserData: UserData = {
                     ...currentUserData,
                     firstName,
                     lastName,
@@ -122,27 +88,100 @@ export function useSettingsFormCloudinary({ user, onUserUpdate }: UseSettingsFor
                     travelPatterns: { selected_patterns: selectedTravelPatterns },
                     sizeInfo: sizeInfo,
                     quickReplyPreferences: quickReplyPreferences,
-                })
-            }
-        }
-    }, [updateState, firstName, lastName, email, defaultLocation, selectedStyles, selectedPackingMethods, selectedCurrencies, selectedTravelPatterns, sizeInfo, quickReplyPreferences])
+                    // Ensure lastLogin is properly typed
+                    lastLogin: currentUserData.lastLogin || undefined,
+                    // Ensure isPremium is properly typed
+                    isPremium: currentUserData.isPremium || undefined,
+                }
+                console.log("Setting updated user data:", updatedUserData)
+                setUserData(updatedUserData)
 
-    // Handle successful profile picture URL update
-    useEffect(() => {
-        if (pictureUrlState?.success) {
-            // Update local storage user data with the new profile picture URL
-            const currentUserData = getUserData()
-            if (currentUserData) {
-                console.log("Profile picture URL updated successfully, updating local storage")
-                // Notify parent component to refresh user data
+                // Notify parent component with updated user data
                 if (onUserUpdate) {
-                    // We need to get the updated profile picture URL
-                    // For now, we'll trigger a refresh by calling the callback
-                    onUserUpdate(user)
+                    console.log("Calling onUserUpdate with updated data")
+                    onUserUpdate(updatedUserData)
                 }
             }
         }
-    }, [pictureUrlState, onUserUpdate, user])
+    }, [updateState, firstName, lastName, email, defaultLocation, selectedStyles, selectedPackingMethods, selectedCurrencies, selectedTravelPatterns, sizeInfo, quickReplyPreferences, onUserUpdate])
+
+    // Add ref to track if we've already processed a successful update
+    const processedUpdateRef = useRef<string | null>(null)
+
+    // Handle successful profile picture update
+    useEffect(() => {
+        console.log("Profile picture update effect triggered, pictureUpdateState:", pictureUpdateState)
+
+        // Check if this is a new successful update we haven't processed yet
+        const updateKey = `${pictureUpdateState?.success}-${pictureUpdateState?.message}`
+        if (pictureUpdateState?.success && processedUpdateRef.current !== updateKey) {
+            console.log("Profile picture update successful, updating local storage")
+            processedUpdateRef.current = updateKey
+
+            // Fetch the updated user data from the backend to get the new profile picture URL
+            const fetchUpdatedUser = async () => {
+                const token = getAuthToken()
+                if (!token) {
+                    console.error("No token available to fetch updated user data")
+                    return
+                }
+
+                try {
+                    const { user: updatedUser, error } = await getUserProfile(token)
+                    if (error) {
+                        console.error("Failed to fetch updated user data:", error)
+                        return
+                    }
+
+                    if (updatedUser) {
+                        // Convert UserOut to UserData format
+                        const updatedUserData: UserData = {
+                            id: updatedUser.id,
+                            firstName: updatedUser.first_name,
+                            lastName: updatedUser.last_name,
+                            email: updatedUser.email,
+                            profilePictureUrl: updatedUser.profile_picture_url,
+                            profileCompleted: updatedUser.profile_completed || undefined,
+                            stylePreferences: updatedUser.style_preferences || undefined,
+                            sizeInfo: updatedUser.size_info || undefined,
+                            travelPatterns: updatedUser.travel_patterns || undefined,
+                            quickReplyPreferences: updatedUser.quick_reply_preferences || undefined,
+                            packingMethods: updatedUser.packing_methods || undefined,
+                            currencyPreferences: updatedUser.currency_preferences || undefined,
+                            selectedStyleNames: updatedUser.selected_style_names || undefined,
+                            defaultLocation: updatedUser.default_location,
+                            maxBookmarks: updatedUser.max_bookmarks,
+                            maxConversations: updatedUser.max_conversations,
+                            subscriptionTier: updatedUser.subscription_tier,
+                            subscriptionExpiresAt: updatedUser.subscription_expires_at,
+                            isPremium: updatedUser.is_premium || undefined,
+                            createdAt: updatedUser.created_at,
+                            updatedAt: updatedUser.updated_at,
+                            lastLogin: updatedUser.last_login,
+                        }
+
+                        console.log("Setting updated user data with new profile picture:", updatedUserData)
+                        setUserData(updatedUserData)
+
+                        // Notify parent component with updated user data
+                        if (onUserUpdate) {
+                            console.log("Calling onUserUpdate with updated profile picture data")
+                            onUserUpdate(updatedUserData)
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error fetching updated user data:", error)
+                }
+            }
+
+            fetchUpdatedUser()
+        }
+    }, [pictureUpdateState?.success, pictureUpdateState?.message, onUserUpdate])
+
+    // Reset the processed update ref when the component unmounts or user changes
+    useEffect(() => {
+        processedUpdateRef.current = null
+    }, [user.id])
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
@@ -176,13 +215,6 @@ export function useSettingsFormCloudinary({ user, onUserUpdate }: UseSettingsFor
         })
     }
 
-    // Handle profile picture update with Cloudinary URL
-    const handlePictureUpdate = (imageUrl: string) => {
-        startTransition(() => {
-            pictureUrlAction(imageUrl)
-        })
-    }
-
     const toggleItem = (item: string, currentList: string[], setList: (list: string[]) => void) => {
         if (currentList.includes(item)) {
             setList(currentList.filter((i) => i !== item))
@@ -197,6 +229,17 @@ export function useSettingsFormCloudinary({ user, onUserUpdate }: UseSettingsFor
 
     const handleToggleQuickReplies = (enabled: boolean) => {
         setQuickReplyPreferences((prev) => ({ ...prev, enabled }))
+    }
+
+    // Handle profile picture update with Cloudinary URL
+    const handlePictureUpdate = (imageUrl: string) => {
+        console.log("handlePictureUpdate called with URL:", imageUrl)
+        // Use the dedicated profile picture update action
+        startTransition(() => {
+            console.log("Calling pictureUpdateAction with URL:", imageUrl)
+            console.log("Token available:", !!getAuthToken())
+            pictureUpdateAction(imageUrl)
+        })
     }
 
     return {
@@ -227,13 +270,11 @@ export function useSettingsFormCloudinary({ user, onUserUpdate }: UseSettingsFor
         toggleItem,
         updateState,
         isUpdating,
+        formAction,
 
         // Profile picture actions (Cloudinary approach)
         handlePictureUpdate,
-        deleteAction,
-        deleteState,
-        isDeleting,
-        pictureUrlState,
+        pictureUpdateState,
         isUpdatingPicture,
     }
 }

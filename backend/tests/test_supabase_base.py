@@ -401,17 +401,22 @@ class TestSupabaseBaseServiceUpsert:
     """Test upsert method."""
 
     @pytest.mark.asyncio
-    async def test_upsert_success(self, base_service, mock_supabase_client):
-        """Test successful record upsert."""
+    async def test_upsert_success_new_record(self, base_service, mock_supabase_client):
+        """Test successful record upsert for new record."""
         mock_response = Mock()
         mock_response.data = [{"id": "1", "name": "upserted_test"}]
 
         mock_table = Mock()
-        mock_upsert = Mock()
+        mock_select = Mock()
+        mock_match = Mock()
+        mock_insert = Mock()
 
         mock_supabase_client.table.return_value = mock_table
-        mock_table.upsert.return_value = mock_upsert
-        mock_upsert.execute.return_value = mock_response
+        mock_table.select.return_value = mock_select
+        mock_select.match.return_value = mock_match
+        mock_match.execute.return_value = Mock(data=[])  # No existing record
+        mock_table.insert.return_value = mock_insert
+        mock_insert.execute.return_value = mock_response
 
         data = {"id": "1", "name": "upserted_test"}
         result = await base_service.upsert(data, ["id"])
@@ -421,17 +426,50 @@ class TestSupabaseBaseServiceUpsert:
         assert result.data["name"] == "upserted_test"
 
     @pytest.mark.asyncio
+    async def test_upsert_success_existing_record(self, base_service, mock_supabase_client):
+        """Test successful record upsert for existing record."""
+        mock_response = Mock()
+        mock_response.data = [{"id": "1", "name": "updated_test"}]
+
+        mock_table = Mock()
+        mock_select = Mock()
+        mock_match = Mock()
+        mock_update = Mock()
+
+        mock_supabase_client.table.return_value = mock_table
+        mock_table.select.return_value = mock_select
+        mock_select.match.return_value = mock_match
+        mock_match.execute.return_value = Mock(
+            data=[{"id": "1", "name": "old_test"}]
+        )  # Existing record
+        mock_table.update.return_value = mock_update
+        mock_update.eq.return_value = mock_update
+        mock_update.execute.return_value = mock_response
+
+        data = {"id": "1", "name": "updated_test"}
+        result = await base_service.upsert(data, ["id"])
+
+        assert result is not None
+        assert result.data["id"] == "1"
+        assert result.data["name"] == "updated_test"
+
+    @pytest.mark.asyncio
     async def test_upsert_no_data_returned(self, base_service, mock_supabase_client):
         """Test upsert with no data returned."""
         mock_response = Mock()
         mock_response.data = []
 
         mock_table = Mock()
-        mock_upsert = Mock()
+        mock_select = Mock()
+        mock_match = Mock()
+        mock_insert = Mock()
 
         mock_supabase_client.table.return_value = mock_table
-        mock_table.upsert.return_value = mock_upsert
-        mock_upsert.execute.return_value = mock_response
+        mock_table.select.return_value = mock_select
+        mock_select.match.return_value = mock_match
+        mock_match.execute.return_value = Mock(data=[])  # No existing record
+        mock_table.insert.return_value = mock_insert
+        mock_insert.execute.return_value = mock_response
 
         data = {"id": "1", "name": "upserted_test"}
         result = await base_service.upsert(data, ["id"])

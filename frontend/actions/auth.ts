@@ -11,6 +11,7 @@ interface AuthState {
   error?: string
   authData?: {
     access_token: string
+    refresh_token?: string
     user: any
   }
 }
@@ -63,6 +64,7 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
     message: "Login successful",
     authData: {
       access_token: response.access_token,
+      refresh_token: response.refresh_token,
       user: response.user,
     },
   }
@@ -114,6 +116,7 @@ export async function signup(prevState: AuthState, formData: FormData): Promise<
     message: "Signup successful",
     authData: {
       access_token: response.access_token,
+      refresh_token: response.refresh_token,
       user: response.user,
     },
   }
@@ -141,11 +144,26 @@ export async function forgotPassword(prevState: AuthState, formData: FormData): 
 
 export async function logout(): Promise<AuthState> {
   try {
+    // Get the refresh token from localStorage (only if available)
+    let refreshToken: string | null = null
+    let authToken: string | null = null
+    if (typeof window !== 'undefined' && window.localStorage) {
+      refreshToken = window.localStorage.getItem("travelstyle_refresh_token")
+      authToken = window.localStorage.getItem("travelstyle_auth_token")
+      console.log("[logout] Retrieved tokens:", {
+        hasRefreshToken: !!refreshToken,
+        hasAuthToken: !!authToken,
+        authTokenLength: authToken?.length || 0
+      })
+    } else {
+      console.log("[logout] localStorage not available")
+    }
+
     // Call the logout endpoint to revoke tokens
     await fetchApiServer<MessageResponse>("/auth/logout", {
       method: "POST",
-      body: JSON.stringify({}),
-    })
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }, authToken || undefined)
 
     return { success: true, message: "Logged out successfully" }
   } catch (error: any) {

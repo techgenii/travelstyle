@@ -1,6 +1,7 @@
 "use client"
 
 import { useReducer, useCallback } from "react"
+import type { UserData } from "@/lib/auth"
 
 export type AppScreen = "home" | "chat" | "recent" | "profile" | "settings"
 export type NavigationTab = "home" | "recent" | "profile"

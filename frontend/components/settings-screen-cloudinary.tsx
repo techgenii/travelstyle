@@ -16,40 +16,41 @@ import { SizeInfoSection } from "./settings/size-info-section"
 import { QuickReplySection } from "./settings/quick-reply-section"
 import { NotificationsSection } from "./settings/notifications-section"
 import { ProfilePictureUploadCloudinary } from "./profile-picture-upload-cloudinary"
-
-interface User {
-    id: string
-    firstName: string
-    lastName?: string | null
-    email: string
-    profilePictureUrl?: string | null
-    profileCompleted?: boolean
-    stylePreferences?: Record<string, any>
-    sizeInfo?: Record<string, any>
-    travelPatterns?: Record<string, any>
-    quickReplyPreferences?: Record<string, any>
-    packingMethods?: Record<string, any>
-    currencyPreferences?: Record<string, any>
-    selectedStyleNames?: string[]
-    defaultLocation?: string | null
-    maxBookmarks?: number | null
-    maxConversations?: number | null
-    subscriptionTier?: string | null
-    subscriptionExpiresAt?: string | null
-    createdAt?: string
-    updatedAt?: string
-    lastLogin?: string
-    isPremium?: boolean
-}
+import type React from "react"
+import { useState, useEffect, startTransition } from "react"
+import { useActionState } from "react"
+import { updateUserProfile } from "@/actions/user"
+import { getAuthToken, setUserData, getUserData } from "@/lib/auth"
+import type { UserOut } from "@/lib/types/api"
+import type { UserData } from "@/lib/auth"
 
 interface SettingsScreenCloudinaryProps {
     onBack: () => void
-    user: User
-    onUserUpdate?: (updatedUser: User) => void
+    user: UserData
+    onUserUpdate?: (updatedUser: UserData) => void
 }
 
 export function SettingsScreenCloudinary({ onBack, user, onUserUpdate }: SettingsScreenCloudinaryProps) {
     const { activeSection, setActiveSection, settingSections } = useSettingsNavigation()
+
+    // Convert UserData to the expected type for ProfileSection
+    const profileUser = {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        profilePictureUrl: user.profilePictureUrl,
+        profileCompleted: user.profileCompleted,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastLogin: user.lastLogin || undefined,
+        isPremium: user.isPremium || undefined,
+        defaultLocation: user.defaultLocation,
+        maxBookmarks: user.maxBookmarks,
+        maxConversations: user.maxConversations,
+        subscriptionTier: user.subscriptionTier,
+        subscriptionExpiresAt: user.subscriptionExpiresAt,
+    }
 
     const {
         firstName,
@@ -77,10 +78,7 @@ export function SettingsScreenCloudinary({ onBack, user, onUserUpdate }: Setting
         updateState,
         isUpdating,
         handlePictureUpdate,
-        deleteAction,
-        deleteState,
-        isDeleting,
-        pictureUrlState,
+        formAction,
         isUpdatingPicture,
     } = useSettingsFormCloudinary({ user, onUserUpdate })
 
@@ -89,7 +87,7 @@ export function SettingsScreenCloudinary({ onBack, user, onUserUpdate }: Setting
             case "profile":
                 return (
                     <ProfileSection
-                        user={user}
+                        user={profileUser}
                         firstName={firstName}
                         setFirstName={setFirstName}
                         lastName={lastName}
@@ -102,11 +100,17 @@ export function SettingsScreenCloudinary({ onBack, user, onUserUpdate }: Setting
                         profilePictureComponent={
                             <ProfilePictureUploadCloudinary
                                 currentPictureUrl={user.profilePictureUrl}
-                                firstName={firstName}
-                                lastName={lastName}
                                 onPictureUpdate={handlePictureUpdate}
-                                onPictureDelete={deleteAction}
-                                isDeleting={isDeleting}
+                                onPictureDelete={() => {
+                                    // Handle deletion through main profile update
+                                    const comprehensivePayload: Partial<UserOut> = {
+                                        profile_picture_url: null,
+                                    }
+                                    formAction(comprehensivePayload)
+                                }}
+                                isUpdating={isUpdating}
+                                isUpdatingPicture={isUpdatingPicture}
+                                isDeleting={false}
                             />
                         }
                     />
@@ -154,7 +158,7 @@ export function SettingsScreenCloudinary({ onBack, user, onUserUpdate }: Setting
                 console.warn(`[SettingsScreen] Unknown section: ${activeSection}, falling back to profile`)
                 return (
                     <ProfileSection
-                        user={user}
+                        user={profileUser}
                         firstName={firstName}
                         setFirstName={setFirstName}
                         lastName={lastName}
@@ -166,11 +170,17 @@ export function SettingsScreenCloudinary({ onBack, user, onUserUpdate }: Setting
                         profilePictureComponent={
                             <ProfilePictureUploadCloudinary
                                 currentPictureUrl={user.profilePictureUrl}
-                                firstName={firstName}
-                                lastName={lastName}
                                 onPictureUpdate={handlePictureUpdate}
-                                onPictureDelete={deleteAction}
-                                isDeleting={isDeleting}
+                                onPictureDelete={() => {
+                                    // Handle deletion through main profile update
+                                    const comprehensivePayload: Partial<UserOut> = {
+                                        profile_picture_url: null,
+                                    }
+                                    formAction(comprehensivePayload)
+                                }}
+                                isUpdating={isUpdating}
+                                isUpdatingPicture={isUpdatingPicture}
+                                isDeleting={false}
                             />
                         }
                     />

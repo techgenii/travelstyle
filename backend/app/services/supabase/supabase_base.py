@@ -126,9 +126,41 @@ class SupabaseBaseService[T](ABC):
     async def upsert(self, data: dict[str, Any], unique_fields: list[str]) -> T | None:
         """Upsert a record based on unique fields."""
         try:
-            response = await asyncio.to_thread(
-                lambda: self.client.table(self.table_name).upsert(data).execute()
-            )
+            # First try to find existing record with the unique fields
+            filter_conditions = {}
+            for field in unique_fields:
+                if field in data:
+                    filter_conditions[field] = data[field]
+
+            if filter_conditions:
+                # Try to find existing record
+                existing_records = await self._execute_query(
+                    lambda: self.client.table(self.table_name)
+                    .select("*")
+                    .match(filter_conditions)
+                    .execute()
+                )
+
+                if existing_records:
+                    # Update existing record
+                    record_id = existing_records[0]["id"]
+                    response = await asyncio.to_thread(
+                        lambda: self.client.table(self.table_name)
+                        .update(data)
+                        .eq("id", record_id)
+                        .execute()
+                    )
+                else:
+                    # Insert new record
+                    response = await asyncio.to_thread(
+                        lambda: self.client.table(self.table_name).insert(data).execute()
+                    )
+            else:
+                # Fallback to regular upsert if no unique fields provided
+                response = await asyncio.to_thread(
+                    lambda: self.client.table(self.table_name).upsert(data).execute()
+                )
+
             if response.data:
                 return self._parse_record(response.data[0])
             return None

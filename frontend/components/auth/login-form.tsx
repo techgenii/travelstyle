@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { setAuthToken, setUserData, redirectToHome } from "@/lib/auth"
+import { setAuthToken, setRefreshToken, setUserData, redirectToHome } from "@/lib/auth"
 
 export function LoginForm() {
   const [state, formAction, isPending] = useActionState(login, {
@@ -27,6 +27,11 @@ export function LoginForm() {
       try {
         // Set auth token
         setAuthToken(state.authData.access_token)
+
+        // Set refresh token if available
+        if (state.authData.refresh_token) {
+          setRefreshToken(state.authData.refresh_token)
+        }
 
         // Set user data from the login response
         setUserData({

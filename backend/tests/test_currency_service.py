@@ -323,7 +323,10 @@ async def test_get_exchange_rates_currency_normalization(currency_service):
                 )
             ),
         ),
-        patch("app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.set_currency_cache", new=AsyncMock()),
+        patch(
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.set_currency_cache",
+            new=AsyncMock(),
+        ),
     ):
         # Test with lowercase and whitespace
         rates = await currency_service.get_exchange_rates(" usd ")
@@ -334,9 +337,15 @@ async def test_get_exchange_rates_currency_normalization(currency_service):
 @pytest.mark.asyncio
 async def test_get_pair_exchange_rate_json_parse_error(currency_service):
     """Test get_pair_exchange_rate when JSON parsing fails."""
-    with patch(
-        "httpx.AsyncClient.get",
-        new=AsyncMock(return_value=MockAsyncResponse("invalid json")),
+    with (
+        patch(
+            "httpx.AsyncClient.get",
+            new=AsyncMock(return_value=MockAsyncResponse("invalid json")),
+        ),
+        patch(
+            "app.services.currency.api.enhanced_supabase_cache.get_currency_cache",
+            new=AsyncMock(return_value=None),
+        ),
     ):
         result = await currency_service.get_pair_exchange_rate("USD", "EUR")
         assert result is None
@@ -350,9 +359,15 @@ async def test_get_pair_exchange_rate_json_parse_exception(currency_service):
     mock_response.json.side_effect = ValueError("Invalid JSON")
     mock_response.raise_for_status = MagicMock()
 
-    with patch(
-        "httpx.AsyncClient.get",
-        new=AsyncMock(return_value=mock_response),
+    with (
+        patch(
+            "httpx.AsyncClient.get",
+            new=AsyncMock(return_value=mock_response),
+        ),
+        patch(
+            "app.services.currency.api.enhanced_supabase_cache.get_currency_cache",
+            new=AsyncMock(return_value=None),
+        ),
     ):
         result = await currency_service.get_pair_exchange_rate("USD", "EUR")
         assert result is None
@@ -370,9 +385,15 @@ async def test_get_pair_exchange_rate_non_success_result(currency_service):
 @pytest.mark.asyncio
 async def test_get_pair_exchange_rate_non_dict_response(currency_service):
     """Test get_pair_exchange_rate when response is not a dict."""
-    with patch(
-        "httpx.AsyncClient.get",
-        new=AsyncMock(return_value=MockAsyncResponse("not a dict")),
+    with (
+        patch(
+            "httpx.AsyncClient.get",
+            new=AsyncMock(return_value=MockAsyncResponse("not a dict")),
+        ),
+        patch(
+            "app.services.currency.api.enhanced_supabase_cache.get_currency_cache",
+            new=AsyncMock(return_value=None),
+        ),
     ):
         result = await currency_service.get_pair_exchange_rate("USD", "EUR")
         assert result is None
@@ -381,17 +402,23 @@ async def test_get_pair_exchange_rate_non_dict_response(currency_service):
 @pytest.mark.asyncio
 async def test_get_pair_exchange_rate_currency_normalization(currency_service):
     """Test get_pair_exchange_rate with currency normalization."""
-    with patch(
-        "httpx.AsyncClient.get",
-        new=AsyncMock(
-            return_value=MockAsyncResponse(
-                {
-                    "base_code": "USD",
-                    "conversion_rates": {"EUR": 0.85},
-                    "time_last_update_unix": 1234567890,
-                    "time_last_update_utc": "2024-01-01T12:00:00Z",
-                }
-            )
+    with (
+        patch(
+            "httpx.AsyncClient.get",
+            new=AsyncMock(
+                return_value=MockAsyncResponse(
+                    {
+                        "base_code": "USD",
+                        "conversion_rates": {"EUR": 0.85},
+                        "time_last_update_unix": 1234567890,
+                        "time_last_update_utc": "2024-01-01T12:00:00Z",
+                    }
+                )
+            ),
+        ),
+        patch(
+            "app.services.currency.api.enhanced_supabase_cache.get_currency_cache",
+            new=AsyncMock(return_value=None),
         ),
     ):
         # Test with lowercase and whitespace
@@ -406,10 +433,18 @@ async def test_get_pair_exchange_rate_http_error(currency_service):
     """Test get_pair_exchange_rate when HTTP error occurs."""
     mock_request = Mock()
     mock_response = Mock()
-    with patch(
-        "httpx.AsyncClient.get",
-        new=AsyncMock(
-            side_effect=httpx.HTTPStatusError("404", request=mock_request, response=mock_response)
+    with (
+        patch(
+            "httpx.AsyncClient.get",
+            new=AsyncMock(
+                side_effect=httpx.HTTPStatusError(
+                    "404", request=mock_request, response=mock_response
+                )
+            ),
+        ),
+        patch(
+            "app.services.currency.api.enhanced_supabase_cache.get_currency_cache",
+            new=AsyncMock(return_value=None),
         ),
     ):
         result = await currency_service.get_pair_exchange_rate("USD", "EUR")
@@ -420,9 +455,17 @@ async def test_get_pair_exchange_rate_http_error(currency_service):
 async def test_get_pair_exchange_rate_request_error(currency_service):
     """Test get_pair_exchange_rate when request error occurs."""
     mock_request = Mock()
-    with patch(
-        "httpx.AsyncClient.get",
-        new=AsyncMock(side_effect=httpx.RequestError("connection failed", request=mock_request)),
+    with (
+        patch(
+            "httpx.AsyncClient.get",
+            new=AsyncMock(
+                side_effect=httpx.RequestError("connection failed", request=mock_request)
+            ),
+        ),
+        patch(
+            "app.services.currency.api.enhanced_supabase_cache.get_currency_cache",
+            new=AsyncMock(return_value=None),
+        ),
     ):
         result = await currency_service.get_pair_exchange_rate("USD", "EUR")
         assert result is None
@@ -431,9 +474,15 @@ async def test_get_pair_exchange_rate_request_error(currency_service):
 @pytest.mark.asyncio
 async def test_get_pair_exchange_rate_generic_exception(currency_service):
     """Test get_pair_exchange_rate when generic exception occurs."""
-    with patch(
-        "httpx.AsyncClient.get",
-        new=AsyncMock(side_effect=Exception("unknown error")),
+    with (
+        patch(
+            "httpx.AsyncClient.get",
+            new=AsyncMock(side_effect=Exception("unknown error")),
+        ),
+        patch(
+            "app.services.currency.api.enhanced_supabase_cache.get_currency_cache",
+            new=AsyncMock(return_value=None),
+        ),
     ):
         result = await currency_service.get_pair_exchange_rate("USD", "EUR")
         assert result is None
@@ -442,9 +491,15 @@ async def test_get_pair_exchange_rate_generic_exception(currency_service):
 @pytest.mark.asyncio
 async def test_convert_currency_with_get_pair_exchange_rate_failure(currency_service):
     """Test convert_currency when API returns error."""
-    with patch(
-        "httpx.AsyncClient.get",
-        new=AsyncMock(side_effect=httpx.HTTPStatusError("404", request=None, response=None)),
+    with (
+        patch(
+            "httpx.AsyncClient.get",
+            new=AsyncMock(side_effect=httpx.HTTPStatusError("404", request=None, response=None)),
+        ),
+        patch(
+            "app.services.currency.api.enhanced_supabase_cache.get_currency_cache",
+            new=AsyncMock(return_value=None),
+        ),
     ):
         result = await currency_service.convert_currency(100, "USD", "EUR")
         assert result is None
@@ -462,9 +517,15 @@ async def test_convert_currency_amount_rounding(currency_service):
         }
     )
 
-    with patch(
-        "httpx.AsyncClient.get",
-        new=AsyncMock(return_value=mock_response),
+    with (
+        patch(
+            "httpx.AsyncClient.get",
+            new=AsyncMock(return_value=mock_response),
+        ),
+        patch(
+            "app.services.currency.api.enhanced_supabase_cache.get_currency_cache",
+            new=AsyncMock(return_value=None),
+        ),
     ):
         result = await currency_service.convert_currency(100, "USD", "EUR")
         assert result is not None

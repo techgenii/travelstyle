@@ -24,11 +24,9 @@ export function TestCloudinaryUpload() {
 
     const {
         handlePictureUpdate,
-        deleteAction,
-        isDeleting,
-        pictureUrlState,
-        isUpdatingPicture,
-    } = useSettingsFormCloudinary(testUser)
+        updateState,
+        isUpdating,
+    } = useSettingsFormCloudinary({ user: testUser })
 
     return (
         <div className="p-8 max-w-md mx-auto">
@@ -39,26 +37,32 @@ export function TestCloudinaryUpload() {
                 firstName={testUser.firstName}
                 lastName={testUser.lastName}
                 onPictureUpdate={handlePictureUpdate}
-                onPictureDelete={deleteAction}
-                isDeleting={isDeleting}
-                isUpdatingPicture={isUpdatingPicture}
+                onPictureDelete={() => {
+                    // Handle deletion through main profile update
+                    const comprehensivePayload: any = {
+                        profile_picture_url: null,
+                    }
+                    // Note: This would need formAction which isn't available in this test component
+                }}
+                isUpdating={isUpdating}
+                isDeleting={isUpdating}
             />
 
-            {pictureUrlState?.error && (
+            {updateState?.error && (
                 <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-                    Error: {pictureUrlState.error}
+                    Error: {updateState.error}
                 </div>
             )}
 
-            {pictureUrlState?.success && (
+            {updateState?.success && (
                 <div className="mt-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
-                    Success: {pictureUrlState.message}
+                    Success: {updateState.message}
                 </div>
             )}
 
             <div className="mt-4 text-sm text-gray-600">
-                <p>Status: {isUpdatingPicture ? 'Updating...' : 'Ready'}</p>
-                <p>State: {JSON.stringify(pictureUrlState)}</p>
+                <p>Status: {isUpdating ? 'Updating...' : 'Ready'}</p>
+                <p>State: {JSON.stringify(updateState)}</p>
             </div>
         </div>
     )

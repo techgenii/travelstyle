@@ -56,8 +56,8 @@ export function SettingsScreen({ onBack, user }: SettingsScreenProps) {
     setLastName,
     email,
     setEmail,
-    defaultLocation, // New: Destructure defaultLocation
-    setDefaultLocation, // New: Destructure setDefaultLocation
+    defaultLocation,
+    setDefaultLocation,
     selectedStyles,
     setSelectedStyles,
     selectedPackingMethods,
@@ -74,12 +74,6 @@ export function SettingsScreen({ onBack, user }: SettingsScreenProps) {
     toggleItem,
     updateState,
     isUpdating,
-    uploadAction,
-    deleteAction,
-    uploadState,
-    deleteState,
-    isUploading,
-    isDeleting,
   } = useSettingsForm(user)
 
   const renderCurrentSection = () => {
@@ -94,12 +88,18 @@ export function SettingsScreen({ onBack, user }: SettingsScreenProps) {
             setLastName={setLastName}
             email={email}
             setEmail={setEmail}
-            defaultLocation={defaultLocation} // New: Pass defaultLocation
-            setDefaultLocation={setDefaultLocation} // New: Pass setDefaultLocation
-            onPictureUpdate={uploadAction}
-            onPictureDelete={deleteAction}
-            isUploading={isUploading}
-            isDeleting={isDeleting}
+            defaultLocation={defaultLocation}
+            setDefaultLocation={setDefaultLocation}
+            onPictureUpdate={() => {
+              // TODO: Implement picture update functionality
+              console.log("Picture update not implemented in this version")
+            }}
+            onPictureDelete={() => {
+              // TODO: Implement picture delete functionality
+              console.log("Picture delete not implemented in this version")
+            }}
+            isUploading={false}
+            isDeleting={false}
           />
         )
       case "style":
@@ -154,10 +154,16 @@ export function SettingsScreen({ onBack, user }: SettingsScreenProps) {
             setEmail={setEmail}
             defaultLocation={defaultLocation}
             setDefaultLocation={setDefaultLocation}
-            onPictureUpdate={uploadAction}
-            onPictureDelete={deleteAction}
-            isUploading={isUploading}
-            isDeleting={isDeleting}
+            onPictureUpdate={() => {
+              // TODO: Implement picture update functionality
+              console.log("Picture update not implemented in this version")
+            }}
+            onPictureDelete={() => {
+              // TODO: Implement picture delete functionality
+              console.log("Picture delete not implemented in this version")
+            }}
+            isUploading={false}
+            isDeleting={false}
           />
         )
     }
