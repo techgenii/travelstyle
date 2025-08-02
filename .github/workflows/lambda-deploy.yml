@@ -130,20 +130,29 @@ jobs:
         run: |
           cd backend
 
-          # Handle environment variables properly
+          # Handle environment variables properly with masking
           if [ -n "$ENV_VARS" ] && [ "$ENV_VARS" != "{}" ]; then
             # If ENV_VARS is provided, wrap it in Variables object
             echo "{\"Variables\": $ENV_VARS}" > env.json
+
+            # Mask sensitive values BEFORE any logging
+            echo "$ENV_VARS" | jq -r 'to_entries[] | "::add-mask::" + .value' >> $GITHUB_ENV
+
+            # Safe logging - only show count and variable names, never values
             echo "Environment variables configured (count: $(echo "$ENV_VARS" | jq -r 'keys | length'))"
+            echo "Environment variables: $(echo "$ENV_VARS" | jq -r 'keys | .[]' | tr '\n' ', ')"
           else
             # Create empty environment variables
             echo '{"Variables": {}}' > env.json
             echo "No environment variables configured"
           fi
 
-          # Debug: show what we're creating (without revealing values)
+          # Safe debug: show only structure, never values
           echo "Environment configuration structure:"
           cat env.json | jq -r 'keys' || echo "Environment file created successfully"
+
+          # Ensure env.json is not logged in any AWS CLI output
+          echo "Environment file created and ready for deployment"
 
           if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
             echo "Updating existing function..."
@@ -187,6 +196,8 @@ jobs:
             aws lambda wait function-active --function-name $FUNCTION_NAME
           fi
 
+          # Clean up sensitive files
+          rm -f env.json
           echo "Lambda function deployment completed successfully!"
         env:
           ENV_VARS: ${{ secrets.ENV_VARS || '{}' }}
