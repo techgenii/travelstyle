@@ -50,16 +50,64 @@ class UserOperations:
             return {}
 
         try:
+            # First try to get from user_profile_view
             response = await asyncio.to_thread(
                 lambda: (
                     self.client.table(DatabaseTables.USER_PROFILE_VIEW)
+                    .select("*")
+                    .eq("id", user_id)
+                    .execute()
+                )
+            )
+
+            if response.data:
+                return response.data[0]
+
+            # If user_profile_view returns no data, fall back to basic user data
+            logger.info(
+                f"User profile view returned no data for user {user_id}, falling back to basic user query"
+            )
+
+            # Get basic user data from users table
+            user_response = await asyncio.to_thread(
+                lambda: (
+                    self.client.table(DatabaseTables.USERS).select("*").eq("id", user_id).execute()
+                )
+            )
+
+            if not user_response.data:
+                logger.error(f"User {user_id} not found in users table")
+                return {}
+
+            user_data = user_response.data[0]
+
+            # Get user preferences if they exist
+            prefs_response = await asyncio.to_thread(
+                lambda: (
+                    self.client.table(DatabaseTables.USER_PREFERENCES)
                     .select("*")
                     .eq("user_id", user_id)
                     .execute()
                 )
             )
 
-            return response.data[0] if response.data else {}
+            preferences_data = prefs_response.data[0] if prefs_response.data else {}
+
+            # Combine user data with preferences
+            profile_data = {
+                **user_data,
+                "style_preferences": preferences_data.get("style_preferences", {}),
+                "size_info": preferences_data.get("size_info", {}),
+                "travel_patterns": preferences_data.get("travel_patterns", {}),
+                "quick_reply_preferences": preferences_data.get("quick_reply_preferences", {}),
+                "packing_methods": preferences_data.get("packing_methods", {}),
+                "currency_preferences": preferences_data.get("currency_preferences", {}),
+                "selected_style_names": preferences_data.get("style_preferences", {}).get(
+                    "selected_styles", []
+                ),
+            }
+
+            return profile_data
 
         except Exception as e:
             logger.error(f"Error retrieving user profile: {e}")

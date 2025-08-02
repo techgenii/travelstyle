@@ -75,8 +75,14 @@ class WeatherCacheService(SupabaseBaseService[CacheEntry]):
 
         try:
             records = await self.get_by_field("destination", destination)
-            if records and not records[0].is_expired():
-                return records[0].data
+            if not records:
+                return None
+
+            # Find the most recent non-expired record
+            for record in sorted(records, key=lambda r: r.created_at, reverse=True):
+                if not record.is_expired():
+                    return record.data
+
             return None
         except Exception as e:
             logger.error(f"Weather cache get error: {e}")
@@ -96,8 +102,9 @@ class WeatherCacheService(SupabaseBaseService[CacheEntry]):
                 "weather_data": data,
                 "expires_at": expires_at.isoformat(),
                 "created_at": datetime.now(UTC).isoformat(),
+                "api_source": "openweathermap",  # Add API source for unique constraint
             }
-            result = await self.upsert(cache_data, ["destination"])
+            result = await self.upsert(cache_data, ["destination", "api_source"])
             return result is not None
         except Exception as e:
             logger.error(f"Weather cache set error: {e}")
@@ -131,8 +138,14 @@ class CulturalCacheService(SupabaseBaseService[CacheEntry]):
 
         try:
             records = await self.get_by_field("destination", destination)
-            if records and not records[0].is_expired():
-                return records[0].data
+            if not records:
+                return None
+
+            # Find the most recent non-expired record
+            for record in sorted(records, key=lambda r: r.created_at, reverse=True):
+                if not record.is_expired():
+                    return record.data
+
             return None
         except Exception as e:
             logger.error(f"Cultural cache get error: {e}")
@@ -155,8 +168,9 @@ class CulturalCacheService(SupabaseBaseService[CacheEntry]):
                 "style_data": data.get("style_data", {}),
                 "expires_at": expires_at.isoformat(),
                 "created_at": datetime.now(UTC).isoformat(),
+                "api_source": "qloo",  # Add API source for unique constraint
             }
-            result = await self.upsert(cache_data, ["destination"])
+            result = await self.upsert(cache_data, ["destination", "api_source"])
             return result is not None
         except Exception as e:
             logger.error(f"Cultural cache set error: {e}")
@@ -187,8 +201,14 @@ class CurrencyCacheService(SupabaseBaseService[CacheEntry]):
 
         try:
             records = await self.get_by_field("base_currency", base_currency)
-            if records and not records[0].is_expired():
-                return records[0].data
+            if not records:
+                return None
+
+            # Find the most recent non-expired record
+            for record in sorted(records, key=lambda r: r.created_at, reverse=True):
+                if not record.is_expired():
+                    return record.data
+
             return None
         except Exception as e:
             logger.error(f"Currency cache get error: {e}")
@@ -208,7 +228,7 @@ class CurrencyCacheService(SupabaseBaseService[CacheEntry]):
                 "expires_at": expires_at.isoformat(),
                 "api_source": "exchangerate-api",
             }
-            result = await self.upsert(cache_data, ["base_currency"])
+            result = await self.upsert(cache_data, ["base_currency", "api_source"])
             return result is not None
         except Exception as e:
             logger.error(f"Currency cache set error: {e}")

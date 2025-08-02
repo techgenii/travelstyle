@@ -23,7 +23,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
-from app.services.supabase import supabase_cache
+from app.services.supabase import enhanced_supabase_cache
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class QlooService:
             categories = ["fashion", "etiquette", "social_norms"]
 
         # Check cache first
-        cached_data = await supabase_cache.get_cultural_cache(destination, context)
+        cached_data = await enhanced_supabase_cache.get_cultural_cache(destination, context)
         if cached_data:
             return cached_data
 
@@ -81,7 +81,7 @@ class QlooService:
                 processed_data = self._process_cultural_data(data, destination)
 
                 # Cache for 24 hours
-                await supabase_cache.set_cultural_cache(destination, context, processed_data, 24)
+                await enhanced_supabase_cache.set_cultural_cache(destination, context, processed_data, 24)
 
                 return processed_data
 

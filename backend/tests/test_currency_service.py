@@ -194,7 +194,7 @@ async def test_get_exchange_rates_json_parse_error(currency_service):
     """Test get_exchange_rates when JSON parsing fails."""
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             new=AsyncMock(return_value=None),
         ),
         patch(
@@ -216,7 +216,7 @@ async def test_get_exchange_rates_json_parse_exception(currency_service):
 
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             new=AsyncMock(return_value=None),
         ),
         patch(
@@ -233,7 +233,7 @@ async def test_get_exchange_rates_non_dict_response(currency_service):
     """Test get_exchange_rates when response is not a dict."""
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             new=AsyncMock(return_value=None),
         ),
         patch(
@@ -252,7 +252,7 @@ async def test_get_exchange_rates_http_status_error(currency_service):
     mock_response = Mock()
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             new=AsyncMock(return_value=None),
         ),
         patch(
@@ -273,7 +273,7 @@ async def test_get_exchange_rates_timeout_error(currency_service):
     """Test get_exchange_rates when timeout error occurs."""
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             new=AsyncMock(return_value=None),
         ),
         patch(
@@ -290,7 +290,7 @@ async def test_get_exchange_rates_value_error(currency_service):
     """Test get_exchange_rates when ValueError occurs."""
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             new=AsyncMock(return_value=None),
         ),
         patch(
@@ -307,7 +307,7 @@ async def test_get_exchange_rates_currency_normalization(currency_service):
     """Test get_exchange_rates with currency normalization (whitespace, case)."""
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             new=AsyncMock(return_value=None),
         ),
         patch(
@@ -323,7 +323,7 @@ async def test_get_exchange_rates_currency_normalization(currency_service):
                 )
             ),
         ),
-        patch("app.services.supabase.supabase_cache.supabase_cache.set_currency_cache", new=AsyncMock()),
+        patch("app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.set_currency_cache", new=AsyncMock()),
     ):
         # Test with lowercase and whitespace
         rates = await currency_service.get_exchange_rates(" usd ")

@@ -257,6 +257,7 @@ class AuthService:
             )
             if not response.user:
                 raise RegistrationError(FAILED_CREATE_USER_MSG)
+
             # Immediately sign in to get token after registration
             login_response = await asyncio.to_thread(
                 lambda: self.client.auth.sign_in_with_password(
@@ -265,6 +266,30 @@ class AuthService:
             )
             if not login_response.session:
                 raise RegistrationError(NO_SESSION_AFTER_REGISTRATION_MSG)
+
+            # Create user preferences record to ensure profile is available
+            user_id = response.user.id
+            try:
+                await asyncio.to_thread(
+                    lambda: self.client.table(USER_PREFERENCES_TABLE)
+                    .insert(
+                        {
+                            "user_id": user_id,
+                            "style_preferences": {},
+                            "size_info": {},
+                            "travel_patterns": {},
+                            "quick_reply_preferences": {},
+                            "packing_methods": {},
+                            "currency_preferences": {},
+                        }
+                    )
+                    .execute()
+                )
+                logger.info(f"Created user preferences for user {user_id}")
+            except Exception as e:
+                # If preferences already exist, that's fine
+                logger.info(f"User preferences creation for {user_id}: {e}")
+
             user_profile = extract_user_profile(login_response.user)
             if not user_profile:
                 user_profile = {}

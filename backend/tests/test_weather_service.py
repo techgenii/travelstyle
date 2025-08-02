@@ -38,7 +38,7 @@ def weather_service():
 @pytest.mark.asyncio
 async def test_get_weather_data_cache_hit(weather_service):
     with patch(
-        "app.services.supabase.supabase_cache.supabase_cache.get_weather_cache",
+        "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_weather_cache",
         new=AsyncMock(return_value={"cached": True}),
     ) as mock_get_cache:
         result = await weather_service.get_weather_data("Paris")
@@ -51,7 +51,7 @@ async def test_get_weather_data_cache_miss_success(weather_service):
     # Mock cache miss, then mock API calls and cache set
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_weather_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_weather_cache",
             new=AsyncMock(return_value=None),
         ),
         patch.object(
@@ -108,7 +108,8 @@ async def test_get_weather_data_cache_miss_success(weather_service):
             ),
         ),
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.set_weather_cache", new=AsyncMock()
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.set_weather_cache",
+            new=AsyncMock(),
         ) as mock_set_cache,
     ):
         result = await weather_service.get_weather_data("Paris")
@@ -121,7 +122,7 @@ async def test_get_weather_data_cache_miss_success(weather_service):
 async def test_get_weather_data_api_error(weather_service):
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_weather_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_weather_cache",
             new=AsyncMock(return_value=None),
         ),
         patch.object(weather_service, "_get_current_weather", new=AsyncMock(return_value=None)),
@@ -356,7 +357,7 @@ async def test_get_weather_data_geocoding_failure(weather_service):
     """Test get_weather_data when geocoding fails."""
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_weather_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_weather_cache",
             new=AsyncMock(return_value=None),
         ),
         patch.object(
@@ -374,7 +375,7 @@ async def test_get_weather_data_current_weather_failure(weather_service):
     """Test get_weather_data when current weather API fails."""
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_weather_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_weather_cache",
             new=AsyncMock(return_value=None),
         ),
         patch.object(
@@ -397,7 +398,7 @@ async def test_get_weather_data_service_exception(weather_service):
     """Test get_weather_data when service raises exception."""
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_weather_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_weather_cache",
             new=AsyncMock(return_value=None),
         ),
         patch.object(
@@ -467,7 +468,7 @@ async def test_get_weather_data_with_state_country(weather_service):
     """Test get_weather_data with state and country parameters."""
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_weather_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_weather_cache",
             new=AsyncMock(return_value=None),
         ),
         patch.object(
@@ -524,7 +525,8 @@ async def test_get_weather_data_with_state_country(weather_service):
             ),
         ),
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.set_weather_cache", new=AsyncMock()
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.set_weather_cache",
+            new=AsyncMock(),
         ),
     ):
         result = await weather_service.get_weather_data("New York", state="NY", country="US")

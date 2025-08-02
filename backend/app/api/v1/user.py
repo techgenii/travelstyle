@@ -51,10 +51,13 @@ async def get_current_user_profile(current_user: dict = current_user_dependency)
     try:
         user_id = current_user.get("id")
         if not user_id:
+            logger.error("Invalid user ID in current_user: %s", current_user)
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
 
         profile = await db_helpers.get_user_profile(user_id)
+
         if not profile:
+            logger.error("User profile not found for user_id: %s", user_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found"
             )

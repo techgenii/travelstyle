@@ -32,7 +32,7 @@ from app.services.currency.constants import (
 )
 from app.services.currency.exceptions import CurrencyAPIError, CurrencyValidationError
 from app.services.currency.validators import normalize_currency_code
-from app.services.supabase import supabase_cache
+from app.services.supabase import enhanced_supabase_cache
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class CurrencyAPI:
             normalized_currency = normalize_currency_code(base_currency)
 
             # Check cache first
-            cached_data = await supabase_cache.get_currency_cache(normalized_currency)
+            cached_data = await enhanced_supabase_cache.get_currency_cache(normalized_currency)
             if cached_data:
                 return cached_data
 
@@ -90,7 +90,7 @@ class CurrencyAPI:
                 }
 
                 # Cache for specified duration
-                await supabase_cache.set_currency_cache(
+                await enhanced_supabase_cache.set_currency_cache(
                     normalized_currency, rates_data, CACHE_DURATION_HOURS
                 )
                 return rates_data

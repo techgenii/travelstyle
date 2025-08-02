@@ -159,7 +159,7 @@ async def test_get_cultural_insights_success():
     """Test successful cultural insights retrieval from service."""
     service = QlooService()
     with patch(
-        "app.services.supabase.supabase_cache.supabase_cache.get_cultural_cache"
+        "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_cultural_cache"
     ) as mock_cache:
         mock_cache.return_value = None
         with patch("httpx.AsyncClient.get") as mock_get:
@@ -199,7 +199,7 @@ async def test_get_cultural_insights_cache():
         "data_source": "qloo",
     }
     with patch(
-        "app.services.supabase.supabase_cache.supabase_cache.get_cultural_cache"
+        "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_cultural_cache"
     ) as mock_cache:
         mock_cache.return_value = cached_data
         result = await service.get_cultural_insights("Paris", "leisure")
@@ -211,7 +211,7 @@ async def test_get_cultural_insights_error():
     """Test cultural insights retrieval error handling."""
     service = QlooService()
     with patch(
-        "app.services.supabase.supabase_cache.supabase_cache.get_cultural_cache"
+        "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_cultural_cache"
     ) as mock_cache:
         mock_cache.return_value = None
         with patch("httpx.AsyncClient.get") as mock_get:

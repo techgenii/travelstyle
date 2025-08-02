@@ -18,16 +18,14 @@
 """Supabase services for TravelStyle AI application."""
 
 from .supabase_base import SupabaseBaseService
-from .supabase_cache import SupabaseCacheService, supabase_cache
-from .supabase_cache_v2 import EnhancedSupabaseCacheService
+from .supabase_cache_v2 import EnhancedSupabaseCacheService, enhanced_supabase_cache
 from .supabase_client import SupabaseClientManager, get_supabase_client
 from .supabase_config import SupabaseConfig
 
 __all__ = [
     "SupabaseBaseService",
-    "SupabaseCacheService",
-    "supabase_cache",
     "EnhancedSupabaseCacheService",
+    "enhanced_supabase_cache",
     "get_supabase_client",
     "SupabaseClientManager",
     "SupabaseConfig",

@@ -24,24 +24,30 @@ export function SignupForm() {
         // Set auth token
         setAuthToken(state.authData.access_token)
 
-        // Set user data
+        // Set user data from the signup response
         setUserData({
           id: state.authData.user.id,
-          firstName: state.authData.user.first_name,
-          lastName: state.authData.user.last_name,
+          firstName: state.authData.user.first_name || "",
+          lastName: state.authData.user.last_name || null,
           email: state.authData.user.email,
-          profilePictureUrl: state.authData.user.profile_picture_url,
-          profileCompleted: state.authData.user.profile_completed,
-          stylePreferences: state.authData.user.style_preferences,
-          sizeInfo: state.authData.user.size_info,
-          travelPatterns: state.authData.user.travel_patterns,
-          quickReplyPreferences: state.authData.user.quick_reply_preferences,
-          packingMethods: state.authData.user.packing_methods,
-          currencyPreferences: state.authData.user.currency_preferences,
+          profilePictureUrl: state.authData.user.profile_picture_url || null,
+          profileCompleted: state.authData.user.profile_completed || false,
+          stylePreferences: state.authData.user.style_preferences || {},
+          sizeInfo: state.authData.user.size_info || {},
+          travelPatterns: state.authData.user.travel_patterns || {},
+          quickReplyPreferences: state.authData.user.quick_reply_preferences || {},
+          packingMethods: state.authData.user.packing_methods || {},
+          currencyPreferences: state.authData.user.currency_preferences || {},
           selectedStyleNames: state.authData.user.selected_style_names || [],
-          createdAt: state.authData.user.created_at,
-          updatedAt: state.authData.user.updated_at,
-          lastLogin: state.authData.user.last_login,
+          defaultLocation: state.authData.user.default_location || null,
+          maxBookmarks: state.authData.user.max_bookmarks || null,
+          maxConversations: state.authData.user.max_conversations || null,
+          subscriptionTier: state.authData.user.subscription_tier || null,
+          subscriptionExpiresAt: state.authData.user.subscription_expires_at || null,
+          isPremium: state.authData.user.is_premium || false,
+          createdAt: state.authData.user.created_at || null,
+          updatedAt: state.authData.user.updated_at || null,
+          lastLogin: state.authData.user.last_login || null,
         })
 
         console.log("[SignupForm] Auth data set successfully, redirecting...")

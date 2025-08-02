@@ -320,7 +320,7 @@ async def test_get_exchange_rates_success():
     service = CurrencyService()
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             new=AsyncMock(return_value=None),
         ),
         patch(
@@ -336,7 +336,10 @@ async def test_get_exchange_rates_success():
                 )
             ),
         ),
-        patch("app.services.supabase.supabase_cache.supabase_cache.set_currency_cache", new=AsyncMock()),
+        patch(
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.set_currency_cache",
+            new=AsyncMock(),
+        ),
     ):
         rates = await service.get_exchange_rates("USD")
         assert rates is not None
@@ -349,7 +352,7 @@ async def test_get_exchange_rates_cache():
     """Test exchange rates retrieval from cache."""
     service = CurrencyService()
     with patch(
-        "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+        "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
         new=AsyncMock(return_value={"cached": True}),
     ):
         rates = await service.get_exchange_rates("USD")
@@ -363,7 +366,7 @@ async def test_get_exchange_rates_error():
     service = CurrencyService()
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             new=AsyncMock(return_value=None),
         ),
         patch(
@@ -381,7 +384,7 @@ async def test_get_pair_exchange_rate_success():
     service = CurrencyService()
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             return_value=None,
         ),
         patch(
@@ -411,7 +414,7 @@ async def test_get_pair_exchange_rate_error():
     service = CurrencyService()
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             return_value=None,
         ),
         patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=Exception("API error"))),
@@ -426,7 +429,7 @@ async def test_convert_currency_success():
     service = CurrencyService()
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             return_value=None,
         ),
         patch(
@@ -458,7 +461,7 @@ async def test_convert_currency_error():
     service = CurrencyService()
     with (
         patch(
-            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_currency_cache",
             return_value=None,
         ),
         patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=Exception("API error"))),

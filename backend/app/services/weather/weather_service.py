@@ -25,7 +25,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
-from app.services.supabase import supabase_cache
+from app.services.supabase import enhanced_supabase_cache
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ class WeatherService:
             Weather data dictionary or None if error.
         """
         # Check cache first
-        cached_data = await supabase_cache.get_weather_cache(destination)
+        cached_data = await enhanced_supabase_cache.get_weather_cache(destination)
         if cached_data:
             return cached_data
 
@@ -118,7 +118,7 @@ class WeatherService:
             }
 
             # Cache for 1 hour
-            await supabase_cache.set_weather_cache(destination, weather_data, 1)
+            await enhanced_supabase_cache.set_weather_cache(destination, weather_data, 1)
 
             return weather_data
 
