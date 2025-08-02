@@ -16,7 +16,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Currency request parsing for TravelStyle AI application.
+Currency parsing utilities for TravelStyle AI.
+Handles detection and parsing of currency conversion requests.
 """
 
 import json
@@ -24,130 +25,111 @@ import logging
 import re
 from typing import Any
 
-from app.services.currency.constants import CURRENCY_PATTERNS, SUPPORTED_CURRENCIES
+from app.services.currency.constants import SUPPORTED_CURRENCIES
 from app.services.currency.validators import validate_currency_code
-from app.services.openai_service import openai_service
+from app.services.openai.openai_service import openai_service
 
 logger = logging.getLogger(__name__)
 
 
 class CurrencyParser:
-    """Service for parsing currency conversion requests from user messages."""
+    """Parser for currency conversion requests using OpenAI and regex fallback."""
 
     def __init__(self):
-        """Initialize the currency parser service."""
-        pass
+        """Initialize the CurrencyParser."""
+        self.currency_patterns = {
+            "USD": r"\b(?:USD|dollars?|bucks?)\b",
+            "EUR": r"\b(?:EUR|euros?)\b",
+            "GBP": r"\b(?:GBP|pounds?|sterling)\b",
+            "JPY": r"\b(?:JPY|yen)\b",
+            "CAD": r"\b(?:CAD|canadian\s+dollars?)\b",
+            "AUD": r"\b(?:AUD|australian\s+dollars?)\b",
+            "CHF": r"\b(?:CHF|swiss\s+francs?)\b",
+            "CNY": r"\b(?:CNY|yuan|renminbi)\b",
+            "INR": r"\b(?:INR|rupees?)\b",
+            "BRL": r"\b(?:BRL|reais?)\b",
+        }
 
     def is_currency_request(self, user_input: str) -> bool:
-        """Check if a user message is a currency conversion request."""
-        if not user_input or not isinstance(user_input, str):
+        """
+        Check if the user input is a currency-related request.
+
+        Args:
+            user_input: The user's message
+
+        Returns:
+            bool: True if the input is a currency request
+        """
+        if not user_input:
             return False
 
         input_lower = user_input.lower()
 
-        # Check for currency-related keywords
+        # Check for currency keywords
         currency_keywords = [
             "convert",
             "exchange",
-            "currency",
             "rate",
-            "usd",
-            "eur",
-            "gbp",
-            "jpy",
+            "currency",
             "dollar",
             "euro",
             "pound",
             "yen",
-            "peso",
-            "franc",
             "yuan",
-            "won",
             "rupee",
-            "ruble",
-            "dinar",
-            "dirham",
-            "riyal",
-            "ringgit",
-            "baht",
-            "dong",
-            "peso",
+            "franc",
             "real",
-            "rand",
-            "krona",
-            "krone",
-            "zloty",
-            "forint",
-            "bucks",
-            "quid",
-            "money",
+            "dollars",
+            "euros",
+            "pounds",
         ]
 
-        # Check for currency codes (3-letter codes)
-        currency_codes = re.findall(r"\b[A-Z]{3}\b", user_input.upper())
-
-        # Check for country names
-        country_names = [
-            "united states",
-            "usa",
-            "america",
-            "japan",
-            "uk",
-            "britain",
-            "india",
-            "china",
-            "mexico",
-            "canada",
-            "australia",
-            "switzerland",
-            "brazil",
-            "south korea",
-            "russia",
-            "saudi arabia",
-            "united arab emirates",
-            "south africa",
-            "new zealand",
-            "singapore",
-            "hong kong",
-            "taiwan",
-        ]
-
-        # Check for numbers followed by currency codes
-        amount_patterns = [
-            r"\d+(?:\.\d+)?\s*[A-Z]{3}",
-            r"[A-Z]{3}\s*\d+(?:\.\d+)?",
-        ]
-
-        # Check for conversion patterns
-        conversion_patterns = [
-            r"to\s+[A-Z]{3}",
-            r"convert\s+\d+",
-            r"exchange\s+rate",
-        ]
-
-        # Check if any currency keywords are present
         has_keywords = any(keyword in input_lower for keyword in currency_keywords)
 
-        # Check if currency codes are present
-        has_codes = len(currency_codes) > 0
-
-        # Check if country names are present
-        has_country_names = any(name in input_lower for name in country_names)
-
-        # Check if amount patterns are present
-        has_amounts = any(re.search(pattern, user_input.upper()) for pattern in amount_patterns)
-
-        # Check if conversion patterns are present
-        has_conversion = any(
-            re.search(pattern, user_input.lower()) for pattern in conversion_patterns
+        # Check for currency codes
+        has_codes = any(
+            re.search(pattern, input_lower, re.IGNORECASE)
+            for pattern in self.currency_patterns.values()
         )
 
-        # Check for specific currency patterns
-        for pattern in CURRENCY_PATTERNS:
-            if re.search(pattern, user_input, re.IGNORECASE):
-                return True
+        # Check for country names that might indicate currency conversion
+        country_names = [
+            "us",
+            "usa",
+            "united states",
+            "america",
+            "american",
+            "europe",
+            "european",
+            "uk",
+            "britain",
+            "british",
+            "japan",
+            "japanese",
+            "china",
+            "chinese",
+            "india",
+            "indian",
+            "brazil",
+            "brazilian",
+            "canada",
+            "canadian",
+            "australia",
+            "australian",
+            "switzerland",
+            "swiss",
+        ]
 
-        # Return True if we have currency codes, country names, or keywords with conversion indicators
+        has_country_names = any(country in input_lower for country in country_names)
+
+        # Check for conversion indicators
+        conversion_indicators = ["to", "into", "=", "equals", "worth"]
+        has_conversion = any(indicator in input_lower for indicator in conversion_indicators)
+
+        # Check for amounts (numbers)
+        has_amounts = bool(re.search(r"\d+(?:\.\d+)?", input_lower))
+
+        # Return True if we have currency codes, country names, or keywords with conversion indicators  # noqa: E501
         return (has_codes and (has_amounts or has_conversion)) or has_keywords or has_country_names
 
     async def parse_currency_request(self, user_message: str) -> dict[str, Any] | None:
@@ -180,7 +162,7 @@ class CurrencyParser:
             User message: "{user_message}"
 
             Return only the JSON object, no additional text.
-            """
+            """  # noqa: E501
 
             response = await openai_service.get_completion(
                 messages=[{"role": "user", "content": prompt}], temperature=0.1, max_tokens=200
@@ -218,6 +200,18 @@ class CurrencyParser:
                 logger.error(f"Invalid to_currency: {cleaned_data['to_currency']}")
                 return None
 
+            # For conversion requests, both currencies are required
+            if cleaned_data.get("request_type") == "conversion":
+                if "from_currency" not in cleaned_data or "to_currency" not in cleaned_data:
+                    logger.error("Missing required currency codes for conversion request")
+                    return None
+
+            # For rate requests, both currencies are required
+            if cleaned_data.get("request_type") == "rate":
+                if "from_currency" not in cleaned_data or "to_currency" not in cleaned_data:
+                    logger.error("Missing required currency codes for rate request")
+                    return None
+
             return cleaned_data
 
         except Exception as e:
@@ -232,7 +226,7 @@ class CurrencyParser:
             return json_match.group(0)
         return ""
 
-    def _clean_parsed_data(self, data: dict) -> dict:
+    def _clean_parsed_data(self, data: dict) -> dict | None:
         """Clean and normalize parsed data."""
         cleaned = {}
 
@@ -243,23 +237,30 @@ class CurrencyParser:
         if "to_currency" in data:
             cleaned["to_currency"] = data["to_currency"].strip().upper()
 
-        # Normalize amount
+        # Normalize amount - handle non-numeric amounts
         if "amount" in data:
             try:
-                cleaned["amount"] = float(data["amount"])
+                # Handle string amounts
+                if isinstance(data["amount"], str):
+                    # Remove any non-numeric characters except decimal point and minus
+                    cleaned_amount = re.sub(r"[^\d.-]", "", data["amount"])
+                    if cleaned_amount:  # Only try to convert if we have numeric content
+                        cleaned["amount"] = float(cleaned_amount)
+                    else:
+                        logger.error(f"Invalid amount: {data['amount']}")
+                        return None
+                else:
+                    cleaned["amount"] = float(data["amount"])
             except (ValueError, TypeError):
-                logger.warning(f"Invalid amount: {data['amount']}")
+                logger.error(f"Invalid amount: {data['amount']}")
                 return None
-        else:
-            # Default to 0.0 if amount is missing
-            cleaned["amount"] = 0.0
 
-        # Copy request type
+        # Normalize request type
         if "request_type" in data:
-            cleaned["request_type"] = data["request_type"].lower()
+            cleaned["request_type"] = data["request_type"].strip().lower()
 
         return cleaned
 
     def get_supported_currencies(self) -> list[str]:
-        """Get list of supported currency codes."""
-        return sorted(list(SUPPORTED_CURRENCIES))
+        """Get list of supported currencies."""
+        return sorted(SUPPORTED_CURRENCIES)

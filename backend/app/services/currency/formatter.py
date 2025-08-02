@@ -90,7 +90,8 @@ class CurrencyFormatter:
             "• Exchange rate USD EUR\n"
             "• 1000 JPY to GBP\n\n"
             "**Supported Currencies:**\n"
-            "I support all major world currencies including USD, EUR, GBP, JPY, CAD, AUD, and many more.\n\n"
+            "I support all major world currencies including USD, EUR, GBP, JPY, CAD, AUD, "
+            "and many more.\n\n"
             "**Tips:**\n"
             "• Use 3-letter currency codes (USD, EUR, etc.)\n"
             "• Include the amount you want to convert\n"
@@ -102,4 +103,8 @@ class CurrencyFormatter:
 
     def format_error_response(self, error_message: str = "Unknown error") -> str:
         """Format an error response."""
-        return f"❌ **Currency Conversion Error**\n\nSorry, I couldn't process your currency request: {error_message}\n\nPlease try again with a different format or check the supported currencies."
+        return (
+            f"❌ **Currency Conversion Error**\n\n"
+            f"Sorry, I couldn't process your currency request: {error_message}\n\n"
+            "Please try again with a different format or check the supported currencies."
+        )

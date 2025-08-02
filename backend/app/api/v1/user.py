@@ -251,7 +251,8 @@ async def save_destination_endpoint(
 
 @router.post("/me/profile-picture")
 async def upload_profile_picture(
-    file: UploadFile = File(...), current_user: dict = current_user_dependency
+    file: UploadFile = File(...),  # noqa: B008
+    current_user: dict = current_user_dependency,
 ):
     """
     Upload a profile picture for the current user.
@@ -398,7 +399,9 @@ async def get_initials_avatar(current_user: dict = current_user_dependency):
             status_code=status.HTTP_200_OK,
             content={
                 "initials_avatar": initials_avatar,
-                "initials": f"{first_name[0] if first_name else ''}{last_name[0] if last_name else ''}",
+                "initials": (
+                    f"{first_name[0] if first_name else ''}{last_name[0] if last_name else ''}"
+                ),
             },
         )
 

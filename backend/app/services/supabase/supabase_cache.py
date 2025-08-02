@@ -28,8 +28,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.services.rate_limiter import db_rate_limiter
-from .supabase_client import get_supabase_client
 from supabase import Client
+
+from .supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 

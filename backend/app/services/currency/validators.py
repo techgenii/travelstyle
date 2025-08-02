@@ -36,7 +36,7 @@ def validate_currency_code(currency_code: str) -> bool:
 
 def validate_amount(amount: Any) -> bool:
     """Validate if an amount is a valid number."""
-    if not isinstance(amount, (int, float)):
+    if not isinstance(amount, int | float):
         return False
 
     try:

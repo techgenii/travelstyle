@@ -23,7 +23,7 @@ Provides common functionality for all Supabase-related services.
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from supabase import Client
 
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class SupabaseBaseService(ABC, Generic[T]):
+class SupabaseBaseService[T](ABC):
     """Base class for Supabase services with common operations."""
 
     def __init__(self, table_name: str, client: Client = None):
@@ -53,25 +53,34 @@ class SupabaseBaseService(ABC, Generic[T]):
 
     async def get_by_id(self, record_id: str) -> T | None:
         """Get a record by ID."""
-        query_func = lambda: (
-            self.client.table(self.table_name).select("*").eq("id", record_id).limit(1).execute()
-        )
+
+        def query_func():
+            return (
+                self.client.table(self.table_name)
+                .select("*")
+                .eq("id", record_id)
+                .limit(1)
+                .execute()
+            )
+
         result = await self._execute_query(query_func)
         return self._parse_record(result[0]) if result else None
 
     async def get_by_field(self, field: str, value: Any) -> list[T]:
         """Get records by a specific field value."""
-        query_func = lambda: (
-            self.client.table(self.table_name).select("*").eq(field, value).execute()
-        )
+
+        def query_func():
+            return self.client.table(self.table_name).select("*").eq(field, value).execute()
+
         result = await self._execute_query(query_func)
         return [self._parse_record(record) for record in result]
 
     async def get_all(self, limit: int | None = None) -> list[T]:
         """Get all records with optional limit."""
-        query_func = lambda: (
-            self.client.table(self.table_name).select("*").limit(limit or 1000).execute()
-        )
+
+        def query_func():
+            return self.client.table(self.table_name).select("*").limit(limit or 1000).execute()
+
         result = await self._execute_query(query_func)
         return [self._parse_record(record) for record in result]
 

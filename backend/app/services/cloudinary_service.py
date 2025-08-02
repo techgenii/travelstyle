@@ -59,7 +59,6 @@ class CloudinaryService:
         """
         try:
             # Generate unique public ID
-            file_extension = filename.split(".")[-1] if "." in filename else "jpg"
             public_id = f"travelstyle/profile_pictures/{user_id}/{uuid.uuid4()}"
 
             # Upload to Cloudinary with transformations
@@ -185,12 +184,14 @@ class CloudinaryService:
                 return result["secure_url"]
             else:
                 # Fallback to simple SVG
-                return f"data:image/svg+xml;base64,PHN2ZyB3aWR0aD0i{size}IiBoZWlnaHQ9Ii{size}IiB2aWV3Qm94PSIwIDAg{size}IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0i{size}IiBoZWlnaHQ9Ii{size}IiBmaWxsPSIjOEI1Q0Y2Ii8+Cjx0ZXh0IHg9Ii{size // 2}IiB5PSI{(size // 2) + 10}IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9Ii{size // 3}Ij57aW5pdGlhbHN9PC90ZXh0Pgo8L3N2Zz4K"
+                svg_base64 = f"data:image/svg+xml;base64,PHN2ZyB3aWR0aD0i{size}IiBoZWlnaHQ9Ii{size}IiB2aWV3Qm94PSIwIDAg{size}IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0i{size}IiBoZWlnaHQ9Ii{size}IiBmaWxsPSIjOEI1Q0Y2Ii8+Cjx0ZXh0IHg9Ii{size // 2}IiB5PSI{(size // 2) + 10}IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9Ii{size // 3}Ij57aW5pdGlhbHN9PC90ZXh0Pgo8L3N2Zz4K"  # noqa: E501
+                return svg_base64
 
         except Exception as e:
             logger.error(f"Error generating initials avatar: {e}")
             # Return a simple fallback
-            return f"data:image/svg+xml;base64,PHN2ZyB3aWR0aD0i{size}IiBoZWlnaHQ9Ii{size}IiB2aWV3Qm94PSIwIDAg{size}IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0i{size}IiBoZWlnaHQ9Ii{size}IiBmaWxsPSIjOEI1Q0Y2Ii8+Cjx0ZXh0IHg9Ii{size // 2}IiB5PSI{(size // 2) + 10}IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9Ii{size // 3}Ij5VPC90ZXh0Pgo8L3N2Zz4K"
+            fallback_svg = f"data:image/svg+xml;base64,PHN2ZyB3aWR0aD0i{size}IiBoZWlnaHQ9Ii{size}IiB2aWV3Qm94PSIwIDAg{size}IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0i{size}IiBoZWlnaHQ9Ii{size}IiBmaWxsPSIjOEI1Q0Y2Ii8+Cjx0ZXh0IHg9Ii{size // 2}IiB5PSI{(size // 2) + 10}IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9Ii{size // 3}Ij5VPC90ZXh0Pgo8L3N2Zz4K"  # noqa: E501
+            return fallback_svg
 
     async def test_connection(self) -> bool:
         """

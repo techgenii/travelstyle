@@ -22,19 +22,17 @@ import logging
 import re
 from typing import Any, cast
 
-from openai import AsyncOpenAI
-from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
-
 from app.core.config import settings
 from app.models.responses import ChatResponse, QuickReply
+from openai import AsyncOpenAI
+from openai.types.chat import ChatCompletion
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 
 logger = logging.getLogger(__name__)
 
 
 class OpenAIService:
     """Service for interacting with OpenAI's chat models for TravelStyle AI."""
-
-    # pylint: disable=too-few-public-methods
 
     def __init__(self):
         """Initialize the OpenAIService with API credentials and default parameters."""
@@ -53,7 +51,7 @@ class OpenAIService:
         weather_context: dict[str, Any] | None = None,
         user_profile: dict[str, Any] | None = None,
     ) -> ChatResponse:
-        """Generate AI response with full context, fallback logic, and improved prompt formatting."""
+        """Generate AI response with full context, fallback logic, and improved prompt formatting."""  # noqa: E501
         try:
             # ---- Step 1: Enrich or fallback missing context ----
             enriched_profile = self._enrich_user_profile(user_profile)
@@ -75,7 +73,7 @@ class OpenAIService:
             messages.append({"role": "user", "content": user_message})
 
             # ---- Step 4: Call OpenAI ----
-            response = await self.client.chat.completions.create(
+            response: ChatCompletion = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 temperature=self.temperature,
@@ -93,7 +91,10 @@ class OpenAIService:
         except Exception as e:  # pylint: disable=broad-except
             logger.error("OpenAI API error: %s", type(e).__name__)
             return ChatResponse(
-                message="I apologize, but I'm having trouble processing your request right now. Please try again.",
+                message=(
+                    "I apologize, but I'm having trouble processing your request right now. "
+                    "Please try again."
+                ),
                 confidence_score=0.0,
             )
 
@@ -102,7 +103,7 @@ class OpenAIService:
     ) -> str | None:
         """Get a simple completion from OpenAI for parsing tasks."""
         try:
-            response = await self.client.chat.completions.create(
+            response: ChatCompletion = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 temperature=temperature,
@@ -116,7 +117,7 @@ class OpenAIService:
             logger.error("OpenAI get_completion error: %s", type(e).__name__)
             return None
 
-    def _build_system_prompt(self) -> str:
+    def _build_system_prompt(self) -> str:  # noqa: E501
         """Build the system prompt for the AI model."""
         return """
     You are TravelStyle AI, a culturally intelligent, weather-aware travel wardrobe expert.
@@ -150,7 +151,7 @@ class OpenAIService:
     - Show both modern and traditional perspectives
 
     GOAL:
-    Help the user confidently pack for their destination with culturally respectful, stylish, and weather-appropriate clothing.
+    Help the user confidently pack for their destination with culturally respectful, stylish, and weather-appropriate clothing.  # noqa: E501
     """
 
     def _build_context_prompt(

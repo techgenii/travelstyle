@@ -79,7 +79,7 @@ def validate_user_metadata(metadata: dict[str, Any]) -> bool:
     for key, value in metadata.items():
         if not isinstance(key, str):
             return False
-        if value is not None and not isinstance(value, (str, int, bool, float)):
+        if value is not None and not isinstance(value, str | int | bool | float):
             return False
 
     return True

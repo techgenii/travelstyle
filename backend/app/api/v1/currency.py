@@ -128,7 +128,10 @@ async def convert_currency(
             converted = result["converted"]
             rate = result["rate"]
 
-            message = f"{original['amount']:.2f} {original['currency']} = {converted['amount']:.2f} {converted['currency']} (Rate: {rate:.4f})"
+            message = (
+                f"{original['amount']:.2f} {original['currency']} = "
+                f"{converted['amount']:.2f} {converted['currency']} (Rate: {rate:.4f})"
+            )
 
             quick_replies = [
                 QuickReply(text="Convert different amount", action="currency_convert"),

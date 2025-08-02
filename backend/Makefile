@@ -40,6 +40,8 @@ help:
 	@echo "  test-orchestrator - Run orchestrator tests only"
 	@echo "  test-recommendations - Run recommendations tests only"
 	@echo "  test-watch     - Run tests in watch mode"
+	@echo "  test-lint      - Run ruff linting"
+	@echo "  test-security  - Run bandit security scan"
 	@echo ""
 	@echo "$(YELLOW)Development (Local Testing):$(NC)"
 	@echo "  dev            - Run all dev checks (lint, security, test)"
@@ -64,7 +66,7 @@ install-dev: install
 	$(PIP) install -r requirements-test.txt
 
 # Testing targets (improved with warnings disabled)
-.PHONY: test test-quick test-chat test-currency test-orchestrator test-recommendations test-watch
+.PHONY: test test-quick test-chat test-currency test-orchestrator test-recommendations test-watch test-lint test-security
 test: | $(REPORT_DIR)
 	@echo "$(BLUE)Running all tests with warnings disabled...$(NC)"
 	pytest --tb=short -v --disable-warnings \
@@ -98,6 +100,14 @@ test-recommendations:
 test-watch:
 	@echo "$(BLUE)Running tests in watch mode...$(NC)"
 	pytest --tb=short -v --disable-warnings -f
+
+test-lint:
+	@echo "$(BLUE)Running ruff linting...$(NC)"
+	ruff check $(APP_DIR)
+
+test-security:
+	@echo "$(BLUE)Running bandit security scan...$(NC)"
+	bandit -r $(APP_DIR)
 
 # Development targets (HTML output)
 .PHONY: dev dev-clean dev-lint dev-security dev-test

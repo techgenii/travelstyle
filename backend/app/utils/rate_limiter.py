@@ -127,7 +127,10 @@ def rate_limit(calls: int = None, period: int = None, endpoint_type: str = None)
                     if call_count >= actual_calls:
                         raise HTTPException(
                             status_code=429,
-                            detail=f"Rate limit exceeded. Maximum {actual_calls} calls per {actual_period} seconds.",
+                            detail=(
+                                f"Rate limit exceeded. Maximum {actual_calls} calls per "
+                                f"{actual_period} seconds."
+                            ),
                         )
                     # Increment call count
                     rate_limit_storage[rate_limit_key] = (last_call_time, call_count + 1)

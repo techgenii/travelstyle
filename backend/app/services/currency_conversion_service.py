@@ -59,8 +59,8 @@ currency_conversion_service = CurrencyService()
 CurrencyConversionService = CurrencyService
 
 # Add openai_service attribute for backward compatibility
-from app.services.currency_service import currency_service
-from app.services.openai_service import openai_service
+from app.services.currency_service import currency_service  # noqa: E402
+from app.services.openai.openai_service import openai_service  # noqa: E402
 
 currency_conversion_service.openai_service = openai_service
 currency_conversion_service.currency_service = currency_service

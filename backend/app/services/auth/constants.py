@@ -26,7 +26,7 @@ READ_RATE_LIMIT_KEY = "read"
 WRITE_RATE_LIMIT_KEY = "write"
 
 # Default token type
-DEFAULT_TOKEN_TYPE = "bearer"
+DEFAULT_TOKEN_TYPE = "bearer"  # nosec B105
 
 # User metadata fields
 FIRST_NAME_FIELD = "first_name"
@@ -50,7 +50,7 @@ NO_SESSION_MSG = "No session created"
 RATE_LIMITED_MSG = "Too many attempts. Please try again later."
 CLIENT_NOT_INITIALIZED_MSG = "Supabase client not initialized"
 REGISTRATION_FAILED_MSG = "Registration failed. Email may already be in use."
-INVALID_TOKEN_MSG = "Invalid or expired reset token"
-INVALID_REFRESH_TOKEN_MSG = "Invalid refresh token"
+INVALID_TOKEN_MSG = "Invalid or expired reset token"  # nosec B105
+INVALID_REFRESH_TOKEN_MSG = "Invalid refresh token"  # nosec B105
 FAILED_CREATE_USER_MSG = "Failed to create user"
 NO_SESSION_AFTER_REGISTRATION_MSG = "No session created after registration"
