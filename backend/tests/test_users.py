@@ -98,12 +98,9 @@ class TestUserOperations:
 
     @pytest.mark.asyncio
     async def test_save_user_profile_success(self, user_operations, mock_client):
-        """Test successful user profile save."""
+        """Test save_user_profile success."""
         user_response = MagicMock()
         user_response.data = [{"id": "test-user"}]
-
-        preferences_response = MagicMock()
-        preferences_response.data = [{"user_id": "test-user"}]
 
         update_response = MagicMock()
         update_response.data = [{"id": "test-user", "name": "Updated User"}]
@@ -112,7 +109,7 @@ class TestUserOperations:
             mock_rate_limit.return_value = True
 
             with patch("asyncio.to_thread") as mock_to_thread:
-                mock_to_thread.side_effect = [user_response, preferences_response, update_response]
+                mock_to_thread.side_effect = [user_response, update_response]
 
                 result = await user_operations.save_user_profile(
                     "test-user", {"name": "Updated User"}
@@ -158,12 +155,9 @@ class TestUserOperations:
 
     @pytest.mark.asyncio
     async def test_save_user_profile_create_preferences(self, user_operations, mock_client):
-        """Test save_user_profile when creating new preferences."""
+        """Test save_user_profile when creating new preferences via view."""
         user_response = MagicMock()
         user_response.data = [{"id": "test-user"}]
-
-        preferences_response = MagicMock()
-        preferences_response.data = []
 
         update_response = MagicMock()
         update_response.data = [{"id": "test-user", "name": "Updated User"}]
@@ -172,12 +166,7 @@ class TestUserOperations:
             mock_rate_limit.return_value = True
 
             with patch("asyncio.to_thread") as mock_to_thread:
-                mock_to_thread.side_effect = [
-                    user_response,
-                    preferences_response,
-                    None,
-                    update_response,
-                ]
+                mock_to_thread.side_effect = [user_response, update_response]
 
                 result = await user_operations.save_user_profile(
                     "test-user", {"name": "Updated User"}
@@ -191,9 +180,6 @@ class TestUserOperations:
         user_response = MagicMock()
         user_response.data = [{"id": "test-user"}]
 
-        preferences_response = MagicMock()
-        preferences_response.data = [{"user_id": "test-user"}]
-
         update_response = MagicMock()
         update_response.data = []
 
@@ -201,7 +187,7 @@ class TestUserOperations:
             mock_rate_limit.return_value = True
 
             with patch("asyncio.to_thread") as mock_to_thread:
-                mock_to_thread.side_effect = [user_response, preferences_response, update_response]
+                mock_to_thread.side_effect = [user_response, update_response]
 
                 result = await user_operations.save_user_profile(
                     "test-user", {"name": "Updated User"}

@@ -24,6 +24,21 @@ interface ProfileScreenProps {
 }
 
 export function ProfileScreen({ onBack, onSettingsClick, user }: ProfileScreenProps) {
+  // Safety check to ensure user data is available
+  if (!user) {
+    return (
+      <div className="flex flex-col h-full bg-[#F8F6FF]">
+        <Header title="Profile" showBack onBack={onBack} />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading profile...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const userFullName = `${user?.firstName || "Guest"} ${user?.lastName || ""}`.trim()
   const userEmail = user?.email || "guest@example.com"
   const userLocation = user?.defaultLocation || "Los Angeles" // Use defaultLocation from user, fallback to Los Angeles
@@ -97,7 +112,7 @@ export function ProfileScreen({ onBack, onSettingsClick, user }: ProfileScreenPr
               alt={`${userFullName}'s avatar`}
             />
             <AvatarFallback className="bg-purple-500 text-white text-3xl">
-              {user.firstName.charAt(0)}
+              {user.firstName?.charAt(0) || ""}
               {user.lastName?.charAt(0) || ""}
             </AvatarFallback>
           </Avatar>

@@ -32,6 +32,16 @@ jobs:
       REGION: ${{ secrets.AWS_REGION }}
       S3_BUCKET: ${{ secrets.LAMBDA_S3_BUCKET }}
       API_NAME: TravelStyleAPI  # Distinct API name
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
+      QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
+      OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+      EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+      CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
 
     steps:
       - name: Checkout code
@@ -130,25 +140,11 @@ jobs:
         run: |
           cd backend
 
-          # Handle environment variables properly with masking
-          if [ -n "$ENV_VARS" ] && [ "$ENV_VARS" != "{}" ]; then
-            # If ENV_VARS is provided, wrap it in Variables object
-            echo "{\"Variables\": $ENV_VARS}" > env.json
+          # Configure environment variables directly
+          ENVIRONMENT_VARS="Variables={OPENAI_API_KEY=$OPENAI_API_KEY,OPENAI_ORG_ID=$OPENAI_ORG_ID,QLOO_API_KEY=$QLOO_API_KEY,OPENWEATHER_API_KEY=$OPENWEATHER_API_KEY,EXCHANGE_API_KEY=$EXCHANGE_API_KEY,SUPABASE_URL=$SUPABASE_URL,SUPABASE_KEY=$SUPABASE_KEY,CLOUDINARY_CLOUD_NAME=$CLOUDINARY_CLOUD_NAME,CLOUDINARY_API_KEY=$CLOUDINARY_API_KEY,CLOUDINARY_API_SECRET=$CLOUDINARY_API_SECRET}"
 
-            # Minimal logging - only show count, never variable names or values
-            echo "Environment variables configured (count: $(echo "$ENV_VARS" | jq -r 'keys | length'))"
-          else
-            # Create empty environment variables
-            echo '{"Variables": {}}' > env.json
-            echo "No environment variables configured"
-          fi
-
-          # Safe debug: show only structure, never values
-          echo "Environment configuration structure:"
-          cat env.json | jq -r 'keys' || echo "Environment file created successfully"
-
-          # Ensure env.json is not logged in any AWS CLI output
-          echo "Environment file created and ready for deployment"
+          echo "Environment variables configured (count: 10)"
+          echo "Environment variables configured and ready for deployment"
 
           if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
             echo "Updating existing function..."
@@ -167,7 +163,7 @@ jobs:
 
             aws lambda update-function-configuration \
               --function-name $FUNCTION_NAME \
-              --environment file://env.json \
+              --environment "$ENVIRONMENT_VARS" \
               --timeout 30 \
               --memory-size 2048 \
               --ephemeral-storage '{"Size": 2048}'
@@ -183,7 +179,7 @@ jobs:
               --handler $HANDLER \
               --architectures $ARCHITECTURE \
               --zip-file fileb://$ZIP_FILE \
-              --environment file://env.json \
+              --environment "$ENVIRONMENT_VARS" \
               --timeout 30 \
               --memory-size 2048 \
               --ephemeral-storage '{"Size": 2048}'
@@ -192,11 +188,7 @@ jobs:
             aws lambda wait function-active --function-name $FUNCTION_NAME
           fi
 
-          # Clean up sensitive files
-          rm -f env.json
           echo "Lambda function deployment completed successfully!"
-        env:
-          ENV_VARS: ${{ secrets.ENV_VARS || '{}' }}
 
       - name: Configure Lambda Logging Permissions
         run: |

@@ -571,14 +571,9 @@ class TestDatabaseHelpersComprehensive:
 
         db = DatabaseHelpers(supabase_client=mock_client)
 
-        # Setup mocks for the new checks
         # Mock users table check - user exists
         users_response = MagicMock()
         users_response.data = [{"id": "test-user"}]
-
-        # Mock user_preferences table check - preferences exist
-        preferences_response = MagicMock()
-        preferences_response.data = [{"user_id": "test-user"}]
 
         # Mock user_profile_view update
         update_response = MagicMock()
@@ -603,12 +598,9 @@ class TestDatabaseHelpersComprehensive:
             }
         ]
 
-        # Setup table mock to return different responses based on table name
+        # Setup table mock
         table_mock = MagicMock()
-        table_mock.select.return_value.eq.return_value.execute.side_effect = [
-            users_response,  # First call: users table check
-            preferences_response,  # Second call: user_preferences table check
-        ]
+        table_mock.select.return_value.eq.return_value.execute.return_value = users_response
         table_mock.update.return_value.eq.return_value.execute.return_value = update_response
         mock_client.table.return_value = table_mock
 
@@ -631,20 +623,13 @@ class TestDatabaseHelpersComprehensive:
         users_response = MagicMock()
         users_response.data = [{"id": "test-user"}]
 
-        # Mock user_preferences table check - preferences exist
-        preferences_response = MagicMock()
-        preferences_response.data = [{"user_id": "test-user"}]
-
         # Mock empty response for user_profile_view update
         mock_response = MagicMock()
         mock_response.data = []
 
-        # Setup table mock to return different responses based on table name
+        # Setup table mock
         mock_table = MagicMock()
-        mock_table.select.return_value.eq.return_value.execute.side_effect = [
-            users_response,  # First call: users table check
-            preferences_response,  # Second call: user_preferences table check
-        ]
+        mock_table.select.return_value.eq.return_value.execute.return_value = users_response
         mock_table.update.return_value.eq.return_value.execute.return_value = mock_response
         mock_client.table.return_value = mock_table
 
@@ -656,7 +641,7 @@ class TestDatabaseHelpersComprehensive:
 
     @pytest.mark.asyncio
     async def test_save_user_profile_create_preferences(self):
-        """Test save_user_profile when user_preferences record needs to be created"""
+        """Test save_user_profile when user_preferences record needs to be created via view"""
         mock_client = MagicMock()
         from app.services.database_helpers import DatabaseHelpers
 
@@ -665,10 +650,6 @@ class TestDatabaseHelpersComprehensive:
         # Mock users table check - user exists
         users_response = MagicMock()
         users_response.data = [{"id": "test-user"}]
-
-        # Mock user_preferences table check - preferences don't exist
-        preferences_response = MagicMock()
-        preferences_response.data = []
 
         # Mock user_profile_view update
         update_response = MagicMock()
@@ -683,10 +664,7 @@ class TestDatabaseHelpersComprehensive:
 
         # Setup table mock to return different responses based on table name
         table_mock = MagicMock()
-        table_mock.select.return_value.eq.return_value.execute.side_effect = [
-            users_response,  # First call: users table check
-            preferences_response,  # Second call: user_preferences table check
-        ]
+        table_mock.select.return_value.eq.return_value.execute.return_value = users_response
         table_mock.update.return_value.eq.return_value.execute.return_value = update_response
         mock_client.table.return_value = table_mock
 
@@ -697,8 +675,8 @@ class TestDatabaseHelpersComprehensive:
         result = await db.save_user_profile("test-user", profile_data)
         assert result["selected_style_names"] == ["Bohemian", "Minimalist"]
 
-        # Verify that insert was called to create user_preferences
-        table_mock.insert.assert_called_once()
+        # Verify that the view was used for the update
+        table_mock.update.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_save_user_profile_exception(self):

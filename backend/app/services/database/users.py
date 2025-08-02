@@ -114,7 +114,7 @@ class UserOperations:
             return {}
 
     async def save_user_profile(self, user_id: str, profile_data: dict) -> dict | None:
-        """Save user profile data."""
+        """Save user profile data using the user_profile_view."""
         if not validate_user_id(user_id):
             logger.error(f"Invalid user_id format: {user_id}")
             return None
@@ -139,56 +139,21 @@ class UserOperations:
                 logger.error(f"User {user_id} not found")
                 return None
 
-            # Check if user preferences exist
-            preferences_response = await asyncio.to_thread(
-                lambda: (
-                    self.client.table(DatabaseTables.USER_PREFERENCES)
-                    .select("user_id")
-                    .eq("user_id", user_id)
-                    .execute()
-                )
-            )
+            # Add updated_at timestamp
+            profile_data["updated_at"] = datetime.now(UTC).isoformat()
 
-            # Create user preferences if they don't exist
-            if not preferences_response.data:
-                logger.info(f"Creating user_preferences record for user {user_id}")
-                await asyncio.to_thread(
-                    lambda: (
-                        self.client.table(DatabaseTables.USER_PREFERENCES)
-                        .insert(
-                            {
-                                "user_id": user_id,
-                                "style_preferences": {},
-                                "size_info": {},
-                                "travel_patterns": {},
-                                "quick_reply_preferences": {"enabled": True},
-                                "packing_methods": {},
-                                "currency_preferences": {},
-                                "created_at": datetime.now(UTC).isoformat(),
-                                "updated_at": datetime.now(UTC).isoformat(),
-                            }
-                        )
-                        .execute()
-                    )
-                )
-
-            # Update user profile
-            update_data = {
-                **profile_data,
-                "updated_at": datetime.now(UTC).isoformat(),
-            }
-
+            # Update through the user_profile_view - the triggers will handle data separation
             response = await asyncio.to_thread(
                 lambda: (
-                    self.client.table(DatabaseTables.USERS)
-                    .update(update_data)
+                    self.client.table(DatabaseTables.USER_PROFILE_VIEW)
+                    .update(profile_data)
                     .eq("id", user_id)
                     .execute()
                 )
             )
 
             if response.data:
-                logger.info(f"Updated profile for user {user_id}")
+                logger.info(f"Updated profile for user {user_id} via user_profile_view")
                 return response.data[0]
             else:
                 logger.error(f"Failed to update profile for user {user_id}")
@@ -219,29 +184,54 @@ class UserOperations:
                 )
             )
 
+            # Prepare the update data with proper field names
+            update_data = {
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+
+            # Map preference keys to the correct column names
+            if "style_preferences" in preferences:
+                update_data["style_preferences"] = preferences["style_preferences"]
+            if "size_info" in preferences:
+                update_data["size_info"] = preferences["size_info"]
+            if "travel_patterns" in preferences:
+                update_data["travel_patterns"] = preferences["travel_patterns"]
+            if "quick_reply_preferences" in preferences:
+                update_data["quick_reply_preferences"] = preferences["quick_reply_preferences"]
+            if "packing_methods" in preferences:
+                update_data["packing_methods"] = preferences["packing_methods"]
+            if "currency_preferences" in preferences:
+                update_data["currency_preferences"] = preferences["currency_preferences"]
+
             if existing_response.data:
                 # Update existing preferences
                 await asyncio.to_thread(
                     lambda: (
                         self.client.table(DatabaseTables.USER_PREFERENCES)
-                        .update(preferences)
+                        .update(update_data)
                         .eq("user_id", user_id)
                         .execute()
                     )
                 )
             else:
-                # Create new preferences
+                # Create new preferences with default values
+                insert_data = {
+                    "user_id": user_id,
+                    "style_preferences": preferences.get("style_preferences", {}),
+                    "size_info": preferences.get("size_info", {}),
+                    "travel_patterns": preferences.get("travel_patterns", {}),
+                    "quick_reply_preferences": preferences.get(
+                        "quick_reply_preferences", {"enabled": True}
+                    ),
+                    "packing_methods": preferences.get("packing_methods", {}),
+                    "currency_preferences": preferences.get("currency_preferences", {}),
+                    "created_at": datetime.now(UTC).isoformat(),
+                    "updated_at": datetime.now(UTC).isoformat(),
+                }
                 await asyncio.to_thread(
                     lambda: (
                         self.client.table(DatabaseTables.USER_PREFERENCES)
-                        .insert(
-                            {
-                                "user_id": user_id,
-                                "preferences": preferences,
-                                "created_at": datetime.now(UTC).isoformat(),
-                                "updated_at": datetime.now(UTC).isoformat(),
-                            }
-                        )
+                        .insert(insert_data)
                         .execute()
                     )
                 )
