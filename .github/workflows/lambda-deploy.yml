@@ -135,9 +135,6 @@ jobs:
             # If ENV_VARS is provided, wrap it in Variables object
             echo "{\"Variables\": $ENV_VARS}" > env.json
 
-            # Mask sensitive values BEFORE any logging
-            echo "$ENV_VARS" | jq -r 'to_entries[] | "::add-mask::" + .value' >> $GITHUB_ENV
-
             # Safe logging - only show count and variable names, never values
             echo "Environment variables configured (count: $(echo "$ENV_VARS" | jq -r 'keys | length'))"
             echo "Environment variables: $(echo "$ENV_VARS" | jq -r 'keys | .[]' | tr '\n' ', ')"
