@@ -88,7 +88,10 @@ class AuthService:
             self.client = get_supabase_client()
             logger.info("Supabase client initialized successfully")
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Failed to initialize Supabase client: %s", type(e).__name__)
+            logger.error("Failed to initialize Supabase client: %s - %s", type(e).__name__, str(e))
+            # Log more details for debugging
+            if hasattr(e, "__cause__") and e.__cause__:
+                logger.error("Caused by: %s - %s", type(e.__cause__).__name__, str(e.__cause__))
             raise ClientInitializationError(f"Failed to initialize client: {e}") from e
 
     def _check_client(self):
@@ -147,7 +150,12 @@ class AuthService:
                 user=user_profile,
             )
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Login failed for email %s: %s", login_data.email, type(e).__name__)
+            logger.error(
+                "Login failed for email %s: %s - %s", login_data.email, type(e).__name__, str(e)
+            )
+            # Log more details for debugging
+            if hasattr(e, "__cause__") and e.__cause__:
+                logger.error("Caused by: %s - %s", type(e.__cause__).__name__, str(e.__cause__))
             raise AuthenticationError(INVALID_CREDENTIALS_MSG) from e
 
     async def logout(self, refresh_token: str | None = None) -> LogoutResponse:

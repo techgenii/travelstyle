@@ -320,19 +320,34 @@ def test_handler_exception():
             mock_mangum_instance.side_effect = Exception("Test exception")
             mock_mangum.return_value = mock_mangum_instance
 
-            # Call the handler and expect it to raise the exception
+            # Call the handler and expect it to return an error response
             with patch("builtins.print") as mock_print:
-                try:
-                    handler(event, context)
-                    assert False, "Expected exception to be raised"
-                except Exception as e:
-                    assert str(e) == "Test exception"
+                response = handler(event, context)
 
-                    # Verify error logging was called
-                    mock_logger.error.assert_called_once_with(
-                        "Lambda handler error: Test exception"
-                    )
-                    mock_print.assert_called_once_with("Lambda handler error: Test exception")
+                # Verify the response is a proper error response
+                assert response["statusCode"] == 500
+                assert "Internal server error" in response["body"]
+                assert "Test exception" in response["body"]
+                assert response["headers"]["content-type"] == "application/json"
+                assert response["isBase64Encoded"] is False
+
+                # Verify error logging was called in the correct order
+                from unittest.mock import call
+
+                expected_error_calls = [
+                    call("Lambda handler error: Test exception"),
+                    call("Error type: Exception"),
+                    call("Error details: Test exception"),
+                ]
+                assert mock_logger.error.call_args_list == expected_error_calls
+
+                # Verify print statements were called in the correct order
+                expected_print_calls = [
+                    call("Lambda handler error: Test exception"),
+                    call("Error type: Exception"),
+                    call("Error details: Test exception"),
+                ]
+                assert mock_print.call_args_list == expected_print_calls
 
 
 def test_handler_with_post_request():

@@ -75,6 +75,9 @@ jobs:
           echo "::add-mask::$EXCHANGE_API_KEY"
           echo "::add-mask::$SUPABASE_URL"
           echo "::add-mask::$SUPABASE_KEY"
+          echo "::add-mask::$CLOUDINARY_URL"
+          echo "::add-mask::$CLOUDINARY_API_KEY"
+          echo "::add-mask::$CLOUDINARY_API_SECRET"
           echo "✅ Secrets validated and masked"
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -84,6 +87,9 @@ jobs:
           EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
 
       # Run tests with improved configuration (warnings disabled)
       - name: Run tests with clean output
@@ -96,6 +102,9 @@ jobs:
           EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
         run: |
           echo "🚀 Running tests with improved configuration (warnings disabled)"
           make prod-test

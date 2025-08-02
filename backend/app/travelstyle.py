@@ -112,6 +112,12 @@ def handler(event, context):
     logger.info(f"Event queryStringParameters: {event.get('queryStringParameters', 'NO_QUERY')}")
 
     try:
+        # Check if required environment variables are set
+        from app.core.config import settings
+
+        logger.info(f"SUPABASE_URL set: {bool(settings.SUPABASE_URL)}")
+        logger.info(f"SUPABASE_KEY set: {bool(settings.SUPABASE_KEY)}")
+
         # Use Mangum to handle the FastAPI app
         mangum_handler = Mangum(travelstyle_app)
         response = mangum_handler(event, context)
@@ -120,5 +126,20 @@ def handler(event, context):
         return response
     except Exception as e:
         logger.error(f"Lambda handler error: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error details: {e}")
         print(f"Lambda handler error: {str(e)}")
-        raise
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error details: {e}")
+
+        # Return a proper error response instead of raising
+        return {
+            "statusCode": 500,
+            "body": f'{{"detail":"Internal server error: {str(e)}","status_code":500}}',
+            "headers": {
+                "content-type": "application/json",
+                "access-control-allow-origin": "*",
+                "access-control-allow-credentials": "true",
+            },
+            "isBase64Encoded": False,
+        }
