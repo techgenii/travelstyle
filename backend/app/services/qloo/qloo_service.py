@@ -23,7 +23,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
-from app.services.supabase_cache import supabase_cache
+from app.services.supabase import supabase_cache
 
 logger = logging.getLogger(__name__)
 

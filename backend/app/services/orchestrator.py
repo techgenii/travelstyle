@@ -28,8 +28,8 @@ from app.models.responses import ChatResponse, ConversationContext, QuickReply
 from app.services.currency_conversion_service import currency_conversion_service
 from app.services.currency_service import currency_service
 from app.services.openai_service import openai_service
-from app.services.qloo_service import qloo_service
-from app.services.weather_service import weather_service
+from app.services.qloo import qloo_service
+from app.services.weather import weather_service
 
 logger = logging.getLogger(__name__)
 
@@ -74,28 +74,48 @@ class TravelOrchestratorService:
                 # Continue with normal currency processing...
                 result = await currency_conversion_service.handle_currency_request(user_message)
 
-                if result and "rate" in result:
-                    # Format the response message
-                    original = result["original"]
-                    converted = result["converted"]
-                    rate = result["rate"]
+                if result and result.get("success") and "data" in result:
+                    data = result["data"]
+                    request_type = result.get("request_type", "conversion")
 
-                    message = f"{original['amount']:.2f} {original['currency']} = {converted['amount']:.2f} {converted['currency']} (Rate: {rate:.4f})"
+                    if request_type == "rate":
+                        # Handle rate request
+                        base_currency = data.get("base_currency", "USD")
+                        target_currency = data.get("target_currency", "EUR")
+                        rate = data.get("rate", 0.0)
 
-                    quick_replies = [
-                        QuickReply(text="Convert different amount", action="currency_convert"),
-                        QuickReply(text="Other currencies", action="currency_list"),
-                    ]
+                        message = f"Exchange rate: 1 {base_currency} = {rate:.4f} {target_currency}"
 
-                    # Add specific quick reply if amount was provided
-                    if original.get("amount", 0) > 0:
-                        quick_replies.insert(
-                            0, QuickReply(text="Show rate only", action="currency_rate_only")
+                        quick_replies = [
+                            QuickReply(text="Convert different amount", action="currency_convert"),
+                            QuickReply(text="Other currencies", action="currency_list"),
+                        ]
+
+                        return ChatResponse(
+                            message=message, confidence_score=0.9, quick_replies=quick_replies
                         )
+                    elif request_type == "conversion":
+                        # Handle conversion request
+                        original = data.get("original", {})
+                        converted = data.get("converted", {})
+                        rate = data.get("rate", 0.0)
 
-                    return ChatResponse(
-                        message=message, confidence_score=0.9, quick_replies=quick_replies
-                    )
+                        message = f"{original.get('amount', 0):.2f} {original.get('currency', 'USD')} = {converted.get('amount', 0):.2f} {converted.get('currency', 'EUR')} (Rate: {rate:.4f})"
+
+                        quick_replies = [
+                            QuickReply(text="Convert different amount", action="currency_convert"),
+                            QuickReply(text="Other currencies", action="currency_list"),
+                        ]
+
+                        # Add specific quick reply if amount was provided
+                        if original.get("amount", 0) > 0:
+                            quick_replies.insert(
+                                0, QuickReply(text="Show rate only", action="currency_rate_only")
+                            )
+
+                        return ChatResponse(
+                            message=message, confidence_score=0.9, quick_replies=quick_replies
+                        )
                 else:
                     return ChatResponse(
                         message="I couldn't understand the currency conversion request. Please specify the currencies and amount clearly.",

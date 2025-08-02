@@ -15,172 +15,42 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Currency service for handling exchange rates and currency conversions."""
+"""
+Currency service for handling exchange rates and currency conversions.
 
-import logging
-from typing import Any
+This module is maintained for backward compatibility.
+For new code, use the modular structure in app.services.currency.*
+"""
 
-import httpx
+# Import everything from the new modular structure
+from app.services.currency import (
+    CURRENCY_PATTERNS,
+    DEFAULT_BASE_CURRENCY,
+    SUPPORTED_CURRENCIES,
+    CurrencyAPIError,
+    CurrencyConversionError,
+    CurrencyService,
+    CurrencyValidationError,
+    normalize_currency_code,
+    validate_amount,
+    validate_currency_code,
+    validate_currency_request,
+)
 
-from app.core.config import settings
-from app.services.supabase_cache import supabase_cache
+# Re-export for backward compatibility
+__all__ = [
+    "CurrencyService",
+    "SUPPORTED_CURRENCIES",
+    "CURRENCY_PATTERNS",
+    "DEFAULT_BASE_CURRENCY",
+    "CurrencyAPIError",
+    "CurrencyConversionError",
+    "CurrencyValidationError",
+    "validate_currency_code",
+    "validate_amount",
+    "validate_currency_request",
+    "normalize_currency_code",
+]
 
-logger = logging.getLogger(__name__)
-
-
-class CurrencyService:
-    """Service for handling currency exchange rates and conversions."""
-
-    def __init__(self):
-        """Initialize the currency service."""
-        self.base_url = settings.EXCHANGE_BASE_URL
-        self.api_key = settings.EXCHANGE_API_KEY
-        self.timeout = 10.0
-
-    async def get_exchange_rates(self, base_currency: str = "USD") -> dict[str, Any] | None:
-        """Get current exchange rates.
-
-        Args:
-            base_currency: The base currency code (default: USD)
-
-        Returns:
-            Dictionary containing exchange rates or None if error
-        """
-        # Check cache first
-        new_currency = base_currency.strip().upper()
-        cached_data = await supabase_cache.get_currency_cache(new_currency)
-        if cached_data:
-            return cached_data
-
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                # Ensure no double slashes
-                latest_url = f"{self.base_url}{self.api_key}/latest/{new_currency}"
-                response = await client.get(latest_url)
-                response.raise_for_status()
-                try:
-                    data = response.json()
-                except Exception as e:
-                    logger.error("Failed to parse JSON: %s, content: %s", e, response.content)
-                    return None
-
-                logger.debug("Currency exchange rate API response: %s", data)
-                if not isinstance(data, dict):
-                    return None
-
-                rates_data = {
-                    "base_code": data["base_code"],
-                    "conversion_rates": data["conversion_rates"],
-                    "last_updated_unix": data["time_last_update_unix"],
-                    "last_updated_utc": data["time_last_update_utc"],
-                }
-
-                # Cache for 1 hour
-                await supabase_cache.set_currency_cache(new_currency, rates_data, 1)
-                return rates_data
-
-        except httpx.RequestError as e:
-            logger.error("Currency service request error: %s", type(e).__name__)
-            return None
-        except httpx.HTTPError as e:
-            logger.error("Currency service HTTP error: %s", type(e).__name__)
-            return None
-        except ValueError as e:
-            logger.error("Currency service JSON decode error: %s", type(e).__name__)
-            return None
-
-    async def convert_currency(
-        self, amount: float, from_currency: str, to_currency: str
-    ) -> dict[str, Any] | None:
-        """Convert currency amounts using the direct conversion endpoint.
-
-        Args:
-            amount: Amount to convert
-            from_currency: Source currency code
-            to_currency: Target currency code
-
-        Returns:
-            Dictionary containing conversion result or None if error
-        """
-        try:
-            from_currency = from_currency.strip().upper()
-            to_currency = to_currency.strip().upper()
-
-            # Use the direct conversion endpoint with amount
-            conversion_url = (
-                f"{self.base_url}{self.api_key}/pair/{from_currency}/{to_currency}/{amount}"
-            )
-
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(conversion_url)
-                response.raise_for_status()
-                try:
-                    data = response.json()
-                except Exception as e:
-                    logger.error("Failed to parse JSON: %s, content: %s", e, response.content)
-                    return None
-
-                logger.debug("Currency conversion API response: %s", data)
-                if not isinstance(data, dict) or data.get("result") != "success":
-                    logger.error(
-                        "Currency conversion failed: %s", data.get("error-type", "unknown error")
-                    )
-                    return None
-
-                return {
-                    "original": {"amount": amount, "currency": data["base_code"]},
-                    "converted": {
-                        "amount": data["conversion_result"],
-                        "currency": data["target_code"],
-                    },
-                    "rate": data["conversion_rate"],
-                    "last_updated_unix": data["time_last_update_unix"],
-                    "last_updated_utc": data["time_last_update_utc"],
-                }
-        except Exception as e:
-            logger.error("Currency conversion error: %s", type(e).__name__)
-            return None
-
-    async def get_pair_exchange_rate(
-        self, base_currency: str = "USD", target_currency: str = "USD"
-    ) -> dict[str, Any] | None:
-        """Get exchange rate for a currency pair (without conversion).
-
-        Args:
-            base_currency: Source currency code
-            target_currency: Target currency code
-
-        Returns:
-            Dictionary containing exchange rate or None if error
-        """
-        try:
-            base_currency = base_currency.strip().upper()
-            target_currency = target_currency.strip().upper()
-            pair_url = f"{self.base_url}{self.api_key}/pair/{base_currency}/{target_currency}"
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(pair_url)
-                response.raise_for_status()
-                try:
-                    data = response.json()
-                except Exception as e:
-                    logger.error("Failed to parse JSON: %s, content: %s", e, response.content)
-                    return None
-
-                logger.debug("Pair exchange rate API response: %s", data)
-                if not isinstance(data, dict) or data.get("result") != "success":
-                    return None
-
-                return {
-                    "base_code": data["base_code"],
-                    "target_code": data["target_code"],
-                    "rate": data["conversion_rate"],
-                    "last_updated_unix": data["time_last_update_unix"],
-                    "last_updated_utc": data["time_last_update_utc"],
-                }
-        except Exception as e:
-            logger.error("Pair exchange rate error: %s", type(e).__name__)
-            return None
-
-
-# Singleton instance
+# Create a singleton instance for backward compatibility
 currency_service = CurrencyService()

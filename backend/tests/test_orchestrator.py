@@ -27,8 +27,8 @@ from app.services.currency_conversion_service import currency_conversion_service
 from app.services.currency_service import currency_service
 from app.services.openai_service import openai_service
 from app.services.orchestrator import TravelOrchestratorService, orchestrator_service
-from app.services.qloo_service import qloo_service
-from app.services.weather_service import weather_service
+from app.services.qloo import qloo_service
+from app.services.weather import weather_service
 
 
 @pytest.mark.asyncio
@@ -444,11 +444,21 @@ async def test_generate_travel_recommendations_currency_request_with_amount():
         patch.object(currency_conversion_service, "is_currency_request", return_value=True),
         patch.object(
             currency_conversion_service,
+            "handle_currency_help_request",
+            return_value=None,
+        ),
+        patch.object(
+            currency_conversion_service,
             "handle_currency_request",
             return_value={
-                "original": {"amount": 100.0, "currency": "USD"},
-                "converted": {"amount": 85.0, "currency": "EUR"},
-                "rate": 0.85,
+                "success": True,
+                "request_type": "conversion",
+                "data": {
+                    "original": {"amount": 100.0, "currency": "USD"},
+                    "converted": {"amount": 85.0, "currency": "EUR"},
+                    "rate": 0.85,
+                    "last_updated_utc": "2024-01-01T12:00:00Z",
+                },
             },
         ),
     ):
@@ -482,11 +492,21 @@ async def test_generate_travel_recommendations_currency_request_without_amount()
         patch.object(currency_conversion_service, "is_currency_request", return_value=True),
         patch.object(
             currency_conversion_service,
+            "handle_currency_help_request",
+            return_value=None,
+        ),
+        patch.object(
+            currency_conversion_service,
             "handle_currency_request",
             return_value={
-                "original": {"amount": 0.0, "currency": "USD"},
-                "converted": {"amount": 0.0, "currency": "EUR"},
-                "rate": 0.85,
+                "success": True,
+                "request_type": "rate",
+                "data": {
+                    "base_currency": "USD",
+                    "target_currency": "EUR",
+                    "rate": 0.85,
+                    "last_updated": "2024-01-01T12:00:00Z",
+                },
             },
         ),
     ):
@@ -503,7 +523,7 @@ async def test_generate_travel_recommendations_currency_request_without_amount()
         )
 
         assert result.confidence_score == 0.9
-        assert "0.00 USD = 0.00 EUR" in result.message
+        assert "Exchange rate: 1 USD = 0.8500 EUR" in result.message
         assert len(result.quick_replies) == 2
 
         # Check that the "Show rate only" quick reply was NOT added (amount = 0)
@@ -518,6 +538,11 @@ async def test_generate_travel_recommendations_currency_request_non_rate_type():
     """Test generate_travel_recommendations when it's a currency request but not rate type."""
     with (
         patch.object(currency_conversion_service, "is_currency_request", return_value=True),
+        patch.object(
+            currency_conversion_service,
+            "handle_currency_help_request",
+            return_value=None,
+        ),
         patch.object(
             currency_conversion_service,
             "handle_currency_request",

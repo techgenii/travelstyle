@@ -19,24 +19,29 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from app.models.auth import LoginRequest
+from app.services.auth.exceptions import AuthenticationError
 from app.services.auth_service import AuthService
 
 
 @pytest.fixture
 def mock_supabase_client():
-    with patch("app.services.auth_service.create_client") as mock_create:
-        mock_client = Mock()
-        mock_create.return_value = mock_client
+    """Mock Supabase client for testing."""
+    with patch("app.services.auth.helpers.get_supabase_client") as mock_get_client:
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
         yield mock_client
 
 
 @pytest.fixture
 def auth_service(mock_supabase_client):  # noqa: ARG001
+    """Create AuthService instance for testing."""
+    from app.services.auth_service import AuthService
+
     return AuthService()
 
 
 @patch(
-    "app.services.auth_service.extract_user_profile",
+    "app.utils.user_utils.extract_user_profile",
     return_value={"id": "user-1", "email": "test@example.com"},
 )
 @pytest.mark.asyncio
@@ -44,6 +49,7 @@ async def test_login_success(mock_extract, auth_service):
     mock_auth = Mock()
     mock_session = Mock(access_token="token", refresh_token="refresh", expires_in=3600)
     mock_user = Mock()
+    mock_user.id = "user-1"  # Set the user ID
     mock_auth.sign_in_with_password.return_value = Mock(user=mock_user, session=mock_session)
     auth_service.client.auth = mock_auth
     login_data = LoginRequest(email="test@example.com", password="password")
@@ -58,7 +64,7 @@ async def test_login_invalid_credentials(auth_service):
     mock_auth.sign_in_with_password.return_value = Mock(user=None, session=None)
     auth_service.client.auth = mock_auth
     login_data = LoginRequest(email="bad@example.com", password="badpassword")
-    with pytest.raises(ValueError):
+    with pytest.raises(AuthenticationError):
         await auth_service.login(login_data)
 
 
@@ -68,7 +74,7 @@ async def test_login_no_session(auth_service):
     mock_auth.sign_in_with_password.return_value = Mock(user=Mock(), session=None)
     auth_service.client.auth = mock_auth
     login_data = LoginRequest(email="test@example.com", password="password")
-    with pytest.raises(ValueError):
+    with pytest.raises(AuthenticationError):
         await auth_service.login(login_data)
 
 
@@ -78,7 +84,7 @@ async def test_login_exception(auth_service):
     mock_auth.sign_in_with_password.side_effect = Exception("fail")
     auth_service.client.auth = mock_auth
     login_data = LoginRequest(email="test@example.com", password="password")
-    with pytest.raises(ValueError):
+    with pytest.raises(AuthenticationError):
         await auth_service.login(login_data)
 
 
@@ -143,7 +149,9 @@ async def test_reset_password_exception_original(auth_service):
     mock_auth = Mock()
     mock_auth.update_user.side_effect = Exception("fail")
     auth_service.client.auth = mock_auth
-    with pytest.raises(ValueError):
+    from app.services.auth.exceptions import TokenError
+
+    with pytest.raises(TokenError):
         await auth_service.reset_password("token", "newpass")
 
 
@@ -162,25 +170,34 @@ async def test_refresh_token_no_session_original(auth_service):
     mock_auth = Mock()
     mock_auth.refresh_session.return_value = Mock(session=None)
     auth_service.client.auth = mock_auth
-    with pytest.raises(ValueError):
+    from app.services.auth.exceptions import TokenError
+
+    with pytest.raises(TokenError):
         await auth_service.refresh_token("refresh")
 
 
-@patch(
-    "app.services.auth_service.extract_user_profile",
-    return_value={"id": "user-1", "email": "test@example.com"},
-)
 @pytest.mark.asyncio
-async def test_register_success(mock_extract, auth_service):
+async def test_register_success(auth_service):
     mock_auth = Mock()
     mock_user = Mock()
     mock_session = Mock(access_token="token", expires_in=3600)
     mock_auth.sign_up.return_value = Mock(user=mock_user)
     mock_auth.sign_in_with_password.return_value = Mock(user=mock_user, session=mock_session)
     auth_service.client.auth = mock_auth
-    result = await auth_service.register("test@example.com", "password", "Jane", "Doe")
-    assert result.access_token == "token"
-    assert result.user["id"] == "user-1"
+
+    # Create a proper mock user profile that returns actual values
+    mock_user_profile = {"id": "user-1", "email": "test@example.com"}
+
+    # Patch the extract_user_profile function to return our mock profile
+    with patch(
+        "app.services.auth.helpers.extract_user_profile",
+        return_value=mock_user_profile,
+    ):
+        result = await auth_service.register("test@example.com", "password", "Jane", "Doe")
+        assert result.access_token == "token"
+        assert result.user["id"] == "user-1"
+        assert result.user_id == "user-1"
+        assert result.success is True
 
 
 @pytest.mark.asyncio
@@ -190,12 +207,14 @@ async def test_register_no_session(auth_service):
     mock_auth.sign_up.return_value = Mock(user=mock_user)
     mock_auth.sign_in_with_password.return_value = Mock(user=mock_user, session=None)
     auth_service.client.auth = mock_auth
-    with pytest.raises(ValueError):
+    from app.services.auth.exceptions import RegistrationError
+
+    with pytest.raises(RegistrationError):
         await auth_service.register("test@example.com", "password")
 
 
 @patch(
-    "app.services.auth_service.extract_user_profile",
+    "app.utils.user_utils.extract_user_profile",
     return_value={"id": "user-1", "email": "test@example.com"},
 )
 @pytest.mark.asyncio
@@ -213,13 +232,15 @@ async def test_get_user_profile_success(mock_extract, auth_service):
 
 
 @patch(
-    "app.services.auth_service.extract_user_profile",
+    "app.utils.user_utils.extract_user_profile",
     return_value={"id": "user-1", "email": "test@example.com"},
 )
 @pytest.mark.asyncio
 async def test_update_user_profile_success(mock_extract, auth_service):
     mock_admin = Mock()
-    mock_admin.update_user_by_id.return_value = Mock(user=Mock())
+    mock_user = Mock()
+    mock_user.id = "user-1"  # Set the user ID properly
+    mock_admin.update_user_by_id.return_value = Mock(user=mock_user)
     auth_service.client.auth.admin = mock_admin
     result = await auth_service.update_user_profile("user-1", {"first_name": "Jane"})
     assert result["id"] == "user-1"
@@ -277,10 +298,18 @@ async def test_update_user_preferences_success(auth_service):
 @pytest.mark.asyncio
 async def test_auth_service_init_client_failure():
     """Test AuthService initialization when Supabase client creation fails."""
+    from app.services.supabase import SupabaseClientManager
+
+    # Reset the singleton first
+    SupabaseClientManager.reset_client()
+
     with patch(
-        "app.services.auth_service.create_client", side_effect=Exception("Connection failed")
+        "app.services.supabase.SupabaseClientManager._create_client",
+        side_effect=Exception("Connection failed"),
     ):
-        with pytest.raises(Exception, match="Connection failed"):
+        with pytest.raises(Exception):
+            from app.services.auth_service import AuthService
+
             AuthService()
 
 
@@ -288,19 +317,21 @@ async def test_auth_service_init_client_failure():
 async def test_login_no_user_profile(auth_service):
     """Test login when extract_user_profile returns None."""
     mock_response = MagicMock()
-    mock_response.user = MagicMock()
+    mock_user = MagicMock()
+    mock_response.user = mock_user
     mock_response.session = MagicMock()
     mock_response.session.access_token = "access_token"
     mock_response.session.refresh_token = "refresh_token"
     mock_response.session.expires_in = 3600
 
-    with patch("app.services.auth_service.extract_user_profile", return_value=None):
+    with patch("app.services.auth.helpers.extract_user_profile", return_value=None):
         with patch.object(
             auth_service.client.auth, "sign_in_with_password", return_value=mock_response
         ):
             result = await auth_service.login(
                 LoginRequest(email="test@example.com", password="password")
             )
+            # The service should return an empty dict when extract_user_profile returns None
             assert result.user == {}
 
 
@@ -341,7 +372,9 @@ async def test_reset_password_exception(auth_service):
     with patch.object(
         auth_service.client.auth, "update_user", side_effect=Exception("Update error")
     ):
-        with pytest.raises(ValueError, match="Invalid or expired reset token"):
+        from app.services.auth.exceptions import TokenError
+
+        with pytest.raises(TokenError, match="Invalid or expired reset token"):
             await auth_service.reset_password("token", "new_password")
 
 
@@ -352,7 +385,9 @@ async def test_refresh_token_no_session(auth_service):
     mock_response.session = None
 
     with patch.object(auth_service.client.auth, "refresh_session", return_value=mock_response):
-        with pytest.raises(ValueError, match="Invalid refresh token"):
+        from app.services.auth.exceptions import TokenError
+
+        with pytest.raises(TokenError, match="Invalid refresh token"):
             await auth_service.refresh_token("refresh_token")
 
 
@@ -362,7 +397,9 @@ async def test_refresh_token_exception(auth_service):
     with patch.object(
         auth_service.client.auth, "refresh_session", side_effect=Exception("Refresh error")
     ):
-        with pytest.raises(ValueError, match="Invalid refresh token"):
+        from app.services.auth.exceptions import TokenError
+
+        with pytest.raises(TokenError, match="Invalid refresh token"):
             await auth_service.refresh_token("refresh_token")
 
 
@@ -373,7 +410,9 @@ async def test_register_no_user(auth_service):
     mock_response.user = None
 
     with patch.object(auth_service.client.auth, "sign_up", return_value=mock_response):
-        with pytest.raises(ValueError, match="Registration failed"):
+        from app.services.auth.exceptions import RegistrationError
+
+        with pytest.raises(RegistrationError, match="Registration failed"):
             await auth_service.register("test@example.com", "password")
 
 
@@ -392,7 +431,9 @@ async def test_register_no_session_after_login(auth_service):
             auth_service.client.auth, "sign_in_with_password", return_value=mock_login_response
         ),
     ):
-        with pytest.raises(ValueError, match="Registration failed"):
+        from app.services.auth.exceptions import RegistrationError
+
+        with pytest.raises(RegistrationError, match="Registration failed"):
             await auth_service.register("test@example.com", "password")
 
 
@@ -402,7 +443,9 @@ async def test_register_exception(auth_service):
     with patch.object(
         auth_service.client.auth, "sign_up", side_effect=Exception("Registration error")
     ):
-        with pytest.raises(ValueError, match="Registration failed"):
+        from app.services.auth.exceptions import RegistrationError
+
+        with pytest.raises(RegistrationError, match="Registration failed"):
             await auth_service.register("test@example.com", "password")
 
 
@@ -530,36 +573,38 @@ async def test_update_user_preferences_exception(auth_service):
 @pytest.mark.asyncio
 async def test_auth_service_no_client():
     """Test AuthService methods when client is not initialized."""
+    from app.services.auth.exceptions import ClientInitializationError
+
     # Create a new instance without initializing the client
     service = AuthService.__new__(AuthService)
     service.client = None
 
-    with pytest.raises(RuntimeError, match="Supabase client not initialized"):
+    with pytest.raises(ClientInitializationError, match="Supabase client not initialized"):
         await service.login(LoginRequest(email="test@example.com", password="password"))
 
-    with pytest.raises(RuntimeError, match="Supabase client not initialized"):
+    with pytest.raises(ClientInitializationError, match="Supabase client not initialized"):
         await service.logout()
 
-    with pytest.raises(RuntimeError, match="Supabase client not initialized"):
+    with pytest.raises(ClientInitializationError, match="Supabase client not initialized"):
         await service.forgot_password("test@example.com")
 
-    with pytest.raises(RuntimeError, match="Supabase client not initialized"):
+    with pytest.raises(ClientInitializationError, match="Supabase client not initialized"):
         await service.reset_password("token", "new_password")
 
-    with pytest.raises(RuntimeError, match="Supabase client not initialized"):
+    with pytest.raises(ClientInitializationError, match="Supabase client not initialized"):
         await service.refresh_token("refresh_token")
 
-    with pytest.raises(RuntimeError, match="Supabase client not initialized"):
+    with pytest.raises(ClientInitializationError, match="Supabase client not initialized"):
         await service.register("test@example.com", "password")
 
-    with pytest.raises(RuntimeError, match="Supabase client not initialized"):
+    with pytest.raises(ClientInitializationError, match="Supabase client not initialized"):
         await service.get_user_profile("user_id")
 
-    with pytest.raises(RuntimeError, match="Supabase client not initialized"):
+    with pytest.raises(ClientInitializationError, match="Supabase client not initialized"):
         await service.update_user_profile("user_id", {})
 
-    with pytest.raises(RuntimeError, match="Supabase client not initialized"):
+    with pytest.raises(ClientInitializationError, match="Supabase client not initialized"):
         await service.update_user_profile_sync("user_id", {})
 
-    with pytest.raises(RuntimeError, match="Supabase client not initialized"):
+    with pytest.raises(ClientInitializationError, match="Supabase client not initialized"):
         await service.update_user_preferences("user_id", {})

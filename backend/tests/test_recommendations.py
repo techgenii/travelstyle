@@ -20,7 +20,7 @@
 from unittest.mock import patch
 
 import pytest
-from app.services.qloo_service import QlooService
+from app.services.qloo import QlooService
 from fastapi import status
 
 
@@ -44,7 +44,9 @@ class TestRecommendationsEndpoints:
 
     def test_cultural_insights_success(self, authenticated_client):
         """Test successful cultural insights retrieval."""
-        with patch("app.services.qloo_service.qloo_service.get_cultural_insights") as mock_insights:
+        with patch(
+            "app.services.qloo.qloo_service.qloo_service.get_cultural_insights"
+        ) as mock_insights:
             mock_insights.return_value = {
                 "destination": "Paris",
                 "cultural_insights": {
@@ -69,7 +71,9 @@ class TestRecommendationsEndpoints:
 
     def test_cultural_insights_not_found(self, authenticated_client):
         """Test cultural insights when not available."""
-        with patch("app.services.qloo_service.qloo_service.get_cultural_insights") as mock_insights:
+        with patch(
+            "app.services.qloo.qloo_service.qloo_service.get_cultural_insights"
+        ) as mock_insights:
             mock_insights.return_value = None
             response = authenticated_client.get("/api/v1/recs/cultural/InvalidCity")
             assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -77,7 +81,9 @@ class TestRecommendationsEndpoints:
 
     def test_cultural_insights_service_exception(self, authenticated_client):
         """Test cultural insights when service raises exception (500)."""
-        with patch("app.services.qloo_service.qloo_service.get_cultural_insights") as mock_insights:
+        with patch(
+            "app.services.qloo.qloo_service.qloo_service.get_cultural_insights"
+        ) as mock_insights:
             mock_insights.side_effect = Exception("Service error")
             response = authenticated_client.get("/api/v1/recs/cultural/Paris")
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -85,7 +91,9 @@ class TestRecommendationsEndpoints:
 
     def test_weather_forecast_success(self, authenticated_client):
         """Test successful weather forecast retrieval."""
-        with patch("app.services.weather_service.weather_service.get_weather_data") as mock_weather:
+        with patch(
+            "app.services.weather.weather_service.weather_service.get_weather_data"
+        ) as mock_weather:
             mock_weather.return_value = {
                 "destination": "Paris",
                 "current_weather": {
@@ -109,7 +117,9 @@ class TestRecommendationsEndpoints:
 
     def test_weather_forecast_not_found(self, authenticated_client):
         """Test weather forecast when not available."""
-        with patch("app.services.weather_service.weather_service.get_weather_data") as mock_weather:
+        with patch(
+            "app.services.weather.weather_service.weather_service.get_weather_data"
+        ) as mock_weather:
             mock_weather.return_value = None
             response = authenticated_client.post(
                 "/api/v1/recs/weather",
@@ -120,7 +130,9 @@ class TestRecommendationsEndpoints:
 
     def test_weather_forecast_service_exception(self, authenticated_client):
         """Test weather forecast when service raises exception (500)."""
-        with patch("app.services.weather_service.weather_service.get_weather_data") as mock_weather:
+        with patch(
+            "app.services.weather.weather_service.weather_service.get_weather_data"
+        ) as mock_weather:
             mock_weather.side_effect = Exception("Service error")
             response = authenticated_client.post(
                 "/api/v1/recs/weather",
@@ -146,7 +158,9 @@ class TestRecommendationsEndpoints:
 async def test_get_cultural_insights_success():
     """Test successful cultural insights retrieval from service."""
     service = QlooService()
-    with patch("app.services.supabase_cache.supabase_cache.get_cultural_cache") as mock_cache:
+    with patch(
+        "app.services.supabase.supabase_cache.supabase_cache.get_cultural_cache"
+    ) as mock_cache:
         mock_cache.return_value = None
         with patch("httpx.AsyncClient.get") as mock_get:
             mock_response = MockAsyncResponse(
@@ -184,7 +198,9 @@ async def test_get_cultural_insights_cache():
         "local_context": {"formality_level": "moderate"},
         "data_source": "qloo",
     }
-    with patch("app.services.supabase_cache.supabase_cache.get_cultural_cache") as mock_cache:
+    with patch(
+        "app.services.supabase.supabase_cache.supabase_cache.get_cultural_cache"
+    ) as mock_cache:
         mock_cache.return_value = cached_data
         result = await service.get_cultural_insights("Paris", "leisure")
         assert result == cached_data
@@ -194,7 +210,9 @@ async def test_get_cultural_insights_cache():
 async def test_get_cultural_insights_error():
     """Test cultural insights retrieval error handling."""
     service = QlooService()
-    with patch("app.services.supabase_cache.supabase_cache.get_cultural_cache") as mock_cache:
+    with patch(
+        "app.services.supabase.supabase_cache.supabase_cache.get_cultural_cache"
+    ) as mock_cache:
         mock_cache.return_value = None
         with patch("httpx.AsyncClient.get") as mock_get:
             mock_get.side_effect = Exception("API error")

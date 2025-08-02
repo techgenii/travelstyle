@@ -40,6 +40,7 @@ from app.models.auth import (
     ResetPasswordRequest,
     ResetPasswordResponse,
 )
+from app.services.auth.exceptions import AuthenticationError, RegistrationError, TokenError
 from app.services.auth_service import auth_service
 
 logger = logging.getLogger(__name__)
@@ -62,10 +63,10 @@ async def login(login_data: LoginRequest):
     try:
         response = await auth_service.login(login_data)
         return response
-    except ValueError as e:
+    except AuthenticationError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},
         ) from e
     except Exception as e:  # pylint: disable=broad-except
@@ -124,10 +125,8 @@ async def reset_password(reset_data: ResetPasswordRequest):
         response = await auth_service.reset_password(reset_data.token, reset_data.new_password)
         logger.info("Password reset successful")
         return response
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token"
-        ) from e
+    except TokenError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:  # pylint: disable=broad-except
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
@@ -145,10 +144,10 @@ async def refresh_token(refresh_data: RefreshTokenRequest):
         response = await auth_service.refresh_token(refresh_data.refresh_token)
         logger.info("Token refreshed successfully")
         return response
-    except ValueError as e:
+    except TokenError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
+            detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},  # pylint: disable=line-too-long
         ) from e
     except Exception as e:  # pylint: disable=broad-except
@@ -172,7 +171,7 @@ async def register(register_data: RegisterRequest):
             last_name=register_data.last_name,
         )
         return response
-    except ValueError as e:
+    except RegistrationError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),

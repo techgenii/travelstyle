@@ -15,11 +15,218 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Tests for authentication API endpoints."""
+"""Tests for authentication API endpoints and validators."""
 
 from unittest.mock import patch
 
+import pytest
+from app.services.auth.validators import (
+    validate_auth_request,
+    validate_email,
+    validate_password,
+    validate_registration_data,
+    validate_token,
+    validate_user_id,
+    validate_user_metadata,
+)
 from fastapi import status
+
+
+class TestAuthValidators:
+    """Test authentication validators."""
+
+    def test_validate_email_valid(self):
+        """Test validate_email with valid email addresses."""
+        valid_emails = [
+            "test@example.com",
+            "user.name@domain.co.uk",
+            "user+tag@example.org",
+            "123@numbers.com",
+            "test.email@subdomain.example.com",
+        ]
+
+        for email in valid_emails:
+            assert validate_email(email) is True
+
+    def test_validate_email_invalid(self):
+        """Test validate_email with invalid email addresses."""
+        invalid_emails = [
+            "",  # Empty string
+            None,  # None value
+            123,  # Non-string
+            "invalid-email",  # Missing @
+            "@example.com",  # Missing local part
+            "test@",  # Missing domain
+            "test@.com",  # Missing domain name
+            "test@example",  # Missing TLD
+        ]
+
+        for email in invalid_emails:
+            assert validate_email(email) is False
+
+    def test_validate_password_valid(self):
+        """Test validate_password with valid passwords."""
+        valid_passwords = [
+            "password123",
+            "123456",  # Minimum length
+            "verylongpasswordwithspecialchars!@#",
+            "a" * 100,  # Very long password
+        ]
+
+        for password in valid_passwords:
+            assert validate_password(password) is True
+
+    def test_validate_password_invalid(self):
+        """Test validate_password with invalid passwords."""
+        invalid_passwords = [
+            "",  # Empty string
+            None,  # None value
+            123,  # Non-string
+            "12345",  # Too short (less than 6 characters)
+            "abc",  # Too short
+            "",  # Empty string
+        ]
+
+        for password in invalid_passwords:
+            assert validate_password(password) is False
+
+    def test_validate_user_id_valid(self):
+        """Test validate_user_id with valid user IDs."""
+        valid_user_ids = [
+            "12345678-1234-1234-1234-123456789012",
+            "abcdef12-3456-7890-abcd-ef1234567890",
+            "00000000-0000-0000-0000-000000000000",
+            "ffffffff-ffff-ffff-ffff-ffffffffffff",
+        ]
+
+        for user_id in valid_user_ids:
+            assert validate_user_id(user_id) is True
+
+    def test_validate_user_id_invalid(self):
+        """Test validate_user_id with invalid user IDs."""
+        invalid_user_ids = [
+            "",  # Empty string
+            None,  # None value
+            123,  # Non-string
+            "invalid-uuid",  # Invalid format
+            "12345678-1234-1234-1234-12345678901",  # Too short
+            "12345678-1234-1234-1234-1234567890123",  # Too long
+            "12345678-1234-1234-1234-12345678901g",  # Invalid character
+            "12345678-1234-1234-1234-12345678901G",  # Invalid character
+            "12345678-1234-1234-1234-12345678901-",  # Invalid character
+        ]
+
+        for user_id in invalid_user_ids:
+            assert validate_user_id(user_id) is False
+
+    def test_validate_token_valid(self):
+        """Test validate_token with valid tokens."""
+        valid_tokens = [
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+            "very_long_token_with_more_than_ten_characters",
+            "a" * 20,  # 20 character token
+            "token123456789",  # 13 character token
+        ]
+
+        for token in valid_tokens:
+            assert validate_token(token) is True
+
+    def test_validate_token_invalid(self):
+        """Test validate_token with invalid tokens."""
+        invalid_tokens = [
+            "",  # Empty string
+            None,  # None value
+            123,  # Non-string
+            "short",  # Too short (less than 10 characters)
+            "123456789",  # Exactly 9 characters (less than 10)
+            "",  # Empty string
+        ]
+
+        for token in invalid_tokens:
+            assert validate_token(token) is False
+
+    def test_validate_user_metadata_valid(self):
+        """Test validate_user_metadata with valid metadata."""
+        valid_metadata = [
+            {},  # Empty dict
+            {"name": "John Doe"},
+            {"age": 25, "email": "test@example.com"},
+            {"score": 95.5, "active": True, "name": "Alice"},
+        ]
+
+        for metadata in valid_metadata:
+            assert validate_user_metadata(metadata) is True
+
+    def test_validate_user_metadata_invalid(self):
+        """Test validate_user_metadata with invalid metadata."""
+        invalid_metadata = [
+            None,  # None value
+            "not_a_dict",  # String instead of dict
+            123,  # Number instead of dict
+            [],  # List instead of dict
+            {123: "value"},  # Non-string key
+            {"key": [1, 2, 3]},  # List value (not allowed)
+            {"key": {"nested": "dict"}},  # Dict value (not allowed)
+            {"key": lambda x: x},  # Function value (not allowed)
+        ]
+
+        for metadata in invalid_metadata:
+            assert validate_user_metadata(metadata) is False
+
+    def test_validate_auth_request_valid(self):
+        """Test validate_auth_request with valid data."""
+        # Should not raise any exception
+        validate_auth_request("test@example.com", "password123")
+
+    def test_validate_auth_request_invalid_email(self):
+        """Test validate_auth_request with invalid email."""
+        from app.services.auth.exceptions import AuthenticationError
+
+        with pytest.raises(AuthenticationError, match="Invalid email format"):
+            validate_auth_request("invalid-email", "password123")
+
+    def test_validate_auth_request_invalid_password(self):
+        """Test validate_auth_request with invalid password."""
+        from app.services.auth.exceptions import AuthenticationError
+
+        with pytest.raises(AuthenticationError, match="Invalid password format"):
+            validate_auth_request("test@example.com", "123")
+
+    def test_validate_registration_data_valid(self):
+        """Test validate_registration_data with valid data."""
+        # Should not raise any exception
+        validate_registration_data("test@example.com", "password123")
+        validate_registration_data("test@example.com", "password123", "John", "Doe")
+        validate_registration_data("test@example.com", "password123", first_name="John")
+        validate_registration_data("test@example.com", "password123", last_name="Doe")
+
+    def test_validate_registration_data_invalid_email(self):
+        """Test validate_registration_data with invalid email."""
+        from app.services.auth.exceptions import AuthenticationError
+
+        with pytest.raises(AuthenticationError, match="Invalid email format"):
+            validate_registration_data("invalid-email", "password123")
+
+    def test_validate_registration_data_invalid_password(self):
+        """Test validate_registration_data with invalid password."""
+        from app.services.auth.exceptions import AuthenticationError
+
+        with pytest.raises(AuthenticationError, match="Invalid password format"):
+            validate_registration_data("test@example.com", "123")
+
+    def test_validate_registration_data_invalid_first_name(self):
+        """Test validate_registration_data with invalid first name."""
+        from app.services.auth.exceptions import AuthenticationError
+
+        with pytest.raises(AuthenticationError, match="Invalid first name format"):
+            validate_registration_data("test@example.com", "password123", first_name=123)
+
+    def test_validate_registration_data_invalid_last_name(self):
+        """Test validate_registration_data with invalid last name."""
+        from app.services.auth.exceptions import AuthenticationError
+
+        with pytest.raises(AuthenticationError, match="Invalid last name format"):
+            validate_registration_data("test@example.com", "password123", last_name=456)
 
 
 class TestAuthEndpoints:
@@ -48,7 +255,9 @@ class TestAuthEndpoints:
     def test_login_invalid_credentials(self, authenticated_client):
         """Test login with invalid credentials."""
         with patch("app.services.auth_service.auth_service.login") as mock_login:
-            mock_login.side_effect = ValueError("Invalid credentials")
+            from app.services.auth.exceptions import AuthenticationError
+
+            mock_login.side_effect = AuthenticationError("Invalid email or password")
             response = authenticated_client.post(
                 "/api/v1/auth/login",
                 json={"email": "test@example.com", "password": "wrongpassword"},
@@ -123,7 +332,9 @@ class TestAuthEndpoints:
     def test_register_invalid_data(self, authenticated_client):
         """Test registration with invalid data."""
         with patch("app.services.auth_service.auth_service.register") as mock_register:
-            mock_register.side_effect = ValueError("Email already exists")
+            from app.services.auth.exceptions import RegistrationError
+
+            mock_register.side_effect = RegistrationError("Email already exists")
             response = authenticated_client.post(
                 "/api/v1/auth/register",
                 json={
@@ -197,7 +408,9 @@ class TestAuthEndpoints:
     def test_reset_password_invalid_token(self, authenticated_client):
         """Test password reset with invalid token."""
         with patch("app.services.auth_service.auth_service.reset_password") as mock_reset:
-            mock_reset.side_effect = ValueError("Invalid or expired token")
+            from app.services.auth.exceptions import TokenError
+
+            mock_reset.side_effect = TokenError("Invalid or expired reset token")
             response = authenticated_client.post(
                 "/api/v1/auth/reset-password",
                 json={"token": "invalid_token", "new_password": "newpassword123"},
@@ -237,7 +450,9 @@ class TestAuthEndpoints:
     def test_refresh_token_invalid_token(self, authenticated_client):
         """Test token refresh with invalid refresh token."""
         with patch("app.services.auth_service.auth_service.refresh_token") as mock_refresh:
-            mock_refresh.side_effect = ValueError("Invalid refresh token")
+            from app.services.auth.exceptions import TokenError
+
+            mock_refresh.side_effect = TokenError("Invalid refresh token")
             response = authenticated_client.post(
                 "/api/v1/auth/refresh",
                 json={"refresh_token": "invalid_refresh_token"},
@@ -257,24 +472,34 @@ class TestAuthEndpoints:
 
     def test_auth_no_auth(self, client):
         """Test auth endpoints without authentication."""
-        # Test login (should work without auth)
-        response = client.post(
-            "/api/v1/auth/login",
-            json={"email": "test@example.com", "password": "password123"},
-        )
-        assert response.status_code in [401, 403, 500]  # Various possible responses
+        # Test login (should work without auth, but fail with invalid credentials)
+        with patch("app.services.auth_service.auth_service.login") as mock_login:
+            from app.services.auth.exceptions import AuthenticationError
 
-        # Test register (should work without auth)
-        response = client.post(
-            "/api/v1/auth/register",
-            json={
-                "email": "test@example.com",
-                "password": "password123",
-                "first_name": "John",
-                "last_name": "Doe",
-            },
-        )
-        assert response.status_code in [400, 401, 403, 500]  # Various possible responses
+            mock_login.side_effect = AuthenticationError("Invalid email or password")
+            response = client.post(
+                "/api/v1/auth/login",
+                json={"email": "nonexistent@example.com", "password": "wrongpassword"},
+            )
+            # Login should fail with invalid credentials, not because of missing auth
+            assert response.status_code in [401, 400]  # Invalid credentials or validation error
+
+        # Test register (should work without auth, but fail with existing user)
+        with patch("app.services.auth_service.auth_service.register") as mock_register:
+            from app.services.auth.exceptions import RegistrationError
+
+            mock_register.side_effect = RegistrationError("Email already exists")
+            response = client.post(
+                "/api/v1/auth/register",
+                json={
+                    "email": "test@example.com",  # This user likely exists
+                    "password": "password123",
+                    "first_name": "John",
+                    "last_name": "Doe",
+                },
+            )
+            # Register should fail if user exists, not because of missing auth
+            assert response.status_code in [400, 409]  # Validation error or user already exists
 
         # Test logout (requires auth)
         response = client.post(
@@ -283,9 +508,13 @@ class TestAuthEndpoints:
         )
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-        # Test refresh (should work without auth)
-        response = client.post(
-            "/api/v1/auth/refresh",
-            json={"refresh_token": "valid_refresh_token"},
-        )
-        assert response.status_code in [401, 403, 500]  # Various possible responses
+        # Test refresh (should work without auth, but fail with invalid token)
+        with patch("app.services.auth_service.auth_service.refresh_token") as mock_refresh:
+            from app.services.auth.exceptions import TokenError
+
+            mock_refresh.side_effect = TokenError("Invalid refresh token")
+            response = client.post(
+                "/api/v1/auth/refresh",
+                json={"refresh_token": "invalid_refresh_token"},
+            )
+            assert response.status_code in [401, 400]  # Invalid refresh token

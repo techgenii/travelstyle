@@ -26,8 +26,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import get_current_user
 from app.models.travel import WeatherRequest
-from app.services.qloo_service import qloo_service
-from app.services.weather_service import weather_service
+from app.services.qloo import qloo_service
+from app.services.weather import weather_service
 from app.utils.rate_limiter import rate_limit
 
 router = APIRouter()

@@ -1,0 +1,347 @@
+# This file is part of TravelSytle AI.
+#
+# Copyright (C) 2025  Trailyn Ventures, LLC
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+"""
+User-related database operations for TravelStyle AI application.
+"""
+
+import asyncio
+import logging
+from datetime import UTC, datetime
+
+from app.services.database.constants import DatabaseTables
+from app.services.database.validators import (
+    validate_profile_data,
+    validate_user_id,
+)
+from app.services.rate_limiter import db_rate_limiter
+
+logger = logging.getLogger(__name__)
+
+
+class UserOperations:
+    """Handles user-related database operations."""
+
+    def __init__(self, client):
+        self.client = client
+
+    async def get_user_profile(self, user_id: str) -> dict:
+        """Retrieve user profile from user_profile_view."""
+        if not validate_user_id(user_id):
+            logger.error(f"Invalid user_id format: {user_id}")
+            return {}
+
+        if not await db_rate_limiter.acquire("read"):
+            logger.warning("Rate limited: get_user_profile")
+            return {}
+
+        try:
+            response = await asyncio.to_thread(
+                lambda: (
+                    self.client.table(DatabaseTables.USER_PROFILE_VIEW)
+                    .select("*")
+                    .eq("user_id", user_id)
+                    .execute()
+                )
+            )
+
+            return response.data[0] if response.data else {}
+
+        except Exception as e:
+            logger.error(f"Error retrieving user profile: {e}")
+            return {}
+
+    async def save_user_profile(self, user_id: str, profile_data: dict) -> dict | None:
+        """Save user profile data."""
+        if not validate_user_id(user_id):
+            logger.error(f"Invalid user_id format: {user_id}")
+            return None
+
+        if not validate_profile_data(profile_data):
+            logger.error("Invalid profile data format")
+            return None
+
+        if not await db_rate_limiter.acquire("write"):
+            logger.warning("Rate limited: save_user_profile")
+            return None
+
+        try:
+            # Check if user exists
+            user_response = await asyncio.to_thread(
+                lambda: (
+                    self.client.table(DatabaseTables.USERS).select("id").eq("id", user_id).execute()
+                )
+            )
+
+            if not user_response.data:
+                logger.error(f"User {user_id} not found")
+                return None
+
+            # Check if user preferences exist
+            preferences_response = await asyncio.to_thread(
+                lambda: (
+                    self.client.table(DatabaseTables.USER_PREFERENCES)
+                    .select("user_id")
+                    .eq("user_id", user_id)
+                    .execute()
+                )
+            )
+
+            # Create user preferences if they don't exist
+            if not preferences_response.data:
+                logger.info(f"Creating user_preferences record for user {user_id}")
+                await asyncio.to_thread(
+                    lambda: (
+                        self.client.table(DatabaseTables.USER_PREFERENCES)
+                        .insert(
+                            {
+                                "user_id": user_id,
+                                "style_preferences": {},
+                                "size_info": {},
+                                "travel_patterns": {},
+                                "quick_reply_preferences": {"enabled": True},
+                                "packing_methods": {},
+                                "currency_preferences": {},
+                                "created_at": datetime.now(UTC).isoformat(),
+                                "updated_at": datetime.now(UTC).isoformat(),
+                            }
+                        )
+                        .execute()
+                    )
+                )
+
+            # Update user profile
+            update_data = {
+                **profile_data,
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+
+            response = await asyncio.to_thread(
+                lambda: (
+                    self.client.table(DatabaseTables.USERS)
+                    .update(update_data)
+                    .eq("id", user_id)
+                    .execute()
+                )
+            )
+
+            if response.data:
+                logger.info(f"Updated profile for user {user_id}")
+                return response.data[0]
+            else:
+                logger.error(f"Failed to update profile for user {user_id}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error saving user profile: {e}")
+            return None
+
+    async def update_user_preferences(self, user_id: str, preferences: dict) -> bool:
+        """Update user preferences."""
+        if not validate_user_id(user_id):
+            logger.error(f"Invalid user_id format: {user_id}")
+            return False
+
+        if not await db_rate_limiter.acquire("write"):
+            logger.warning("Rate limited: update_user_preferences")
+            return False
+
+        try:
+            # Check if preferences exist
+            existing_response = await asyncio.to_thread(
+                lambda: (
+                    self.client.table(DatabaseTables.USER_PREFERENCES)
+                    .select("id")
+                    .eq("user_id", user_id)
+                    .execute()
+                )
+            )
+
+            if existing_response.data:
+                # Update existing preferences
+                await asyncio.to_thread(
+                    lambda: (
+                        self.client.table(DatabaseTables.USER_PREFERENCES)
+                        .update(preferences)
+                        .eq("user_id", user_id)
+                        .execute()
+                    )
+                )
+            else:
+                # Create new preferences
+                await asyncio.to_thread(
+                    lambda: (
+                        self.client.table(DatabaseTables.USER_PREFERENCES)
+                        .insert(
+                            {
+                                "user_id": user_id,
+                                "preferences": preferences,
+                                "created_at": datetime.now(UTC).isoformat(),
+                                "updated_at": datetime.now(UTC).isoformat(),
+                            }
+                        )
+                        .execute()
+                    )
+                )
+
+            logger.info(f"Updated preferences for user {user_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating user preferences: {e}")
+            return False
+
+    async def save_recommendation_feedback(
+        self,
+        user_id: str,
+        conversation_id: str,
+        message_id: str,
+        feedback_type: str,
+        feedback_text: str | None = None,
+        ai_response_content: str | None = None,
+    ) -> bool:
+        """Save recommendation feedback."""
+        if not validate_user_id(user_id):
+            logger.error(f"Invalid user_id format: {user_id}")
+            return False
+
+        if not await db_rate_limiter.acquire("write"):
+            logger.warning("Rate limited: save_recommendation_feedback")
+            return False
+
+        try:
+            feedback_data = {
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "message_id": message_id,
+                "feedback_type": feedback_type,
+                "feedback_text": feedback_text,
+                "ai_response_content": ai_response_content,
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+
+            await asyncio.to_thread(
+                lambda: (
+                    self.client.table(DatabaseTables.RECOMMENDATION_FEEDBACK)
+                    .insert(feedback_data)
+                    .execute()
+                )
+            )
+
+            logger.info(f"Saved feedback for message {message_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error saving recommendation feedback: {e}")
+            return False
+
+    async def save_destination(
+        self, user_id: str, destination_name: str, destination_data: dict | None = None
+    ) -> bool:
+        """Save user destination."""
+        if not validate_user_id(user_id):
+            logger.error(f"Invalid user_id format: {user_id}")
+            return False
+
+        if not await db_rate_limiter.acquire("write"):
+            logger.warning("Rate limited: save_destination")
+            return False
+
+        try:
+            # Check if destination already exists
+            existing_response = await asyncio.to_thread(
+                lambda: (
+                    self.client.table(DatabaseTables.USER_DESTINATIONS)
+                    .select("id")
+                    .eq("user_id", user_id)
+                    .eq("destination_name", destination_name)
+                    .execute()
+                )
+            )
+
+            if existing_response.data:
+                # Update existing destination
+                await asyncio.to_thread(
+                    lambda: (
+                        self.client.table(DatabaseTables.USER_DESTINATIONS)
+                        .update(
+                            {
+                                "destination_data": destination_data or {},
+                                "updated_at": datetime.now(UTC).isoformat(),
+                            }
+                        )
+                        .eq("user_id", user_id)
+                        .eq("destination_name", destination_name)
+                        .execute()
+                    )
+                )
+            else:
+                # Create new destination
+                await asyncio.to_thread(
+                    lambda: (
+                        self.client.table(DatabaseTables.USER_DESTINATIONS)
+                        .insert(
+                            {
+                                "user_id": user_id,
+                                "destination_name": destination_name,
+                                "destination_data": destination_data or {},
+                                "created_at": datetime.now(UTC).isoformat(),
+                                "updated_at": datetime.now(UTC).isoformat(),
+                            }
+                        )
+                        .execute()
+                    )
+                )
+
+            logger.info(f"Saved destination {destination_name} for user {user_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error saving destination: {e}")
+            return False
+
+    async def update_user_profile_picture_url(self, user_id: str, profile_picture_url: str) -> bool:
+        """Update user's profile picture URL."""
+        if not validate_user_id(user_id):
+            logger.error(f"Invalid user_id format: {user_id}")
+            return False
+
+        if not await db_rate_limiter.acquire("write"):
+            logger.warning("Rate limited: update_user_profile_picture_url")
+            return False
+
+        try:
+            await asyncio.to_thread(
+                lambda: (
+                    self.client.table(DatabaseTables.USERS)
+                    .update(
+                        {
+                            "profile_picture_url": profile_picture_url,
+                            "updated_at": datetime.now(UTC).isoformat(),
+                        }
+                    )
+                    .eq("id", user_id)
+                    .execute()
+                )
+            )
+
+            logger.info(f"Updated profile picture for user {user_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating profile picture: {e}")
+            return False

@@ -85,7 +85,7 @@ class TestDatabaseHelpersSimple:
         assert result is True
 
         # Verify methods were called
-        assert table_mock.update.called
+        assert table_mock.insert.called
 
     @pytest.mark.asyncio
     async def test_save_conversation_message_simple(self):
@@ -280,12 +280,12 @@ class TestDatabaseHelpersEdgeCases:
 
         assert result is not None
 
-        # Test with empty message
+        # Test with empty message (should return None due to validation)
         result = await db.save_conversation_message(
             user_id="test-user", conversation_id=None, user_message="", ai_response=""
         )
 
-        assert result is not None
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_create_chat_session_edge_cases(self):

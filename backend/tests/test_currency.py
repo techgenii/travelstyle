@@ -320,7 +320,7 @@ async def test_get_exchange_rates_success():
     service = CurrencyService()
     with (
         patch(
-            "app.services.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
             new=AsyncMock(return_value=None),
         ),
         patch(
@@ -336,7 +336,7 @@ async def test_get_exchange_rates_success():
                 )
             ),
         ),
-        patch("app.services.supabase_cache.supabase_cache.set_currency_cache", new=AsyncMock()),
+        patch("app.services.supabase.supabase_cache.supabase_cache.set_currency_cache", new=AsyncMock()),
     ):
         rates = await service.get_exchange_rates("USD")
         assert rates is not None
@@ -349,7 +349,7 @@ async def test_get_exchange_rates_cache():
     """Test exchange rates retrieval from cache."""
     service = CurrencyService()
     with patch(
-        "app.services.supabase_cache.supabase_cache.get_currency_cache",
+        "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
         new=AsyncMock(return_value={"cached": True}),
     ):
         rates = await service.get_exchange_rates("USD")
@@ -363,7 +363,7 @@ async def test_get_exchange_rates_error():
     service = CurrencyService()
     with (
         patch(
-            "app.services.supabase_cache.supabase_cache.get_currency_cache",
+            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
             new=AsyncMock(return_value=None),
         ),
         patch(
@@ -379,19 +379,23 @@ async def test_get_exchange_rates_error():
 async def test_get_pair_exchange_rate_success():
     """Test successful pair exchange rate retrieval."""
     service = CurrencyService()
-    with patch(
-        "httpx.AsyncClient.get",
-        new=AsyncMock(
-            return_value=MockAsyncResponse(
-                {
-                    "result": "success",
-                    "base_code": "USD",
-                    "target_code": "EUR",
-                    "conversion_rate": 0.85,
-                    "time_last_update_unix": 1234567890,
-                    "time_last_update_utc": "2024-01-01T12:00:00Z",
-                }
-            )
+    with (
+        patch(
+            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            return_value=None,
+        ),
+        patch(
+            "httpx.AsyncClient.get",
+            new=AsyncMock(
+                return_value=MockAsyncResponse(
+                    {
+                        "base_code": "USD",
+                        "conversion_rates": {"EUR": 0.85},
+                        "time_last_update_unix": 1234567890,
+                        "time_last_update_utc": "2024-01-01T12:00:00Z",
+                    }
+                )
+            ),
         ),
     ):
         result = await service.get_pair_exchange_rate("USD", "EUR")
@@ -405,7 +409,13 @@ async def test_get_pair_exchange_rate_success():
 async def test_get_pair_exchange_rate_error():
     """Test pair exchange rate error handling."""
     service = CurrencyService()
-    with patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=Exception("API error"))):
+    with (
+        patch(
+            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            return_value=None,
+        ),
+        patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=Exception("API error"))),
+    ):
         result = await service.get_pair_exchange_rate("USD", "EUR")
         assert result is None
 
@@ -414,20 +424,23 @@ async def test_get_pair_exchange_rate_error():
 async def test_convert_currency_success():
     """Test successful currency conversion."""
     service = CurrencyService()
-    with patch(
-        "httpx.AsyncClient.get",
-        new=AsyncMock(
-            return_value=MockAsyncResponse(
-                {
-                    "result": "success",
-                    "base_code": "USD",
-                    "target_code": "EUR",
-                    "conversion_rate": 0.85,
-                    "conversion_result": 85.0,
-                    "time_last_update_unix": 1234567890,
-                    "time_last_update_utc": "2024-01-01T12:00:00Z",
-                }
-            )
+    with (
+        patch(
+            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            return_value=None,
+        ),
+        patch(
+            "httpx.AsyncClient.get",
+            new=AsyncMock(
+                return_value=MockAsyncResponse(
+                    {
+                        "base_code": "USD",
+                        "conversion_rates": {"EUR": 0.85},
+                        "time_last_update_unix": 1234567890,
+                        "time_last_update_utc": "2024-01-01T12:00:00Z",
+                    }
+                )
+            ),
         ),
     ):
         result = await service.convert_currency(100.0, "USD", "EUR")
@@ -443,7 +456,13 @@ async def test_convert_currency_success():
 async def test_convert_currency_error():
     """Test currency conversion error handling."""
     service = CurrencyService()
-    with patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=Exception("API error"))):
+    with (
+        patch(
+            "app.services.supabase.supabase_cache.supabase_cache.get_currency_cache",
+            return_value=None,
+        ),
+        patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=Exception("API error"))),
+    ):
         result = await service.convert_currency(100.0, "USD", "EUR")
         assert result is None
 

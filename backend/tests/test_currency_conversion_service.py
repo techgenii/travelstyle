@@ -113,32 +113,36 @@ class TestFormatCurrencyResponse:
         response = currency_conversion_service.format_currency_response(
             "USD", "EUR", 100.0, 0.85, 85.0
         )
-        expected = "100.00 USD = 85.00 EUR (Rate: 0.8500)"
-        assert response == expected
+        assert "💱 **Currency Conversion**" in response
+        assert "**100.00 USD** = **85.00 EUR**" in response
+        assert "📊 **Exchange Rate:** 1 USD = 0.8500 EUR" in response
 
     def test_format_currency_response_zero_amount(self):
         """Test formatting currency response with zero amount."""
         response = currency_conversion_service.format_currency_response(
             "USD", "EUR", 0.0, 0.85, 0.0
         )
-        expected = "0.00 USD = 0.00 EUR (Rate: 0.8500)"
-        assert response == expected
+        assert "💱 **Currency Conversion**" in response
+        assert "**0.00 USD** = **0.00 EUR**" in response
+        assert "📊 **Exchange Rate:** 1 USD = 0.8500 EUR" in response
 
     def test_format_currency_response_large_amount(self):
         """Test formatting currency response with large amount."""
         response = currency_conversion_service.format_currency_response(
             "USD", "JPY", 1000.0, 150.25, 150250.0
         )
-        expected = "1000.00 USD = 150250.00 JPY (Rate: 150.2500)"
-        assert response == expected
+        assert "💱 **Currency Conversion**" in response
+        assert "**1,000.00 USD** = **150,250.00 JPY**" in response
+        assert "📊 **Exchange Rate:** 1 USD = 150.2500 JPY" in response
 
     def test_format_currency_response_decimal_amount(self):
         """Test formatting currency response with decimal amount."""
         response = currency_conversion_service.format_currency_response(
             "EUR", "USD", 50.75, 1.15, 58.36
         )
-        expected = "50.75 EUR = 58.36 USD (Rate: 1.1500)"
-        assert response == expected
+        assert "💱 **Currency Conversion**" in response
+        assert "**50.75 EUR** = **58.36 USD**" in response
+        assert "📊 **Exchange Rate:** 1 EUR = 1.1500 USD" in response
 
 
 class TestGetSupportedCurrencies:
@@ -175,32 +179,25 @@ class TestParseCurrencyRequest:
     async def test_parse_currency_request_valid_json(self):
         """Test parsing currency request with valid JSON response."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.get_completion",
             new_callable=AsyncMock,
-        ) as mock_create:
-            # Create a proper mock response with valid JSON
-            mock_choice = MagicMock()
-            mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": 100.50}'
-            )
-
-            mock_response = MagicMock()
-            mock_response.choices = [mock_choice]
-            mock_create.return_value = mock_response
+        ) as mock_get_completion:
+            # Mock the get_completion method to return valid JSON
+            mock_get_completion.return_value = '{"from_currency": "USD", "to_currency": "EUR", "amount": 100.50, "request_type": "conversion"}'
 
             result = await currency_conversion_service.parse_currency_request(
                 "convert $100.50 USD to EUR"
             )
 
-            assert result["first_country"] == "USD"
-            assert result["second_country"] == "EUR"
+            assert result["from_currency"] == "USD"
+            assert result["to_currency"] == "EUR"
             assert result["amount"] == 100.50
 
     @pytest.mark.asyncio
     async def test_parse_currency_request_invalid_json(self):
         """Test parsing currency request with invalid JSON response."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with invalid JSON
@@ -221,12 +218,12 @@ class TestParseCurrencyRequest:
     async def test_parse_currency_request_json_decode_error(self):
         """Test parsing currency request with JSON decode error."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with malformed JSON
             mock_choice = MagicMock()
-            mock_choice.message.content = '{"first_country": "USD", "second_country": "EUR", "amount": 100.50'  # Missing closing brace
+            mock_choice.message.content = '{"from_currency": "USD", "to_currency": "EUR", "amount": 100.50'  # Missing closing brace
 
             mock_response = MagicMock()
             mock_response.choices = [mock_choice]
@@ -242,7 +239,7 @@ class TestParseCurrencyRequest:
     async def test_parse_currency_request_openai_exception(self):
         """Test parsing currency request when OpenAI raises an exception."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Make OpenAI raise an exception
@@ -258,13 +255,13 @@ class TestParseCurrencyRequest:
     async def test_parse_currency_request_with_whitespace(self):
         """Test parsing currency request with whitespace in currency codes."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with whitespace in currency codes
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": " USD ", "second_country": " EUR ", "amount": 100.0}'
+                '{"from_currency": " USD ", "to_currency": " EUR ", "amount": 100.0}'
             )
 
             mock_response = MagicMock()
@@ -275,20 +272,20 @@ class TestParseCurrencyRequest:
                 "convert $100 USD to EUR"
             )
 
-            assert result["first_country"] == "USD"  # Should be stripped and uppercased
-            assert result["second_country"] == "EUR"  # Should be stripped and uppercased
+            assert result["from_currency"] == "USD"  # Should be stripped and uppercased
+            assert result["to_currency"] == "EUR"  # Should be stripped and uppercased
             assert result["amount"] == 100.0
 
     @pytest.mark.asyncio
     async def test_parse_currency_request_with_missing_amount(self):
         """Test parsing currency request with missing amount field."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with missing amount
             mock_choice = MagicMock()
-            mock_choice.message.content = '{"first_country": "USD", "second_country": "EUR"}'
+            mock_choice.message.content = '{"from_currency": "USD", "to_currency": "EUR"}'
 
             mock_response = MagicMock()
             mock_response.choices = [mock_choice]
@@ -296,22 +293,22 @@ class TestParseCurrencyRequest:
 
             result = await currency_conversion_service.parse_currency_request("convert USD to EUR")
 
-            assert result["first_country"] == "USD"
-            assert result["second_country"] == "EUR"
+            assert result["from_currency"] == "USD"
+            assert result["to_currency"] == "EUR"
             assert result["amount"] == 0.0  # Should default to 0.0 for missing field
 
     @pytest.mark.asyncio
     async def test_parse_currency_request_with_formatted_json(self):
         """Test parsing currency request with formatted JSON (with newlines and spaces)."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with formatted JSON
             mock_choice = MagicMock()
             mock_choice.message.content = """{
-  "first_country": "USD",
-  "second_country": "EUR",
+  "from_currency": "USD",
+  "to_currency": "EUR",
   "amount": 100.0
 }"""
 
@@ -323,20 +320,20 @@ class TestParseCurrencyRequest:
                 "convert $100 USD to EUR"
             )
 
-            assert result["first_country"] == "USD"
-            assert result["second_country"] == "EUR"
+            assert result["from_currency"] == "USD"
+            assert result["to_currency"] == "EUR"
             assert result["amount"] == 100.0
 
     @pytest.mark.asyncio
     async def test_parse_currency_request_with_extra_text(self):
         """Test parsing currency request with extra text around JSON."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with extra text around JSON
             mock_choice = MagicMock()
-            mock_choice.message.content = 'Here is the parsed data: {"first_country": "USD", "second_country": "EUR", "amount": 100.0} Thank you!'
+            mock_choice.message.content = 'Here is the parsed data: {"from_currency": "USD", "to_currency": "EUR", "amount": 100.0} Thank you!'
 
             mock_response = MagicMock()
             mock_response.choices = [mock_choice]
@@ -346,21 +343,21 @@ class TestParseCurrencyRequest:
                 "convert $100 USD to EUR"
             )
 
-            assert result["first_country"] == "USD"
-            assert result["second_country"] == "EUR"
+            assert result["from_currency"] == "USD"
+            assert result["to_currency"] == "EUR"
             assert result["amount"] == 100.0
 
     @pytest.mark.asyncio
     async def test_parse_currency_request_with_amount_zero(self):
         """Test parsing currency request with amount zero."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with amount zero
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": 0}'
+                '{"from_currency": "USD", "to_currency": "EUR", "amount": 0}'
             )
 
             mock_response = MagicMock()
@@ -369,21 +366,21 @@ class TestParseCurrencyRequest:
 
             result = await currency_conversion_service.parse_currency_request("convert USD to EUR")
 
-            assert result["first_country"] == "USD"
-            assert result["second_country"] == "EUR"
+            assert result["from_currency"] == "USD"
+            assert result["to_currency"] == "EUR"
             assert result["amount"] == 0.0
 
     @pytest.mark.asyncio
     async def test_parse_currency_request_with_negative_amount(self):
         """Test parsing currency request with negative amount."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with negative amount
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": -50.0}'
+                '{"from_currency": "USD", "to_currency": "EUR", "amount": -50.0}'
             )
 
             mock_response = MagicMock()
@@ -394,21 +391,21 @@ class TestParseCurrencyRequest:
                 "convert -$50 USD to EUR"
             )
 
-            assert result["first_country"] == "USD"
-            assert result["second_country"] == "EUR"
+            assert result["from_currency"] == "USD"
+            assert result["to_currency"] == "EUR"
             assert result["amount"] == -50.0
 
     @pytest.mark.asyncio
     async def test_parse_currency_request_with_missing_currencies(self):
         """Test parsing currency request with missing currency information."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with missing currencies
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "", "second_country": "", "amount": 100.0}'
+                '{"from_currency": "", "to_currency": "", "amount": 100.0}'
             )
 
             mock_response = MagicMock()
@@ -424,13 +421,13 @@ class TestParseCurrencyRequest:
     async def test_parse_currency_request_with_non_numeric_amount(self):
         """Test parsing currency request with non-numeric amount."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with non-numeric amount
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": "invalid"}'
+                '{"from_currency": "USD", "to_currency": "EUR", "amount": "invalid"}'
             )
 
             mock_response = MagicMock()
@@ -446,12 +443,12 @@ class TestParseCurrencyRequest:
     async def test_parse_currency_request_with_regex_fallback(self):
         """Test parsing currency request using regex fallback when JSON parsing fails."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with JSON embedded in text
             mock_choice = MagicMock()
-            mock_choice.message.content = 'I found this data: {"first_country": "USD", "second_country": "EUR", "amount": 100.0} in the request.'
+            mock_choice.message.content = 'I found this data: {"from_currency": "USD", "to_currency": "EUR", "amount": 100.0} in the request.'
 
             mock_response = MagicMock()
             mock_response.choices = [mock_choice]
@@ -461,15 +458,15 @@ class TestParseCurrencyRequest:
                 "convert $100 USD to EUR"
             )
 
-            assert result["first_country"] == "USD"
-            assert result["second_country"] == "EUR"
+            assert result["from_currency"] == "USD"
+            assert result["to_currency"] == "EUR"
             assert result["amount"] == 100.0
 
     @pytest.mark.asyncio
     async def test_parse_currency_request_with_regex_fallback_failure(self):
         """Test parsing currency request when both JSON parsing and regex fallback fail."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with invalid JSON that regex can't fix
@@ -490,12 +487,12 @@ class TestParseCurrencyRequest:
     async def test_parse_currency_request_with_regex_fallback_json_decode_error(self):
         """Test parsing currency request when regex fallback also fails JSON decode."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with malformed JSON that regex extracts but can't parse
             mock_choice = MagicMock()
-            mock_choice.message.content = 'Here is the data: {"first_country": "USD", "second_country": "EUR", "amount": 100.0'  # Missing closing brace
+            mock_choice.message.content = 'Here is the data: {"from_currency": "USD", "to_currency": "EUR", "amount": 100.0'  # Missing closing brace
 
             mock_response = MagicMock()
             mock_response.choices = [mock_choice]
@@ -511,13 +508,13 @@ class TestParseCurrencyRequest:
     async def test_parse_currency_request_with_non_numeric_amount_exception(self):
         """Test parsing currency request with non-numeric amount that causes exception."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with non-numeric amount
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": "invalid"}'
+                '{"from_currency": "USD", "to_currency": "EUR", "amount": "invalid"}'
             )
 
             mock_response = MagicMock()
@@ -533,13 +530,13 @@ class TestParseCurrencyRequest:
     async def test_parse_currency_request_with_debug_logging(self):
         """Test parsing currency request to trigger debug logging."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_create:
             # Create a proper mock response with valid JSON that should trigger debug logging
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": 100.0}'
+                '{"from_currency": "USD", "to_currency": "EUR", "amount": 100.0}'
             )
 
             mock_response = MagicMock()
@@ -550,8 +547,8 @@ class TestParseCurrencyRequest:
                 "convert $100 USD to EUR"
             )
 
-            assert result["first_country"] == "USD"
-            assert result["second_country"] == "EUR"
+            assert result["from_currency"] == "USD"
+            assert result["to_currency"] == "EUR"
             assert result["amount"] == 100.0
 
 
@@ -563,18 +560,18 @@ class TestHandleCurrencyRequest:
         """Test currency request with valid amount and exchange rate."""
         with (
             patch(
-                "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+                "app.services.openai_service.openai_service.client.chat.completions.create",
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.convert_currency",
+                "app.services.currency_conversion_service.currency_conversion_service.convert_currency",
                 new_callable=AsyncMock,
             ) as mock_convert,
         ):
             # Create a proper mock response with valid currencies and amount
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": 100.0}'
+                '{"from_currency": "USD", "to_currency": "EUR", "amount": 100.0}'
             )
 
             mock_response = MagicMock()
@@ -594,67 +591,69 @@ class TestHandleCurrencyRequest:
                 "convert 100 USD to EUR"
             )
 
-            assert result["original"]["amount"] == 100.0
-            assert result["original"]["currency"] == "USD"
-            assert result["converted"]["amount"] == 85.0
-            assert result["converted"]["currency"] == "EUR"
-            assert result["rate"] == 0.85
-            assert result["last_updated_utc"] == "2024-01-01T12:00:00Z"
+            assert result["success"] is True
+            assert result["request_type"] == "conversion"
+            assert result["data"]["original"]["amount"] == 100.0
+            assert result["data"]["original"]["currency"] == "USD"
+            assert result["data"]["converted"]["amount"] == 85.0
+            assert result["data"]["converted"]["currency"] == "EUR"
+            assert result["data"]["rate"] == 0.85
+            assert result["data"]["last_updated_utc"] == "2024-01-01T12:00:00Z"
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_without_amount(self):
         """Test currency request without amount (just exchange rate)."""
         with (
             patch(
-                "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+                "app.services.openai_service.openai_service.client.chat.completions.create",
                 new_callable=AsyncMock,
             ) as mock_openai,
-            patch(
-                "app.services.currency_conversion_service.currency_service.convert_currency",
+            patch.object(
+                currency_conversion_service,
+                "get_pair_exchange_rate",
                 new_callable=AsyncMock,
-            ) as mock_convert,
+            ) as mock_rate,
         ):
-            # Create a proper mock response with valid currencies but no amount
+            # Create a proper mock response with valid currencies for rate request
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": 0.0}'
+                '{"from_currency": "USD", "to_currency": "EUR", "request_type": "rate"}'
             )
 
             mock_response = MagicMock()
             mock_response.choices = [mock_choice]
             mock_openai.return_value = mock_response
 
-            # Mock currency conversion service response
-            mock_convert.return_value = {
-                "original": {"amount": 0.0, "currency": "USD"},
-                "converted": {"amount": 0.0, "currency": "EUR"},
+            # Mock exchange rate service response
+            mock_rate.return_value = {
+                "base_currency": "USD",
+                "target_currency": "EUR",
                 "rate": 0.85,
-                "last_updated_utc": "2024-01-01T12:00:00Z",
-                "last_updated_unix": 1704110400,
+                "last_updated": "2024-01-01T12:00:00Z",
             }
 
             result = await currency_conversion_service.handle_currency_request(
                 "What's the USD to EUR rate?"
             )
 
-            assert result["original"]["amount"] == 0.0
-            assert result["original"]["currency"] == "USD"
-            assert result["converted"]["amount"] == 0.0
-            assert result["converted"]["currency"] == "EUR"
-            assert result["rate"] == 0.85
-            assert result["last_updated_utc"] == "2024-01-01T12:00:00Z"
+            assert result["success"] is True
+            assert result["request_type"] == "rate"
+            assert result["data"]["base_currency"] == "USD"
+            assert result["data"]["target_currency"] == "EUR"
+            assert result["data"]["rate"] == 0.85
+            assert result["data"]["last_updated"] == "2024-01-01T12:00:00Z"
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_missing_currencies(self):
         """Test currency request with missing currency information."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_openai:
             # Create a proper mock response with missing currencies
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "", "second_country": "", "amount": 100.0}'
+                '{"from_currency": "", "to_currency": "", "amount": 100.0}'
             )
 
             mock_response = MagicMock()
@@ -663,19 +662,20 @@ class TestHandleCurrencyRequest:
 
             result = await currency_conversion_service.handle_currency_request("convert something")
 
-            assert result is None
+            assert result["success"] is False
+            assert "Could not parse your request" in result["response"]
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_unsupported_from_currency(self):
         """Test currency request with unsupported from currency."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_openai:
             # Create a proper mock response with unsupported currency
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "XXX", "second_country": "EUR", "amount": 100.0}'
+                '{"from_currency": "XXX", "to_currency": "EUR", "amount": 100.0}'
             )
 
             mock_response = MagicMock()
@@ -686,19 +686,20 @@ class TestHandleCurrencyRequest:
                 "convert 100 XXX to EUR"
             )
 
-            assert result is None
+            assert result["success"] is False
+            assert "Could not parse your request" in result["response"]
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_unsupported_to_currency(self):
         """Test currency request with unsupported to currency."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_openai:
             # Create a proper mock response with unsupported currency
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "YYY", "amount": 100.0}'
+                '{"from_currency": "USD", "to_currency": "YYY", "amount": 100.0}'
             )
 
             mock_response = MagicMock()
@@ -709,25 +710,26 @@ class TestHandleCurrencyRequest:
                 "convert 100 USD to YYY"
             )
 
-            assert result is None
+            assert result["success"] is False
+            assert "Could not parse your request" in result["response"]
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_no_exchange_rate(self):
         """Test currency request when exchange rate service returns None."""
         with (
             patch(
-                "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+                "app.services.openai_service.openai_service.client.chat.completions.create",
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.convert_currency",
+                "app.services.currency_conversion_service.currency_conversion_service.convert_currency",
                 new_callable=AsyncMock,
             ) as mock_convert,
         ):
             # Create a proper mock response with valid currencies
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": 100.0}'
+                '{"from_currency": "USD", "to_currency": "EUR", "amount": 100.0}'
             )
 
             mock_response = MagicMock()
@@ -741,25 +743,26 @@ class TestHandleCurrencyRequest:
                 "convert 100 USD to EUR"
             )
 
-            assert result is None
+            assert result["success"] is False
+            assert "Could not perform conversion" in result["response"]
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_no_rate_in_response(self):
         """Test currency request when currency conversion service returns None."""
         with (
             patch(
-                "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+                "app.services.openai_service.openai_service.client.chat.completions.create",
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.convert_currency",
+                "app.services.currency_conversion_service.currency_conversion_service.convert_currency",
                 new_callable=AsyncMock,
             ) as mock_convert,
         ):
             # Create a proper mock response with valid currencies
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": 100.0}'
+                '{"from_currency": "USD", "to_currency": "EUR", "amount": 100.0}'
             )
 
             mock_response = MagicMock()
@@ -773,13 +776,14 @@ class TestHandleCurrencyRequest:
                 "convert 100 USD to EUR"
             )
 
-            assert result is None
+            assert result["success"] is False
+            assert "Could not perform conversion" in result["response"]
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_parse_failure(self):
         """Test currency request when parsing fails."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_openai:
             # Make OpenAI raise an exception
@@ -789,13 +793,14 @@ class TestHandleCurrencyRequest:
                 "convert 100 USD to EUR"
             )
 
-            assert result is None
+            assert result["success"] is False
+            assert "Could not parse your request" in result["response"]
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_exception(self):
         """Test currency request when an exception occurs."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_openai:
             # Make OpenAI raise an exception
@@ -805,25 +810,26 @@ class TestHandleCurrencyRequest:
                 "convert 100 USD to EUR"
             )
 
-            assert result is None
+            assert result["success"] is False
+            assert "Could not parse your request" in result["response"]
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_with_decimal_amount(self):
         """Test currency request with decimal amount."""
         with (
             patch(
-                "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+                "app.services.openai_service.openai_service.client.chat.completions.create",
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.convert_currency",
+                "app.services.currency_conversion_service.currency_conversion_service.convert_currency",
                 new_callable=AsyncMock,
             ) as mock_convert,
         ):
             # Create a proper mock response with decimal amount
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": 50.75}'
+                '{"from_currency": "USD", "to_currency": "EUR", "amount": 50.75}'
             )
 
             mock_response = MagicMock()
@@ -843,59 +849,50 @@ class TestHandleCurrencyRequest:
                 "convert 50.75 USD to EUR"
             )
 
-            assert result["original"]["amount"] == 50.75
-            assert result["original"]["currency"] == "USD"
-            assert result["converted"]["amount"] == 43.14  # 50.75 * 0.85
-            assert result["converted"]["currency"] == "EUR"
-            assert result["rate"] == 0.85
+            assert result["data"]["original"]["amount"] == 50.75
+            assert result["data"]["original"]["currency"] == "USD"
+            assert abs(result["data"]["converted"]["amount"] - 43.14) < 0.01  # 50.75 * 0.85
+            assert result["data"]["converted"]["currency"] == "EUR"
+            assert result["data"]["rate"] == 0.85
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_with_negative_amount(self):
         """Test currency request with negative amount."""
         with (
             patch(
-                "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+                "app.services.openai_service.openai_service.client.chat.completions.create",
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.convert_currency",
+                "app.services.currency_conversion_service.currency_conversion_service.convert_currency",
                 new_callable=AsyncMock,
             ) as mock_convert,
         ):
             # Create a proper mock response with negative amount
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": -25.0}'
+                '{"from_currency": "USD", "to_currency": "EUR", "amount": -25.0}'
             )
 
             mock_response = MagicMock()
             mock_response.choices = [mock_choice]
             mock_openai.return_value = mock_response
 
-            # Mock currency conversion service response
-            mock_convert.return_value = {
-                "original": {"amount": -25.0, "currency": "USD"},
-                "converted": {"amount": -21.25, "currency": "EUR"},
-                "rate": 0.85,
-                "last_updated_utc": "2024-01-01T12:00:00Z",
-                "last_updated_unix": 1704110400,
-            }
+            # Mock currency conversion service to return None (error)
+            mock_convert.return_value = None
 
             result = await currency_conversion_service.handle_currency_request(
                 "convert -25 USD to EUR"
             )
 
-            assert result["original"]["amount"] == -25.0
-            assert result["original"]["currency"] == "USD"
-            assert result["converted"]["amount"] == -21.25  # -25.0 * 0.85
-            assert result["converted"]["currency"] == "EUR"
-            assert result["rate"] == 0.85
+            assert result["success"] is False
+            assert "Could not perform conversion" in result["response"]
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_generic_exception(self):
         """Test currency request when a generic exception occurs during processing."""
         with patch(
-            "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+            "app.services.openai_service.openai_service.client.chat.completions.create",
             new_callable=AsyncMock,
         ) as mock_openai:
             # Make OpenAI raise an exception during processing
@@ -905,25 +902,26 @@ class TestHandleCurrencyRequest:
                 "convert 100 USD to EUR"
             )
 
-            assert result is None
+            assert result["success"] is False
+            assert "Could not parse your request" in result["response"]
 
     @pytest.mark.asyncio
     async def test_handle_currency_request_duplicate_validation(self):
         """Test currency request to cover the duplicate validation check."""
         with (
             patch(
-                "app.services.currency_conversion_service.openai_service.client.chat.completions.create",
+                "app.services.openai_service.openai_service.client.chat.completions.create",
                 new_callable=AsyncMock,
             ) as mock_openai,
             patch(
-                "app.services.currency_conversion_service.currency_service.convert_currency",
+                "app.services.currency_conversion_service.currency_conversion_service.convert_currency",
                 new_callable=AsyncMock,
             ) as mock_convert,
         ):
             # Create a proper mock response with valid currencies
             mock_choice = MagicMock()
             mock_choice.message.content = (
-                '{"first_country": "USD", "second_country": "EUR", "amount": 100.0}'
+                '{"from_currency": "USD", "to_currency": "EUR", "amount": 100.0}'
             )
 
             mock_response = MagicMock()
@@ -944,11 +942,11 @@ class TestHandleCurrencyRequest:
             )
 
             # This should pass both validation checks and return a valid result
-            assert result["original"]["amount"] == 100.0
-            assert result["original"]["currency"] == "USD"
-            assert result["converted"]["amount"] == 85.0
-            assert result["converted"]["currency"] == "EUR"
-            assert result["rate"] == 0.85
+            assert result["data"]["original"]["amount"] == 100.0
+            assert result["data"]["original"]["currency"] == "USD"
+            assert result["data"]["converted"]["amount"] == 85.0
+            assert result["data"]["converted"]["currency"] == "EUR"
+            assert result["data"]["rate"] == 0.85
 
 
 class TestHelperMethods:
@@ -959,24 +957,23 @@ class TestHelperMethods:
         service = currency_conversion_service
 
         # Test with normal data
-        data = {"first_country": " usd ", "second_country": " eur ", "amount": 100.0}
+        data = {"from_currency": " usd ", "to_currency": " eur ", "amount": 100.0}
         result = service._clean_parsed_data(data)
-        assert result["first_country"] == "USD"
-        assert result["second_country"] == "EUR"
+        assert result["from_currency"] == "USD"
+        assert result["to_currency"] == "EUR"
         assert result["amount"] == 100.0
 
         # Test with missing fields
-        data = {"first_country": "USD"}
+        data = {"from_currency": "USD"}
         result = service._clean_parsed_data(data)
-        assert result["first_country"] == "USD"
-        assert result["second_country"] == ""
+        assert result["from_currency"] == "USD"
+        assert "to_currency" not in result
         assert result["amount"] == 0.0
 
         # Test with empty data
         data = {}
         result = service._clean_parsed_data(data)
-        assert result["first_country"] == ""
-        assert result["second_country"] == ""
+        assert len(result) == 1  # Only amount with default value
         assert result["amount"] == 0.0
 
     def test_extract_json_from_text(self):
@@ -984,9 +981,9 @@ class TestHelperMethods:
         service = currency_conversion_service
 
         # Test with JSON in text
-        text = 'Here is the data: {"first_country": "USD", "second_country": "EUR", "amount": 100.0} Thank you!'
+        text = 'Here is the data: {"from_currency": "USD", "to_currency": "EUR", "amount": 100.0} Thank you!'
         result = service._extract_json_from_text(text)
-        assert result == '{"first_country": "USD", "second_country": "EUR", "amount": 100.0}'
+        assert result == '{"from_currency": "USD", "to_currency": "EUR", "amount": 100.0}'
 
         # Test with no JSON
         text = "No JSON here"

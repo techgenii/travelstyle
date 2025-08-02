@@ -97,6 +97,25 @@ class OpenAIService:
                 confidence_score=0.0,
             )
 
+    async def get_completion(
+        self, messages: list[dict[str, str]], temperature: float = 0.7, max_tokens: int = 1000
+    ) -> str | None:
+        """Get a simple completion from OpenAI for parsing tasks."""
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+
+            content = response.choices[0].message.content
+            return content if content else None
+
+        except Exception as e:
+            logger.error("OpenAI get_completion error: %s", type(e).__name__)
+            return None
+
     def _build_system_prompt(self) -> str:
         """Build the system prompt for the AI model."""
         return """
