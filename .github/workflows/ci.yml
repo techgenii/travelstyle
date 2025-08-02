@@ -298,16 +298,7 @@ jobs:
 
       - name: Commit & Push changes to Readme
         if: ${{ github.ref == 'refs/heads/main' }}
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          # Fetch latest changes and reset to origin/main
-          git fetch origin main
-          git reset --hard origin/main
-          git add README.md
-          if ! git diff --staged --quiet; then
-            git commit -m "Update coverage on Readme"
-            git push origin main
-          else
-            echo "No changes to README.md, skipping commit"
-          fi
+        uses: actions-js/push@master
+        with:
+          message: Update coverage on Readme
+          github_token: ${{ secrets.GITHUB_TOKEN }}
