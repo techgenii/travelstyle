@@ -50,6 +50,7 @@ class OpenAIService:
         cultural_context: dict[str, Any] | None = None,
         weather_context: dict[str, Any] | None = None,
         user_profile: dict[str, Any] | None = None,
+        context_type: str | None = None,
     ) -> ChatResponse:
         """Generate AI response with full context, fallback logic, and improved prompt formatting."""  # noqa: E501
         try:
@@ -59,7 +60,7 @@ class OpenAIService:
             enriched_culture = cultural_context or {"note": "No cultural insights available."}
 
             # ---- Step 2: Build prompt blocks ----
-            system_prompt = self._build_system_prompt()
+            system_prompt = self._build_system_prompt(context_type)
             context_prompt = self._build_context_prompt(
                 enriched_culture, enriched_weather, enriched_profile
             )
@@ -117,9 +118,10 @@ class OpenAIService:
             logger.error("OpenAI get_completion error: %s", type(e).__name__)
             return None
 
-    def _build_system_prompt(self) -> str:  # noqa: E501
-        """Build the system prompt for the AI model."""
-        return """
+    def _build_system_prompt(self, context_type: str | None = None) -> str:  # noqa: E501
+        """Build the system prompt for the AI model based on context type."""
+
+        base_prompt = """
     You are TravelStyle AI, a culturally intelligent, weather-aware travel wardrobe expert.
 
     CAPABILITIES:
@@ -151,8 +153,50 @@ class OpenAIService:
     - Show both modern and traditional perspectives
 
     GOAL:
-    Help the user confidently pack for their destination with culturally respectful, stylish, and weather-appropriate clothing.  # noqa: E501
+    Help the user confidently pack for their destination with culturally respectful, stylish, and weather-appropriate clothing.
     """
+
+        # Add context-specific instructions
+        if context_type == "wardrobe":
+            base_prompt += """
+
+    WARDROBE FOCUS:
+    - Focus specifically on clothing and packing recommendations
+    - Provide detailed packing lists and outfit suggestions
+    - Consider weather conditions for clothing choices
+    - Include layering strategies for variable weather
+    """
+        elif context_type == "style":
+            base_prompt += """
+
+    STYLE FOCUS:
+    - Focus on fashion etiquette and dress codes
+    - Provide cultural style guidance and local fashion norms
+    - Suggest appropriate attire for different occasions
+    - Include formal vs casual dressing advice
+    """
+        elif context_type == "destination":
+            base_prompt += """
+
+    DESTINATION FOCUS:
+    - Provide comprehensive destination information
+    - Include cultural insights, weather, and local customs
+    - Suggest activities and experiences
+    - Offer practical travel tips for the destination
+    """
+        elif context_type == "logistics":
+            base_prompt += """
+
+    LOGISTICS FOCUS:
+    - Provide comprehensive travel planning and logistics
+    - Include visa requirements, vaccination needs, and travel documents
+    - Address currency exchange and financial planning
+    - Consider weather and cultural factors in planning
+    - Provide actionable steps and timelines
+    - Structure information clearly for easy follow-up
+    """
+
+        return base_prompt
 
     def _build_context_prompt(
         self,

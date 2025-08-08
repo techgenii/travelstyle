@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Light mode colors */
+:root {
+  --color-primary: #893168;
+  --color-secondary: #6a7fdb;
+  --color-accent: #748cab;
+  --color-background: #ffffff;
+  --color-surface: #f8f9fa;
+  --color-text-primary: #2e1c2b;
+  --color-text-secondary: #3e5c76;
+  --color-success: #6a7fdb;
+  --color-warning: #893168;
+  --color-error: #4a1942;
+  --color-border: #e9ecef;
+  
+  /* Light variations for backgrounds */
+  --color-primary-light: #f3e8ef;
+  --color-secondary-light: #eef1fd;
+  --color-accent-light: #f0f2f5;
+  --color-success-light: #eef1fd;
+  --color-warning-light: #f3e8ef;
+  --color-error-light: #f0e6ed;
+}
+
+/* Dark mode colors */
+.dark {
+  --color-primary: #893168;
+  --color-secondary: #6a7fdb;
+  --color-accent: #748cab;
+  --color-background: #050404;
+  --color-surface: #2e1c2b;
+  --color-text-primary: #ffffff; /* Primary text is white */
+  --color-text-secondary: #ffffff; /* Secondary text should also be white for better visibility */
+  --color-success: #6a7fdb;
+  --color-warning: #893168;
+  --color-error: #ff6b6b;
+  --color-border: #4a1942;
+  
+  /* Light variations for backgrounds in dark mode */
+  --color-primary-light: #4a1942;
+  --color-secondary-light: #3e4a7a;
+  --color-accent-light: #3e4a5c;
+  --color-success-light: #3e4a7a;
+  --color-warning-light: #4a1942;
+  --color-error-light: #5c2c2c;
+}
+
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease;
+}
