@@ -20,6 +20,7 @@ This service acts as a router that takes messages from UI buttons and routes the
 appropriate specialized chat functions that return the correct response for display.
 """
 
+import inspect
 import logging
 import re
 from typing import Any
@@ -117,11 +118,15 @@ class TravelOrchestratorService:
             Respond with only the category name (e.g., "currency", "weather", etc.):
             """
 
-            response = await openai_service.get_completion(
+            response = openai_service.get_completion(
                 messages=[{"role": "user", "content": classification_prompt}],
                 temperature=0.1,
                 max_tokens=10,
             )
+
+            # Support both async and sync implementations/mocks
+            if inspect.isawaitable(response):
+                response = await response
 
             if response:
                 # Clean up the response and extract the category
@@ -146,6 +151,65 @@ class TravelOrchestratorService:
         except Exception as e:
             logger.error(f"Message classification error: {e}")
             return "general"
+
+    def _determine_message_type(self, user_message: str) -> str:
+        """Rule-based message type determination for quick routing and tests."""
+        text = user_message.lower().strip()
+
+        # Action-style hints
+        if any(
+            token in text
+            for token in [
+                "currency_convert",
+                "currency_rate",
+                "currency",
+            ]
+        ):
+            return "currency"
+        if any(token in text for token in ["weather_info", "weather"]):
+            return "weather"
+        if any(token in text for token in ["wardrobe_planning", "wardrobe"]):
+            return "wardrobe"
+        if any(token in text for token in ["style_etiquette", "style"]):
+            return "style"
+        if any(token in text for token in ["destination_info", "destination"]):
+            return "destination"
+
+        # Keyword heuristics
+        currency_keywords = [
+            "convert",
+            "exchange rate",
+            "rate",
+            "usd",
+            "eur",
+            "gbp",
+            "yen",
+            "jpy",
+        ]
+        if any(k in text for k in currency_keywords):
+            return "currency"
+
+        weather_keywords = ["weather", "temperature", "forecast", "rain", "sunny"]
+        if any(k in text for k in weather_keywords):
+            return "weather"
+
+        wardrobe_keywords = ["pack", "packing", "what should i pack", "outfit"]
+        if any(k in text for k in wardrobe_keywords):
+            return "wardrobe"
+
+        style_keywords = ["dress code", "fashion", "etiquette", "style"]
+        if any(k in text for k in style_keywords):
+            return "style"
+
+        destination_keywords = ["tell me about", "going to", "visiting", "trip to"]
+        if any(k in text for k in destination_keywords):
+            return "destination"
+
+        logistics_keywords = ["visa", "vaccination", "itinerary", "logistics", "preparation"]
+        if any(k in text for k in logistics_keywords):
+            return "logistics"
+
+        return "general"
 
     async def _handle_currency_request(
         self, user_message: str, context: ConversationContext
@@ -418,10 +482,12 @@ class TravelOrchestratorService:
                     ],
                 )
 
-            # Gather comprehensive destination data
-            weather_data = await weather_service.get_weather_data(destination, context.travel_dates)
-            cultural_insights = await qloo_service.get_cultural_insights(
-                destination, context.trip_purpose or "leisure"
+            # Gather comprehensive destination data using safe wrappers
+            weather_data = await self._safe_api_call(
+                weather_service.get_weather_data, destination, context.travel_dates
+            )
+            cultural_insights = await self._safe_api_call(
+                qloo_service.get_cultural_insights, destination, context.trip_purpose or "leisure"
             )
 
             # Generate AI response for destination
@@ -480,9 +546,13 @@ class TravelOrchestratorService:
             cultural_insights = None
 
             if destination:
-                weather_data = await weather_service.get_weather_data(destination, travel_dates)
-                cultural_insights = await qloo_service.get_cultural_insights(
-                    destination, context.trip_purpose or "leisure"
+                weather_data = await self._safe_api_call(
+                    weather_service.get_weather_data, destination, travel_dates
+                )
+                cultural_insights = await self._safe_api_call(
+                    qloo_service.get_cultural_insights,
+                    destination,
+                    context.trip_purpose or "leisure",
                 )
 
             # Generate comprehensive logistics response

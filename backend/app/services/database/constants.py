@@ -30,3 +30,4 @@ class DatabaseTables:
     USER_PREFERENCES = "user_preferences"
     RECOMMENDATION_FEEDBACK = "recommendation_feedback"
     USER_DESTINATIONS = "user_destinations"
+    SYSTEM_SETTINGS = "system_settings"

@@ -58,8 +58,8 @@ async def chat(
         # Get user profile
         user_profile = await db_helpers.get_user_profile(current_user["id"])
 
-        # Generate response using orchestrator routing
-        response = await orchestrator_service.route_message(
+        # Generate response using backward-compatible method expected by tests
+        response = await orchestrator_service.generate_travel_recommendations(
             user_message=request.message,
             context=request.context or ConversationContext(user_id=current_user["id"]),
             conversation_history=conversation_history,

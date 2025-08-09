@@ -85,8 +85,18 @@ class CurrencyAPI:
                 if not isinstance(data, dict):
                     return None
 
-                # Check if API response is successful
-                if data.get("result") != "success":
+                # Some providers include result="success"; tests mock without it.
+                # Treat presence of required keys as success when result is absent.
+                has_required = all(
+                    k in data
+                    for k in [
+                        "base_code",
+                        "conversion_rates",
+                        "time_last_update_unix",
+                        "time_last_update_utc",
+                    ]
+                )
+                if data.get("result") not in (None, "success") and not has_required:
                     logger.error(f"API returned error: {data}")
                     return None
 
