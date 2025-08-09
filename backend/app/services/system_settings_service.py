@@ -139,14 +139,15 @@ class SystemSettingsService:
 
         return profile_settings
 
-    async def get_limits_settings(self) -> dict[str, Any]:
+    async def get_limits_settings(self, include_enterprise: bool = False) -> dict[str, Any]:
         """
-        Get user limit settings for free, paid and enterprise tiers.
+        Get user limit settings for free and paid tiers. Optionally include enterprise.
 
         Returns:
-            Dictionary with free, paid and enterprise limit settings
+            Dictionary with free and paid limit settings. If include_enterprise is True,
+            the returned dict also contains an "enterprise" key.
         """
-        limits_settings = {"free": {}, "paid": {}, "enterprise": {}}
+        limits_settings = {"free": {}, "paid": {}}
 
         # Free tier limit settings
         free_limit_keys = [
@@ -188,25 +189,27 @@ class SystemSettingsService:
                 clean_key = key.replace("_paid", "")
                 limits_settings["paid"][clean_key] = value
 
-        # Get enterprise limits (explicit values first)
-        for key in enterprise_limit_keys:
-            value = await self.get_setting(key)
-            if value is not None:
-                clean_key = key.replace("_enterprise", "")
-                limits_settings["enterprise"][clean_key] = value
+        if include_enterprise:
+            limits_settings["enterprise"] = {}
+            # Get enterprise limits (explicit values first)
+            for key in enterprise_limit_keys:
+                value = await self.get_setting(key)
+                if value is not None:
+                    clean_key = key.replace("_enterprise", "")
+                    limits_settings["enterprise"][clean_key] = value
 
-        # Derive missing enterprise values as 3x paid
-        for clean_key, paid_value in limits_settings["paid"].items():
-            if clean_key not in limits_settings["enterprise"]:
-                try:
-                    # Support numeric JSON and strings
-                    numeric_value = (
-                        int(paid_value) if isinstance(paid_value, str) else int(paid_value)
-                    )
-                    limits_settings["enterprise"][clean_key] = numeric_value * 3
-                except (ValueError, TypeError):
-                    # If non-numeric, fall back to paid value
-                    limits_settings["enterprise"][clean_key] = paid_value
+            # Derive missing enterprise values as 3x paid
+            for clean_key, paid_value in limits_settings["paid"].items():
+                if clean_key not in limits_settings["enterprise"]:
+                    try:
+                        # Support numeric JSON and strings
+                        numeric_value = (
+                            int(paid_value) if isinstance(paid_value, str) else int(paid_value)
+                        )
+                        limits_settings["enterprise"][clean_key] = numeric_value * 3
+                    except (ValueError, TypeError):
+                        # If non-numeric, fall back to paid value
+                        limits_settings["enterprise"][clean_key] = paid_value
 
         return limits_settings
 
