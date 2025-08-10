@@ -306,7 +306,7 @@ class TestUserEndpoints:
         assert response.status_code in (401, 403)
 
     def test_update_current_user_profile_no_valid_fields(self, authenticated_client):
-        """Test update_current_user_profile with no valid fields to update."""
+        """Test update_current_user_profile when no valid fields are provided."""
         response = authenticated_client.put(
             "/api/v1/users/me",
             json={},  # Empty update data
@@ -587,16 +587,110 @@ class TestUserEndpoints:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_update_profile_picture_url_update_failure(self, authenticated_client):
-        """Test profile picture URL update when database update fails."""
+        """Test update_profile_picture_url when the update fails."""
         with patch("app.api.v1.user.db_helpers.update_user_profile_picture_url") as mock_update:
             mock_update.return_value = False
-
             response = authenticated_client.patch(
                 "/api/v1/users/me/profile-picture-url",
                 json={"profile_picture_url": "https://example.com/image.jpg"},
             )
-
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert response.json()["detail"] == "Failed to update profile picture URL"
+
+    def test_update_profile_picture_url_generic_exception(self, authenticated_client):
+        """Test update_profile_picture_url when a generic exception is raised."""
+        with patch("app.api.v1.user.db_helpers.update_user_profile_picture_url") as mock_update:
+            mock_update.side_effect = Exception("Database error")
+            response = authenticated_client.patch(
+                "/api/v1/users/me/profile-picture-url",
+                json={"profile_picture_url": "https://example.com/image.jpg"},
+            )
+            assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+            assert response.json()["detail"] == "Failed to update profile picture URL"
+
+    def test_update_current_user_profile_no_valid_fields(self, authenticated_client):
+        """Test update_current_user_profile when no valid fields are provided."""
+        response = authenticated_client.put("/api/v1/users/me", json={})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["detail"] == "No valid fields to update"
+
+    def test_update_user_preferences_empty_data(self, authenticated_client):
+        """Test update_user_preferences when empty preferences are provided."""
+        response = authenticated_client.put("/api/v1/users/preferences", json={})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["detail"] == "Preferences data is required"
+
+    def test_update_user_preferences_no_valid_fields(self, authenticated_client):
+        """Test update_user_preferences when no valid preference fields are provided."""
+        response = authenticated_client.put(
+            "/api/v1/users/preferences", json={"invalid_field": "value"}
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["detail"] == "No valid preference fields to update"
+
+    def test_save_destination_missing_destination_name(self, authenticated_client):
+        """Test save_destination_endpoint when destination_name is missing."""
+        response = authenticated_client.post(
+            "/api/v1/users/destinations/save",
+            json={"destination_data": {"country": "France"}},
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["detail"] == "destination_name is required"
+
+    def test_update_profile_picture_url_missing_url(self, authenticated_client):
+        """Test update_profile_picture_url when profile_picture_url is missing."""
+        response = authenticated_client.patch("/api/v1/users/me/profile-picture-url", json={})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["detail"] == "Profile picture URL is required"
+
+    @patch("app.api.v1.user.system_settings_service.get_profile_settings")
+    @patch("app.api.v1.user.system_settings_service.get_limits_settings")
+    @patch("app.api.v1.user.system_settings_service.get_feature_flags")
+    @patch("app.api.v1.user.system_settings_service.get_subscription_settings")
+    def test_get_system_settings_success(
+        self, mock_subscription, mock_features, mock_limits, mock_profile, authenticated_client
+    ):
+        """Test successful retrieval of system settings."""
+        mock_profile.return_value = {"categories": ["casual", "formal"]}
+        mock_limits.return_value = {"max_destinations": 10}
+        mock_features.return_value = {"profile_enhancement": True}
+        mock_subscription.return_value = {"basic": {"price": 9.99}}
+
+        response = authenticated_client.get("/api/v1/users/system-settings")
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "profile_settings" in data
+        assert "limits" in data
+        assert "features" in data
+        assert "subscriptions" in data
+        assert "timestamp" in data
+
+    @patch("app.api.v1.user.system_settings_service.get_profile_settings")
+    def test_get_system_settings_exception(self, mock_profile, authenticated_client):
+        """Test get_system_settings when an exception occurs."""
+        mock_profile.side_effect = Exception("Service error")
+        response = authenticated_client.get("/api/v1/users/system-settings")
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.json()["detail"] == "Failed to retrieve system settings"
+
+    @patch("app.api.v1.user.system_settings_service.get_public_settings")
+    def test_get_public_system_settings_success(self, mock_public, client):
+        """Test successful retrieval of public system settings."""
+        mock_public.return_value = {"app_version": "1.0.0", "features": ["basic"]}
+        response = client.get("/api/v1/users/system-settings/public")
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "settings" in data
+        assert "timestamp" in data
+        assert data["settings"]["app_version"] == "1.0.0"
+
+    @patch("app.api.v1.user.system_settings_service.get_public_settings")
+    def test_get_public_system_settings_exception(self, mock_public, client):
+        """Test get_public_system_settings when an exception occurs."""
+        mock_public.side_effect = Exception("Service error")
+        response = client.get("/api/v1/users/system-settings/public")
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.json()["detail"] == "Failed to retrieve public system settings"
 
 
 class TestGetPreferencesData:
