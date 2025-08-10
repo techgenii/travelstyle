@@ -55,7 +55,6 @@ from app.services.auth.constants import (
     USER_ID_FIELD,
     USER_PREFERENCES_TABLE,
     USER_PROFILE_VIEW,
-    USERS_TABLE,
 )
 from app.services.auth.exceptions import (
     AuthenticationError,
@@ -130,18 +129,57 @@ class AuthService:
             user_id = response.user.id
             try:
                 current_time = datetime.now(UTC).isoformat()
-                await asyncio.to_thread(
-                    lambda: self.client.table(USERS_TABLE)
-                    .update({LAST_LOGIN_FIELD: current_time})
-                    .eq(ID_FIELD, user_id)
-                    .execute()
+                logger.info(
+                    f"Attempting to update last_login for user {user_id} with time: {current_time}"
                 )
+
+                # Try updating users table directly first to test
+                update_data = {LAST_LOGIN_FIELD: current_time}
+                logger.info(f"Update data: {update_data}")
+
+                # First try the view
+                try:
+                    response_update = await asyncio.to_thread(
+                        lambda: self.client.table(USER_PROFILE_VIEW)
+                        .update(update_data)
+                        .eq(ID_FIELD, user_id)
+                        .execute()
+                    )
+                    logger.info(f"Successfully updated last_login via view for user {user_id}")
+                except Exception as view_error:
+                    logger.warning(f"View update failed, trying users table directly: {view_error}")
+                    # Fallback to users table
+                    response_update = await asyncio.to_thread(
+                        lambda: self.client.table("users")
+                        .update(update_data)
+                        .eq(ID_FIELD, user_id)
+                        .execute()
+                    )
+                    logger.info(
+                        f"Successfully updated last_login via users table for user {user_id}"
+                    )
+
             except Exception as e:
                 logger.warning(f"Failed to update last_login for user {user_id}: {e}")
+                # Log more details about the error
+                if hasattr(e, "response"):
+                    logger.warning(f"Response status: {getattr(e.response, 'status_code', 'N/A')}")
+                    logger.warning(f"Response text: {getattr(e.response, 'text', 'N/A')}")
+                if hasattr(e, "message"):
+                    logger.warning(f"Error message: {e.message}")
+                if hasattr(e, "details"):
+                    logger.warning(f"Error details: {e.details}")
 
-            user_profile = extract_user_profile(response.user)
-            if not user_profile:
-                user_profile = {}
+            # Get complete user profile from user_profile_view
+            try:
+                user_profile = await self.get_complete_user_profile(user_id)
+                if not user_profile:
+                    # Fallback to extracted profile if view doesn't have data yet
+                    user_profile = extract_user_profile(response.user) or {}
+            except Exception as e:
+                logger.warning(f"Failed to get user profile from view for user {user_id}: {e}")
+                # Fallback to extracted profile
+                user_profile = extract_user_profile(response.user) or {}
             return LoginResponse(
                 access_token=response.session.access_token,
                 refresh_token=response.session.refresh_token,
@@ -290,9 +328,16 @@ class AuthService:
                 # If preferences already exist, that's fine
                 logger.info(f"User preferences creation for {user_id}: {e}")
 
-            user_profile = extract_user_profile(login_response.user)
-            if not user_profile:
-                user_profile = {}
+            # Get complete user profile from user_profile_view
+            try:
+                user_profile = await self.get_complete_user_profile(user_id)
+                if not user_profile:
+                    # Fallback to extracted profile if view doesn't have data yet
+                    user_profile = extract_user_profile(login_response.user) or {}
+            except Exception as e:
+                logger.warning(f"Failed to get user profile from view for user {user_id}: {e}")
+                # Fallback to extracted profile
+                user_profile = extract_user_profile(login_response.user) or {}
             return RegisterResponse(
                 access_token=login_response.session.access_token,
                 token_type=DEFAULT_TOKEN_TYPE,
@@ -327,6 +372,46 @@ class AuthService:
             return None
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to get user profile for %s: %s", user_id, type(e).__name__)
+            return None
+
+    async def get_complete_user_profile(self, user_id: str) -> dict[str, Any] | None:
+        """Get complete user profile with all related data from user_profile_view."""
+        self._check_client()
+
+        # Apply rate limiting for read operations
+        if not await db_rate_limiter.acquire("read"):
+            logger.warning("Rate limited: get_complete_user_profile")
+            return None
+
+        try:
+            # Get complete profile from user_profile_view which includes:
+            # - User auth data (email, metadata, etc.)
+            # - User preferences (style, size, travel patterns, etc.)
+            # - Saved destinations
+            # - Currency preferences
+            # - Packing templates
+            # - And other related data
+            response = await asyncio.to_thread(
+                lambda: (
+                    self.client.table(USER_PROFILE_VIEW)
+                    .select("*")
+                    .eq(ID_FIELD, user_id)
+                    .single()
+                    .execute()
+                )
+            )
+
+            if response.data:
+                logger.info(f"Retrieved complete profile for user {user_id}")
+                return response.data
+            else:
+                logger.warning(f"No profile data found for user {user_id}")
+                return None
+
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error(
+                "Failed to get complete user profile for %s: %s", user_id, type(e).__name__
+            )
             return None
 
     async def update_user_profile(

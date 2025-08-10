@@ -21,6 +21,7 @@ Handles access to system configuration settings stored in the database.
 """
 
 import asyncio
+import json
 import logging
 from typing import Any
 
@@ -147,69 +148,89 @@ class SystemSettingsService:
             Dictionary with free and paid limit settings. If include_enterprise is True,
             the returned dict also contains an "enterprise" key.
         """
-        limits_settings = {"free": {}, "paid": {}}
+        limits_settings = {"free": {}, "paid": {}, "premium": {}}
 
-        # Free tier limit settings
-        free_limit_keys = [
-            "max_style_preferences_per_user_free",
-            "max_conversations_per_user_free",
-            "max_bookmarks_per_user_free",
-            "api_rate_limit_per_user_per_hour_free",
-        ]
+        # Get the unified tier definitions
+        free_tier = await self.get_setting("subscription_tier_free")
+        premium_tier = await self.get_setting("subscription_tier_premium")
+        enterprise_tier = (
+            await self.get_setting("subscription_tier_enterprise") if include_enterprise else None
+        )
 
-        # Paid tier limit settings
-        paid_limit_keys = [
-            "max_style_preferences_per_user_paid",
-            "max_conversations_per_user_paid",
-            "max_bookmarks_per_user_paid",
-            "api_rate_limit_per_user_per_hour_paid",
-        ]
+        # Process free tier limits
+        if free_tier:
+            if isinstance(free_tier, str):
+                try:
+                    free_tier = json.loads(free_tier)
+                except json.JSONDecodeError:
+                    logger.warning("Failed to parse subscription_tier_free JSON")
+                    free_tier = {}
 
-        # Enterprise tier limit settings (explicit). If not present, will be derived from paid.
-        enterprise_limit_keys = [
-            "max_style_preferences_per_user_enterprise",
-            "max_conversations_per_user_enterprise",
-            "max_bookmarks_per_user_enterprise",
-            "api_rate_limit_per_user_per_hour_enterprise",
-        ]
+            if isinstance(free_tier, dict) and "limits" in free_tier:
+                limits = free_tier["limits"]
+                # Convert keys to match the expected format
+                for key, value in limits.items():
+                    if key == "style_preferences":
+                        limits_settings["free"]["max_style_preferences_per_user"] = value
+                    elif key == "conversations":
+                        limits_settings["free"]["max_conversations_per_user"] = value
+                    elif key == "bookmarks":
+                        limits_settings["free"]["max_bookmarks_per_user"] = value
+                    elif key == "api_rate_limit_per_hour":
+                        limits_settings["free"]["api_rate_limit_per_user_per_hour"] = value
 
-        # Get free limits
-        for key in free_limit_keys:
-            value = await self.get_setting(key)
-            if value is not None:
-                # Convert key from "max_style_preferences_per_user_free" to "max_style_preferences_per_user"
-                clean_key = key.replace("_free", "")
-                limits_settings["free"][clean_key] = value
+        # Process premium tier limits (paid tier)
+        if premium_tier:
+            if isinstance(premium_tier, str):
+                try:
+                    premium_tier = json.loads(premium_tier)
+                except json.JSONDecodeError:
+                    logger.warning("Failed to parse subscription_tier_premium JSON")
+                    premium_tier = {}
 
-        # Get paid limits
-        for key in paid_limit_keys:
-            value = await self.get_setting(key)
-            if value is not None:
-                # Convert key from "max_style_preferences_per_user_paid" to "max_style_preferences_per_user"
-                clean_key = key.replace("_paid", "")
-                limits_settings["paid"][clean_key] = value
+            if isinstance(premium_tier, dict) and "limits" in premium_tier:
+                limits = premium_tier["limits"]
+                # Convert keys to match the expected format
+                for key, value in limits.items():
+                    if key == "style_preferences":
+                        limits_settings["paid"]["max_style_preferences_per_user"] = value
+                        limits_settings["premium"]["max_style_preferences_per_user"] = value
+                    elif key == "conversations":
+                        limits_settings["paid"]["max_conversations_per_user"] = value
+                        limits_settings["premium"]["max_conversations_per_user"] = value
+                    elif key == "bookmarks":
+                        limits_settings["paid"]["max_bookmarks_per_user"] = value
+                        limits_settings["premium"]["max_bookmarks_per_user"] = value
+                    elif key == "api_rate_limit_per_hour":
+                        limits_settings["paid"]["api_rate_limit_per_user_per_hour"] = value
+                        limits_settings["premium"]["api_rate_limit_per_user_per_hour"] = value
 
         if include_enterprise:
             limits_settings["enterprise"] = {}
-            # Get enterprise limits (explicit values first)
-            for key in enterprise_limit_keys:
-                value = await self.get_setting(key)
-                if value is not None:
-                    clean_key = key.replace("_enterprise", "")
-                    limits_settings["enterprise"][clean_key] = value
 
-            # Derive missing enterprise values as 3x paid
-            for clean_key, paid_value in limits_settings["paid"].items():
-                if clean_key not in limits_settings["enterprise"]:
+            # Process enterprise tier limits
+            if enterprise_tier:
+                if isinstance(enterprise_tier, str):
                     try:
-                        # Support numeric JSON and strings
-                        numeric_value = (
-                            int(paid_value) if isinstance(paid_value, str) else int(paid_value)
-                        )
-                        limits_settings["enterprise"][clean_key] = numeric_value * 3
-                    except (ValueError, TypeError):
-                        # If non-numeric, fall back to paid value
-                        limits_settings["enterprise"][clean_key] = paid_value
+                        enterprise_tier = json.loads(enterprise_tier)
+                    except json.JSONDecodeError:
+                        logger.warning("Failed to parse subscription_tier_enterprise JSON")
+                        enterprise_tier = {}
+
+                if isinstance(enterprise_tier, dict) and "limits" in enterprise_tier:
+                    limits = enterprise_tier["limits"]
+                    # Convert keys to match the expected format
+                    for key, value in limits.items():
+                        if key == "style_preferences":
+                            limits_settings["enterprise"]["max_style_preferences_per_user"] = value
+                        elif key == "conversations":
+                            limits_settings["enterprise"]["max_conversations_per_user"] = value
+                        elif key == "bookmarks":
+                            limits_settings["enterprise"]["max_bookmarks_per_user"] = value
+                        elif key == "api_rate_limit_per_hour":
+                            limits_settings["enterprise"]["api_rate_limit_per_user_per_hour"] = (
+                                value
+                            )
 
         return limits_settings
 
@@ -265,17 +286,40 @@ class SystemSettingsService:
         Get subscription tier settings and features.
 
         Returns:
-            Dictionary with subscription tiers and features
+            Dictionary with subscription tier information
         """
         subscription_settings = {}
 
-        # Get subscription tier settings
-        subscription_setting_keys = ["subscription_tiers", "subscription_features"]
+        # Get subscription tier constants
+        subscription_tiers = await self.get_setting("subscription_tiers")
+        subscription_tier_order = await self.get_setting("subscription_tier_order")
 
-        for key in subscription_setting_keys:
-            value = await self.get_setting(key)
-            if value is not None:
-                subscription_settings[key] = value
+        # Get the unified tier definitions
+        free_tier = await self.get_setting("subscription_tier_free")
+        premium_tier = await self.get_setting("subscription_tier_premium")
+        enterprise_tier = await self.get_setting("subscription_tier_enterprise")
+
+        # Process tier definitions
+        tiers = {}
+        for tier_key, tier_data in [
+            ("free", free_tier),
+            ("premium", premium_tier),
+            ("enterprise", enterprise_tier),
+        ]:
+            if tier_data:
+                if isinstance(tier_data, str):
+                    try:
+                        tier_data = json.loads(tier_data)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Failed to parse subscription_tier_{tier_key} JSON")
+                        continue
+
+                if isinstance(tier_data, dict):
+                    tiers[tier_key] = tier_data
+
+        subscription_settings["tiers"] = tiers
+        subscription_settings["tier_list"] = subscription_tiers
+        subscription_settings["tier_order"] = subscription_tier_order
 
         return subscription_settings
 

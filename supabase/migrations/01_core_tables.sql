@@ -12,7 +12,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- =============================================================================
 
 -- Main users table
-CREATE TABLE public.users (
+CREATE TABLE public.profiles (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   email character varying NOT NULL UNIQUE, -- User's email address
   first_name character varying, -- User's first name
@@ -27,7 +27,7 @@ CREATE TABLE public.users (
   is_premium boolean DEFAULT false, -- Whether user has premium features
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT users_pkey PRIMARY KEY (id)
+  CONSTRAINT profiles_pkey PRIMARY KEY (id)
 );
 
 -- User preferences and settings
@@ -43,7 +43,7 @@ CREATE TABLE public.user_preferences (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT user_preferences_pkey PRIMARY KEY (id),
-  CONSTRAINT user_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT user_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
   CONSTRAINT user_preferences_user_id_key UNIQUE (user_id)
 );
 
@@ -57,7 +57,7 @@ CREATE TABLE public.user_auth_tokens (
   is_revoked boolean DEFAULT false, -- Whether token has been revoked
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT user_auth_tokens_pkey PRIMARY KEY (id),
-  CONSTRAINT user_auth_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+  CONSTRAINT user_auth_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );
 
 -- System settings and configuration
@@ -72,6 +72,47 @@ CREATE TABLE public.system_settings (
   CONSTRAINT system_settings_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS public.user_payment_methods (
+    id uuid PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+    user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    stripe_customer_id text,
+    stripe_payment_method_id text,
+    payment_method_type text NOT NULL,
+    expiry_date text,
+    is_default boolean DEFAULT false,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+ALTER TABLE public.user_payment_methods ENABLE ROW LEVEL SECURITY;
+
+-- Allow users to view their own payment methods
+CREATE POLICY "Users can view their own payment methods"
+ON public.user_payment_methods
+FOR SELECT TO authenticated
+USING ((SELECT auth.uid()) = user_id);
+
+-- Allow users to insert their own payment methods
+CREATE POLICY "Users can insert their own payment methods"
+ON public.user_payment_methods
+FOR INSERT TO authenticated
+WITH CHECK ((SELECT auth.uid()) = user_id);
+
+-- Allow users to update their own payment methods
+CREATE POLICY "Users can update their own payment methods"
+ON public.user_payment_methods
+FOR UPDATE TO authenticated
+USING ((SELECT auth.uid()) = user_id)
+WITH CHECK ((SELECT auth.uid()) = user_id);
+
+-- Allow users to delete their own payment methods
+CREATE POLICY "Users can delete their own payment methods"
+ON public.user_payment_methods
+FOR DELETE TO authenticated
+USING ((SELECT auth.uid()) = user_id);
+
+-- Create an index on user_id for faster lookups
+CREATE INDEX idx_user_payment_methods_user_id ON public.user_payment_methods(user_id);
 -- =============================================================================
 -- INDEXES FOR CORE TABLES
 -- =============================================================================

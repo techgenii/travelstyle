@@ -9,7 +9,7 @@
 -- Create packing_templates table
 CREATE TABLE IF NOT EXISTS packing_templates (
     id uuid PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
-    user_id uuid NOT NULL REFERENCES users(id),
+    user_id uuid NOT NULL REFERENCES profiles(id),
     template_name text NOT NULL,
     template_data jsonb NOT NULL DEFAULT '{}'::jsonb,
     is_default boolean DEFAULT false,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS packing_templates (
 -- Create saved_destinations table
 CREATE TABLE IF NOT EXISTS saved_destinations (
     id uuid PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
-    user_id uuid NOT NULL REFERENCES users(id),
+    user_id uuid NOT NULL REFERENCES profiles(id),
     destination_name text NOT NULL,
     destination_data jsonb NOT NULL DEFAULT '{}'::jsonb,
     is_favorite boolean DEFAULT false,
@@ -49,7 +49,7 @@ $$ language 'plpgsql';
 -- =============================================================================
 
 -- Core table timestamp triggers
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences

@@ -19,7 +19,7 @@ CREATE TABLE public.currency_favorites (
   last_used timestamp with time zone DEFAULT now(), -- Last time this pair was used
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT currency_favorites_pkey PRIMARY KEY (id),
-  CONSTRAINT currency_favorites_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+  CONSTRAINT currency_favorites_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );
 
 -- Store user's packing templates
@@ -37,7 +37,7 @@ CREATE TABLE public.packing_templates (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT packing_templates_pkey PRIMARY KEY (id),
-  CONSTRAINT packing_templates_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+  CONSTRAINT packing_templates_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );
 
 -- Store user's saved destinations
@@ -52,7 +52,7 @@ CREATE TABLE public.saved_destinations (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT saved_destinations_pkey PRIMARY KEY (id),
-  CONSTRAINT saved_destinations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+  CONSTRAINT saved_destinations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );
 
 -- =============================================================================

@@ -27,11 +27,6 @@ $$ LANGUAGE plpgsql;
 -- ADD MISSING COLUMNS TO EXISTING TABLES
 -- =============================================================================
 
--- Note: All enhanced user columns (first_name, last_name, profile_picture_url,
--- default_location, max_bookmarks, max_conversations, subscription_tier,
--- subscription_expires_at, is_premium) are already defined in 01_core_tables.sql
--- No duplication needed here.
-
 -- First check if saved_destinations table exists
 DO $$
 BEGIN
@@ -77,79 +72,76 @@ BEGIN
 END $$;
 
 -- =============================================================================
--- ADD MISSING TABLES (if they don't exist)
+-- ADD MISSING COLUMNS TO EXISTING TABLES
 -- =============================================================================
 
--- Create clothing_styles table if it doesn't exist (with your enhanced schema)
-CREATE TABLE IF NOT EXISTS clothing_styles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    style_name VARCHAR(255) NOT NULL UNIQUE,
-    category VARCHAR(100) NOT NULL CHECK (category IN (
-        'aesthetic',        -- streetwear, boho, minimalist, etc.
-        'cultural_etiquette', -- mosque-appropriate, temple-appropriate, etc.
-        'functional'        -- rain-ready, airport-friendly, snow gear, etc.
-    )),
-    description TEXT,
-    region_applicability JSONB DEFAULT '[]'::jsonb, -- list of regions or country codes (optional)
-    qloo_entity_id VARCHAR(255), -- optional: Qloo-compatible entity ID if available
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- Add missing columns to user_preferences if they don't exist
+DO $$
+BEGIN
+    -- Add style_preferences column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+        AND table_name = 'user_preferences'
+        AND column_name = 'style_preferences'
+    ) THEN
+        ALTER TABLE user_preferences ADD COLUMN style_preferences JSONB DEFAULT '{}'::jsonb;
+    END IF;
 
--- Create user_style_preferences table if it doesn't exist (with your enhanced schema)
-CREATE TABLE IF NOT EXISTS user_style_preferences (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL,
-    style_id UUID NOT NULL,
-    importance_level INTEGER DEFAULT 3 CHECK (importance_level BETWEEN 1 AND 5), -- optional user weighting
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, style_id),
-    CONSTRAINT user_style_preferences_user_id_fkey FOREIGN KEY (user_id)
-        REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT user_style_preferences_style_id_fkey FOREIGN KEY (style_id)
-        REFERENCES clothing_styles(id) ON DELETE CASCADE
-);
+    -- Add size_info column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+        AND table_name = 'user_preferences'
+        AND column_name = 'size_info'
+    ) THEN
+        ALTER TABLE user_preferences ADD COLUMN size_info JSONB DEFAULT '{}'::jsonb;
+    END IF;
 
--- =============================================================================
--- ADD OPTIMIZED INDEXES FOR CLOTHING STYLES
--- =============================================================================
+    -- Add travel_patterns column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+        AND table_name = 'user_preferences'
+        AND column_name = 'travel_patterns'
+    ) THEN
+        ALTER TABLE user_preferences ADD COLUMN travel_patterns JSONB DEFAULT '{}'::jsonb;
+    END IF;
 
--- For fast lookups by style name (e.g., autocomplete, search)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_clothing_styles_style_name
-  ON public.clothing_styles (style_name);
+    -- Add quick_reply_preferences column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+        AND table_name = 'user_preferences'
+        AND column_name = 'quick_reply_preferences'
+    ) THEN
+        ALTER TABLE user_preferences ADD COLUMN quick_reply_preferences JSONB DEFAULT '{"enabled": true}'::jsonb;
+    END IF;
 
--- For filtering by category (aesthetic, functional, etc.)
-CREATE INDEX IF NOT EXISTS idx_clothing_styles_category
-  ON public.clothing_styles (category);
+    -- Add packing_methods column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+        AND table_name = 'user_preferences'
+        AND column_name = 'packing_methods'
+    ) THEN
+        ALTER TABLE user_preferences ADD COLUMN packing_methods JSONB DEFAULT '{}'::jsonb;
+    END IF;
 
--- For region-based style filtering (on JSONB field)
-CREATE INDEX IF NOT EXISTS idx_clothing_styles_region_applicability
-  ON public.clothing_styles
-  USING GIN (region_applicability);
-
--- For lookups via Qloo entity ID
-CREATE INDEX IF NOT EXISTS idx_clothing_styles_qloo_entity_id
-  ON public.clothing_styles (qloo_entity_id);
-
--- Speed up join queries between users and their style prefs
-CREATE INDEX IF NOT EXISTS idx_user_style_preferences_user_id
-  ON public.user_style_preferences (user_id);
-
-CREATE INDEX IF NOT EXISTS idx_user_style_preferences_style_id
-  ON public.user_style_preferences (style_id);
-
--- Composite index for user and style (avoid duplicate inserts or for upserts)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_user_style_preferences_user_style
-  ON public.user_style_preferences (user_id, style_id);
+    -- Add currency_preferences column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+        AND table_name = 'user_preferences'
+        AND column_name = 'currency_preferences'
+    ) THEN
+        ALTER TABLE user_preferences ADD COLUMN currency_preferences JSONB DEFAULT '{}'::jsonb;
+    END IF;
+END $$;
 
 -- =============================================================================
 -- ADD MISSING INDEXES FOR EXISTING TABLES
 -- =============================================================================
-
--- Add missing indexes for users table (only new ones not in core indexes)
--- Note: Core user indexes are already defined in indexes/01_core_indexes.sql
--- Only adding indexes for new columns not in core tables
 
 -- Add missing indexes for saved_destinations if the table exists
 DO $$
@@ -222,63 +214,13 @@ CREATE POLICY "Users can delete own style preferences" ON user_style_preferences
     FOR DELETE USING ((auth.uid() = user_id));
 
 -- =============================================================================
--- ADD MISSING SYSTEM SETTINGS
--- =============================================================================
-
--- Insert additional system settings if they don't exist
-INSERT INTO system_settings (setting_key, setting_value, description, is_public) VALUES
-('max_style_preferences_per_user', '50'::jsonb, 'Maximum number of style preferences a user can have', false),
-('style_recommendation_enabled', 'true'::jsonb, 'Whether to enable style recommendations', false),
-('clothing_categories', '["aesthetic", "cultural_etiquette", "functional"]'::jsonb, 'Available clothing categories', true),
-('style_importance_levels', '5'::jsonb, 'Maximum importance level for style preferences', true)
-ON CONFLICT (setting_key) DO NOTHING;
-
--- =============================================================================
--- ADD MISSING COLUMNS TO USERS TABLE
--- =============================================================================
-
--- Add missing columns to users table if they don't exist
-DO $$
-BEGIN
-    -- Add last_login column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = 'public'
-        AND table_name = 'users'
-        AND column_name = 'last_login'
-    ) THEN
-        ALTER TABLE users ADD COLUMN last_login TIMESTAMP WITH TIME ZONE;
-    END IF;
-
-    -- Add preferences column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = 'public'
-        AND table_name = 'users'
-        AND column_name = 'preferences'
-    ) THEN
-        ALTER TABLE users ADD COLUMN preferences JSONB DEFAULT '{}'::jsonb;
-    END IF;
-
-    -- Add ui_preferences column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = 'public'
-        AND table_name = 'users'
-        AND column_name = 'ui_preferences'
-    ) THEN
-        ALTER TABLE users ADD COLUMN ui_preferences JSONB DEFAULT '{}'::jsonb;
-    END IF;
-END $$;
-
--- =============================================================================
 -- ADD MISSING VIEWS
 -- =============================================================================
 
 -- Create enhanced user profile view if it doesn't exist
 DROP VIEW IF EXISTS public.user_profile_view;
 
-CREATE VIEW public.user_profile_view WITH (security_invoker=on) AS
+CREATE OR REPLACE VIEW public.user_profile_view WITH (security_invoker=on) AS
 SELECT
     u.id,
     u.email,
@@ -294,38 +236,17 @@ SELECT
     p.currency_preferences,
     u.created_at,
     u.updated_at,
-    u.last_login,
-
-    -- NEW: Aggregate list of selected style names
-    ARRAY_REMOVE(ARRAY_AGG(DISTINCT cs.style_name), NULL) AS selected_style_names,
-
-    -- NEW: Additional user fields
-    u.preferences,
-    u.ui_preferences,
+    COALESCE(p.style_preferences->>'selected_styles', '[]')::text[] AS selected_style_names,
     u.default_location,
     u.max_bookmarks,
     u.max_conversations,
     u.subscription_tier,
     u.subscription_expires_at,
     u.is_premium
-
 FROM
-    public.users u
+    public.profiles u
 LEFT JOIN
-    public.user_preferences p ON u.id = p.user_id
-LEFT JOIN
-    public.user_style_preferences usp ON u.id = usp.user_id
-LEFT JOIN
-    public.clothing_styles cs ON usp.style_id = cs.id
-
-GROUP BY
-    u.id, u.email, u.first_name, u.last_name, u.profile_completed,
-    u.profile_picture_url, p.style_preferences, p.size_info,
-    p.travel_patterns, p.quick_reply_preferences, p.packing_methods,
-    p.currency_preferences, u.created_at, u.updated_at, u.last_login,
-    u.preferences, u.ui_preferences, u.default_location, u.max_bookmarks,
-    u.max_conversations, u.subscription_tier, u.subscription_expires_at,
-    u.is_premium;
+    public.user_preferences p ON u.id = p.user_id;
 
 -- Create style preferences summary view
 DROP VIEW IF EXISTS public.user_style_preferences_summary;
@@ -341,7 +262,153 @@ SELECT
     COUNT(usp.id) FILTER (WHERE cs.category = 'cultural_etiquette') as cultural_styles,
     COUNT(usp.id) FILTER (WHERE cs.category = 'functional') as functional_styles,
     MAX(usp.created_at) as last_style_update
-FROM users u
+FROM profiles u
 LEFT JOIN user_style_preferences usp ON u.id = usp.user_id
 LEFT JOIN clothing_styles cs ON usp.style_id = cs.id
 GROUP BY u.id, u.email;
+
+-- =============================================================================
+-- CREATE TRIGGERS FOR USER PROFILE VIEW
+-- =============================================================================
+
+-- Create or replace the trigger function
+CREATE OR REPLACE FUNCTION handle_user_profile_view_update()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- For INSERT operations
+    IF TG_OP = 'INSERT' THEN
+        -- Insert into profiles table
+        INSERT INTO profiles (
+            id,
+            email,
+            first_name,
+            last_name,
+            profile_completed,
+            profile_picture_url,
+            default_location,
+            max_bookmarks,
+            max_conversations,
+            subscription_tier,
+            subscription_expires_at,
+            is_premium
+        ) VALUES (
+            COALESCE(NEW.id, extensions.uuid_generate_v4()),
+            NEW.email,
+            NEW.first_name,
+            NEW.last_name,
+            NEW.profile_completed,
+            NEW.profile_picture_url,
+            NEW.default_location,
+            NEW.max_bookmarks,
+            NEW.max_conversations,
+            NEW.subscription_tier,
+            NEW.subscription_expires_at,
+            NEW.is_premium
+        )
+        RETURNING id INTO NEW.id;
+
+        -- Insert into user_preferences table
+        INSERT INTO user_preferences (
+            user_id,
+            style_preferences,
+            size_info,
+            travel_patterns,
+            quick_reply_preferences,
+            packing_methods,
+            currency_preferences
+        ) VALUES (
+            NEW.id,
+            NEW.style_preferences,
+            NEW.size_info,
+            NEW.travel_patterns,
+            NEW.quick_reply_preferences,
+            NEW.packing_methods,
+            NEW.currency_preferences
+        );
+
+    -- For UPDATE operations
+    ELSIF TG_OP = 'UPDATE' THEN
+        -- Update profiles table
+        IF NEW.first_name IS DISTINCT FROM OLD.first_name OR
+           NEW.last_name IS DISTINCT FROM OLD.last_name OR
+           NEW.profile_completed IS DISTINCT FROM OLD.profile_completed OR
+           NEW.profile_picture_url IS DISTINCT FROM OLD.profile_picture_url OR
+           NEW.default_location IS DISTINCT FROM OLD.default_location OR
+           NEW.max_bookmarks IS DISTINCT FROM OLD.max_bookmarks OR
+           NEW.max_conversations IS DISTINCT FROM OLD.max_conversations OR
+           NEW.subscription_tier IS DISTINCT FROM OLD.subscription_tier OR
+           NEW.subscription_expires_at IS DISTINCT FROM OLD.subscription_expires_at OR
+           NEW.is_premium IS DISTINCT FROM OLD.is_premium THEN
+
+            UPDATE profiles SET
+                first_name = NEW.first_name,
+                last_name = NEW.last_name,
+                profile_completed = NEW.profile_completed,
+                profile_picture_url = NEW.profile_picture_url,
+                default_location = NEW.default_location,
+                max_bookmarks = NEW.max_bookmarks,
+                max_conversations = NEW.max_conversations,
+                subscription_tier = NEW.subscription_tier,
+                subscription_expires_at = NEW.subscription_expires_at,
+                is_premium = NEW.is_premium,
+                updated_at = NOW()
+            WHERE id = NEW.id;
+        END IF;
+
+        -- Update user_preferences table
+        IF NEW.style_preferences IS DISTINCT FROM OLD.style_preferences OR
+           NEW.size_info IS DISTINCT FROM OLD.size_info OR
+           NEW.travel_patterns IS DISTINCT FROM OLD.travel_patterns OR
+           NEW.quick_reply_preferences IS DISTINCT FROM OLD.quick_reply_preferences OR
+           NEW.packing_methods IS DISTINCT FROM OLD.packing_methods OR
+           NEW.currency_preferences IS DISTINCT FROM OLD.currency_preferences THEN
+
+            -- Check if user_preferences record exists
+            IF EXISTS (SELECT 1 FROM user_preferences WHERE user_id = NEW.id) THEN
+                UPDATE user_preferences SET
+                    style_preferences = NEW.style_preferences,
+                    size_info = NEW.size_info,
+                    travel_patterns = NEW.travel_patterns,
+                    quick_reply_preferences = NEW.quick_reply_preferences,
+                    packing_methods = NEW.packing_methods,
+                    currency_preferences = NEW.currency_preferences,
+                    updated_at = NOW()
+                WHERE user_id = NEW.id;
+            ELSE
+                INSERT INTO user_preferences (
+                    user_id,
+                    style_preferences,
+                    size_info,
+                    travel_patterns,
+                    quick_reply_preferences,
+                    packing_methods,
+                    currency_preferences
+                ) VALUES (
+                    NEW.id,
+                    NEW.style_preferences,
+                    NEW.size_info,
+                    NEW.travel_patterns,
+                    NEW.quick_reply_preferences,
+                    NEW.packing_methods,
+                    NEW.currency_preferences
+                );
+            END IF;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create triggers for user_profile_view
+DROP TRIGGER IF EXISTS user_profile_view_insert_trigger ON user_profile_view;
+CREATE TRIGGER user_profile_view_insert_trigger
+    INSTEAD OF INSERT ON user_profile_view
+    FOR EACH ROW
+    EXECUTE FUNCTION handle_user_profile_view_update();
+
+DROP TRIGGER IF EXISTS user_profile_view_update_trigger ON user_profile_view;
+CREATE TRIGGER user_profile_view_update_trigger
+    INSTEAD OF UPDATE ON user_profile_view
+    FOR EACH ROW
+    EXECUTE FUNCTION handle_user_profile_view_update();

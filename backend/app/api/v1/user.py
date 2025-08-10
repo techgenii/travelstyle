@@ -480,6 +480,43 @@ def get_preferences_data(user_id=None):
     }
 
 
+@router.get("/settings")
+async def get_settings(current_user: dict = current_user_dependency):
+    """
+    Get settings for the current user.
+
+    Returns dynamic settings that are relevant for user profile functionality,
+    including clothing categories, style importance levels, supported currencies,
+    and default packing methods.
+    """
+    try:
+        # Get profile-related settings
+        profile_settings = await system_settings_service.get_profile_settings()
+
+        # Get user limit settings
+        limits_settings = await system_settings_service.get_limits_settings()
+
+        # Get feature flag settings
+        feature_settings = await system_settings_service.get_feature_flags()
+
+        # Get subscription settings
+        subscription_settings = await system_settings_service.get_subscription_settings()
+
+        return {
+            "profile_settings": profile_settings,
+            "limits": limits_settings,
+            "features": feature_settings,
+            "subscriptions": subscription_settings,
+            "timestamp": "2025-01-01T00:00:00Z",  # You could make this dynamic
+        }
+    except Exception as e:
+        logger.error("Get settings error: %s", type(e).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve settings",
+        ) from e
+
+
 @router.get("/system-settings")
 async def get_system_settings(current_user: dict = current_user_dependency):
     """

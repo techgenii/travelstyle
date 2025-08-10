@@ -49,7 +49,7 @@ BEGIN
             MAX(c.updated_at),
             MAX(arl.created_at)
         ) as last_activity
-    FROM users u
+    FROM profiles u
     LEFT JOIN conversations c ON u.id = c.user_id
         AND c.updated_at >= NOW() - INTERVAL '1 day' * days_back
     LEFT JOIN api_request_logs arl ON u.id = arl.user_id
@@ -69,10 +69,10 @@ RETURNS TABLE(
 BEGIN
     RETURN QUERY
     SELECT
-        'total_users'::TEXT as metric_name,
+        'total_profiles'::TEXT as metric_name,
         COUNT(*)::NUMERIC as metric_value,
-        'users'::TEXT as metric_unit
-    FROM users
+        'profiles'::TEXT as metric_unit
+    FROM profiles
     UNION ALL
     SELECT
         'active_conversations'::TEXT,

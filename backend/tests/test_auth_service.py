@@ -52,6 +52,21 @@ async def test_login_success(mock_extract, auth_service):
     mock_user.id = "user-1"  # Set the user ID
     mock_auth.sign_in_with_password.return_value = Mock(user=mock_user, session=mock_session)
     auth_service.client.auth = mock_auth
+
+    # Mock the database table operations for user_profile_view
+    mock_table = MagicMock()
+    mock_response = MagicMock()
+    mock_response.data = {
+        "id": "user-1",
+        "email": "test@example.com",
+        "first_name": "John",
+        "last_name": "Doe",
+    }
+    mock_table.select.return_value.eq.return_value.single.return_value.execute.return_value = (
+        mock_response
+    )
+    auth_service.client.table = Mock(return_value=mock_table)
+
     login_data = LoginRequest(email="test@example.com", password="password")
     result = await auth_service.login(login_data)
     assert result.access_token == "token"
@@ -180,10 +195,25 @@ async def test_refresh_token_no_session_original(auth_service):
 async def test_register_success(auth_service):
     mock_auth = Mock()
     mock_user = Mock()
+    mock_user.id = "user-1"  # Set the user ID properly
     mock_session = Mock(access_token="token", expires_in=3600)
     mock_auth.sign_up.return_value = Mock(user=mock_user)
     mock_auth.sign_in_with_password.return_value = Mock(user=mock_user, session=mock_session)
     auth_service.client.auth = mock_auth
+
+    # Mock the database table operations for user_profile_view
+    mock_table = MagicMock()
+    mock_response = MagicMock()
+    mock_response.data = {
+        "id": "user-1",
+        "email": "test@example.com",
+        "first_name": "Jane",
+        "last_name": "Doe",
+    }
+    mock_table.select.return_value.eq.return_value.single.return_value.execute.return_value = (
+        mock_response
+    )
+    auth_service.client.table = Mock(return_value=mock_table)
 
     # Create a proper mock user profile that returns actual values
     mock_user_profile = {"id": "user-1", "email": "test@example.com"}
@@ -318,11 +348,26 @@ async def test_login_no_user_profile(auth_service):
     """Test login when extract_user_profile returns None."""
     mock_response = MagicMock()
     mock_user = MagicMock()
+    mock_user.id = "user-1"  # Set the user ID properly
     mock_response.user = mock_user
     mock_response.session = MagicMock()
     mock_response.session.access_token = "access_token"
     mock_response.session.refresh_token = "refresh_token"
     mock_response.session.expires_in = 3600
+
+    # Mock the database table operations for user_profile_view
+    mock_table = MagicMock()
+    mock_db_response = MagicMock()
+    mock_db_response.data = {
+        "id": "user-1",
+        "email": "test@example.com",
+        "first_name": "John",
+        "last_name": "Doe",
+    }
+    mock_table.select.return_value.eq.return_value.single.return_value.execute.return_value = (
+        mock_db_response
+    )
+    auth_service.client.table = Mock(return_value=mock_table)
 
     with patch("app.services.auth.helpers.extract_user_profile", return_value=None):
         with patch.object(
@@ -331,8 +376,9 @@ async def test_login_no_user_profile(auth_service):
             result = await auth_service.login(
                 LoginRequest(email="test@example.com", password="password")
             )
-            # The service should return an empty dict when extract_user_profile returns None
-            assert result.user == {}
+            # The service should return the profile data from the database when extract_user_profile returns None
+            assert result.user["id"] == "user-1"
+            assert result.user["email"] == "test@example.com"
 
 
 @pytest.mark.asyncio

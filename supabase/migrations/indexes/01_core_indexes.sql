@@ -9,10 +9,10 @@
 -- =============================================================================
 
 -- User table indexes
-CREATE INDEX idx_users_subscription_tier ON public.users(subscription_tier);
-CREATE INDEX idx_users_subscription_expires ON public.users(subscription_expires_at);
-CREATE INDEX idx_users_email ON public.users(email);
-CREATE INDEX idx_users_profile_completed ON public.users(profile_completed);
+CREATE INDEX idx_profiles_subscription_tier ON public.profiles(subscription_tier);
+CREATE INDEX idx_profiles_subscription_expires ON public.profiles(subscription_expires_at);
+CREATE INDEX idx_profiles_email ON public.profiles(email);
+CREATE INDEX idx_profiles_profile_completed ON public.profiles(profile_completed);
 
 -- User preferences indexes
 CREATE INDEX idx_user_preferences_user_id ON user_preferences(user_id);

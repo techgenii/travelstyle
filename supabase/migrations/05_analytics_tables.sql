@@ -23,7 +23,7 @@ CREATE TABLE public.api_request_logs (
   user_agent text, -- Client user agent string
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT api_request_logs_pkey PRIMARY KEY (id),
-  CONSTRAINT api_request_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT api_request_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
   CONSTRAINT api_request_logs_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.chat_sessions(id)
 );
 
@@ -40,7 +40,7 @@ CREATE TABLE public.api_usage_tracking (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT api_usage_tracking_pkey PRIMARY KEY (id),
-  CONSTRAINT api_usage_tracking_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+  CONSTRAINT api_usage_tracking_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );
 
 -- Track recommendation quality and usage
@@ -55,7 +55,7 @@ CREATE TABLE public.recommendation_history (
   was_used boolean DEFAULT false, -- Whether user acted on the recommendation
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT recommendation_history_pkey PRIMARY KEY (id),
-  CONSTRAINT recommendation_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT recommendation_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
   CONSTRAINT recommendation_history_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id)
 );
 
@@ -70,7 +70,7 @@ CREATE TABLE public.response_feedback (
   ai_response_content text, -- Content of the AI response for context
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT response_feedback_pkey PRIMARY KEY (id),
-  CONSTRAINT response_feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT response_feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
   CONSTRAINT response_feedback_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id)
 );
 

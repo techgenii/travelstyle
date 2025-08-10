@@ -22,10 +22,23 @@ WHERE id NOT IN (
     WHERE t.rn = 1
 );
 
--- Add the unique constraint
-ALTER TABLE currency_rates_cache
-ADD CONSTRAINT currency_rates_cache_base_currency_api_source_key
-UNIQUE (base_currency, api_source);
+-- Add the unique constraint only if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_constraint con
+        INNER JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
+        INNER JOIN pg_catalog.pg_namespace nsp ON nsp.oid = rel.relnamespace
+        WHERE nsp.nspname = 'public'
+          AND rel.relname = 'currency_rates_cache'
+          AND con.conname = 'currency_rates_cache_base_currency_api_source_key'
+    ) THEN
+        ALTER TABLE currency_rates_cache
+        ADD CONSTRAINT currency_rates_cache_base_currency_api_source_key
+        UNIQUE (base_currency, api_source);
+    END IF;
+END $$;
 
 -- =============================================================================
 -- CONVERSATION MESSAGES SCHEMA FIX
@@ -91,14 +104,53 @@ BEGIN
 END $$;
 
 -- Add NOT NULL constraints if they don't exist
-ALTER TABLE conversation_messages ALTER COLUMN message_id SET NOT NULL;
-ALTER TABLE conversation_messages ALTER COLUMN role SET NOT NULL;
-ALTER TABLE conversation_messages ALTER COLUMN content SET NOT NULL;
+DO $$
+BEGIN
+    -- First check if the columns exist and are nullable before altering
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'conversation_messages'
+        AND column_name = 'message_id'
+        AND is_nullable = 'YES'
+    ) THEN
+        ALTER TABLE conversation_messages ALTER COLUMN message_id SET NOT NULL;
+    END IF;
 
--- Add check constraint for role values
-ALTER TABLE conversation_messages DROP CONSTRAINT IF EXISTS conversation_messages_role_check;
-ALTER TABLE conversation_messages ADD CONSTRAINT conversation_messages_role_check
-    CHECK (role::text = ANY (ARRAY['user'::character varying, 'assistant'::character varying, 'system'::character varying]::text[]));
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'conversation_messages'
+        AND column_name = 'role'
+        AND is_nullable = 'YES'
+    ) THEN
+        ALTER TABLE conversation_messages ALTER COLUMN role SET NOT NULL;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'conversation_messages'
+        AND column_name = 'content'
+        AND is_nullable = 'YES'
+    ) THEN
+        ALTER TABLE conversation_messages ALTER COLUMN content SET NOT NULL;
+    END IF;
+END $$;
+
+-- Add check constraint for role values if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_constraint con
+        INNER JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
+        INNER JOIN pg_catalog.pg_namespace nsp ON nsp.oid = rel.relnamespace
+        WHERE nsp.nspname = 'public'
+          AND rel.relname = 'conversation_messages'
+          AND con.conname = 'conversation_messages_role_check'
+    ) THEN
+        ALTER TABLE conversation_messages ADD CONSTRAINT conversation_messages_role_check
+            CHECK (role::text = ANY (ARRAY['user'::character varying, 'assistant'::character varying, 'system'::character varying]::text[]));
+    END IF;
+END $$;
 
 -- =============================================================================
 -- CHAT SESSIONS SCHEMA FIX

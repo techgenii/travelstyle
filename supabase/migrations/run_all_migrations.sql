@@ -9,7 +9,7 @@
 \i 01_core_tables.sql
 
 -- ============================================================================
--- STEP 2: CHAT TABLES (Depends on users)
+-- STEP 2: CHAT TABLES (Depends on profiles)
 -- ============================================================================
 \echo 'Creating chat tables...'
 \i 02_chat_tables.sql
@@ -21,43 +21,31 @@
 \i 03_cache_tables.sql
 
 -- ============================================================================
--- STEP 4: USER DATA TABLES (Depends on users)
+-- STEP 4: STYLE TABLES (Depends on profiles)
+-- ============================================================================
+\echo 'Creating style tables...'
+\i 04_style_tables.sql
+
+-- ============================================================================
+-- STEP 5: USER DATA TABLES (Depends on profiles)
 -- ============================================================================
 \echo 'Creating user data tables...'
 \i 04_user_data_tables.sql
 
 -- ============================================================================
--- STEP 5: ANALYTICS TABLES (Depends on users and conversations)
+-- STEP 6: ANALYTICS TABLES (Depends on profiles and conversations)
 -- ============================================================================
 \echo 'Creating analytics tables...'
 \i 05_analytics_tables.sql
 
 -- ============================================================================
--- STEP 6: VIEWS (Depends on all tables)
+-- STEP 7: VIEWS (Depends on all tables)
 -- ============================================================================
 \echo 'Creating views...'
 \i 06_views.sql
 
 -- ============================================================================
--- STEP 7: ONE-TIME FIXES (For existing databases - safe to run)
--- ============================================================================
-\echo 'Applying one-time fixes...'
-\i 07_one_time_fixes.sql
-
--- ============================================================================
--- STEP 8: SCHEMA ENHANCEMENTS
--- ============================================================================
-\echo 'Applying schema enhancements...'
-\i 08_schema_enhancements.sql
-
--- ============================================================================
--- STEP 9: ROW LEVEL SECURITY (Security policies)
--- ============================================================================
-\echo 'Setting up Row Level Security...'
-\i 09_row_level_security.sql
-
--- ============================================================================
--- STEP 10: FUNCTIONS (Depends on tables)
+-- STEP 8: FUNCTIONS (Depends on tables and views)
 -- ============================================================================
 \echo 'Creating functions...'
 \i functions/01_timestamp_triggers.sql
@@ -67,13 +55,31 @@
 \i functions/05_utility_functions.sql
 
 -- ============================================================================
--- STEP 11: INDEXES (Depends on tables)
+-- STEP 9: INDEXES (Depends on tables)
 -- ============================================================================
 \echo 'Creating indexes...'
 \i indexes/01_core_indexes.sql
 \i indexes/02_chat_indexes.sql
 \i indexes/03_cache_indexes.sql
 \i indexes/04_analytics_indexes.sql
+
+-- ============================================================================
+-- STEP 10: SCHEMA ENHANCEMENTS (Adds missing columns)
+-- ============================================================================
+\echo 'Applying schema enhancements...'
+\i 08_schema_enhancements.sql
+
+-- ============================================================================
+-- STEP 11: ROW LEVEL SECURITY (Security policies)
+-- ============================================================================
+\echo 'Setting up Row Level Security...'
+\i 09_row_level_security.sql
+
+-- ============================================================================
+-- STEP 12: SUBSCRIPTION LIMITS (Final configuration)
+-- ============================================================================
+\echo 'Setting up subscription limits...'
+\i 10_subscription_limits.sql
 
 -- ============================================================================
 -- COMPLETION

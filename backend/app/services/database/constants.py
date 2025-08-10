@@ -24,7 +24,7 @@ class DatabaseTables:
     """Constants for database table names"""
 
     # Core tables
-    USERS = "users"
+    USERS = "profiles"
     USER_PREFERENCES = "user_preferences"
     USER_AUTH_TOKENS = "user_auth_tokens"
     SYSTEM_SETTINGS = "system_settings"

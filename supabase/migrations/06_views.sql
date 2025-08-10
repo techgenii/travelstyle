@@ -1,33 +1,89 @@
 -- =============================================================================
--- TravelStyle AI - Database Views
+-- TravelStyle AI - Views
 -- =============================================================================
--- This file contains database views for simplified data access
--- =============================================================================
-
--- =============================================================================
--- DATABASE VIEWS
+-- This file contains database views for complex queries
 -- =============================================================================
 
--- Enhanced user profile view that combines users, user_preferences, and style preferences
--- Note: This view is defined in 08_schema_enhancements.sql with full style integration
--- This placeholder ensures the view exists for the modular structure
+-- =============================================================================
+-- USER PROFILE VIEW
+-- =============================================================================
 
--- API performance summary view
-CREATE OR REPLACE VIEW api_performance_summary AS
+-- Create enhanced user profile view
+DROP VIEW IF EXISTS public.user_profile_view;
+
+CREATE OR REPLACE VIEW public.user_profile_view WITH (security_invoker=on) AS
 SELECT
-    api_name,
+    u.id,
+    u.email,
+    u.first_name,
+    u.last_name,
+    u.profile_completed,
+    u.profile_picture_url,
+    p.style_preferences,
+    p.size_info,
+    p.travel_patterns,
+    p.quick_reply_preferences,
+    p.packing_methods,
+    p.currency_preferences,
+    u.created_at,
+    u.updated_at,
+    -- Remove the non-existent column u.last_login
+    COALESCE(p.style_preferences->>'selected_styles', '[]')::text[] AS selected_style_names,
+    u.default_location,
+    u.max_bookmarks,
+    u.max_conversations,
+    u.subscription_tier,
+    u.subscription_expires_at,
+    u.is_premium
+FROM
+            public.profiles u
+LEFT JOIN
+    public.user_preferences p ON u.id = p.user_id;
+
+-- =============================================================================
+-- USER STYLE PREFERENCES SUMMARY VIEW
+-- =============================================================================
+
+-- Create style preferences summary view
+DROP VIEW IF EXISTS public.user_style_preferences_summary;
+
+CREATE VIEW public.user_style_preferences_summary WITH (security_invoker=on) AS
+SELECT
+    u.id as user_id,
+    u.email,
+    COUNT(usp.id) as total_style_preferences,
+    COUNT(usp.id) FILTER (WHERE usp.importance_level >= 4) as high_priority_styles,
+    COUNT(usp.id) FILTER (WHERE usp.importance_level <= 2) as low_priority_styles,
+    COUNT(usp.id) FILTER (WHERE cs.category = 'aesthetic') as aesthetic_styles,
+    COUNT(usp.id) FILTER (WHERE cs.category = 'cultural_etiquette') as cultural_styles,
+    COUNT(usp.id) FILTER (WHERE cs.category = 'functional') as functional_styles,
+    MAX(usp.created_at) as last_style_update
+FROM profiles u
+LEFT JOIN user_style_preferences usp ON u.id = usp.user_id
+LEFT JOIN clothing_styles cs ON usp.style_id = cs.id
+GROUP BY u.id, u.email;
+
+-- =============================================================================
+-- API PERFORMANCE SUMMARY VIEW
+-- =============================================================================
+
+-- Create API performance summary view
+DROP VIEW IF EXISTS public.api_performance_summary;
+
+CREATE VIEW public.api_performance_summary WITH (security_invoker=on) AS
+SELECT
     endpoint,
+    method,
     COUNT(*) as total_requests,
     AVG(response_time_ms) as avg_response_time,
     MAX(response_time_ms) as max_response_time,
     MIN(response_time_ms) as min_response_time,
-    COUNT(CASE WHEN response_status >= 400 THEN 1 END) as error_count,
-    ROUND(
-        (COUNT(CASE WHEN response_status >= 400 THEN 1 END)::numeric / COUNT(*)::numeric) * 100, 2
-    ) as error_rate_percent
+    COUNT(*) FILTER (WHERE response_status >= 200 AND response_status < 300) as successful_requests,
+    COUNT(*) FILTER (WHERE response_status >= 400) as error_requests,
+    AVG(response_time_ms) FILTER (WHERE response_status >= 200 AND response_status < 300) as avg_success_time
 FROM api_request_logs
 WHERE created_at >= NOW() - INTERVAL '24 hours'
-GROUP BY api_name, endpoint
+GROUP BY endpoint, method
 ORDER BY total_requests DESC;
 
 -- =============================================================================
@@ -38,5 +94,11 @@ ORDER BY total_requests DESC;
 GRANT SELECT ON public.user_profile_view TO authenticated;
 GRANT SELECT ON public.user_profile_view TO anon;
 
+-- Grant permissions for user_style_preferences_summary
+GRANT SELECT ON public.user_style_preferences_summary TO authenticated;
+GRANT SELECT ON public.user_style_preferences_summary TO anon;
+
 -- Grant permissions for api_performance_summary
-GRANT SELECT ON api_performance_summary TO authenticated;
+GRANT SELECT ON public.api_performance_summary TO authenticated;
+GRANT SELECT ON public.api_performance_summary TO anon;
+

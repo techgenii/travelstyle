@@ -154,18 +154,12 @@ class TestGetLimitsSettings:
     @pytest.mark.asyncio
     async def test_limits_free_paid_and_enterprise_derivation(self, service):
         with patch.object(service, "get_setting") as mock_get:
-            # Return strings to test numeric coercion path
+            # Return JSON objects for the new unified tier structure
             key_to_value = {
-                "max_style_preferences_per_user_free": "1",
-                "max_conversations_per_user_free": "2",
-                "max_bookmarks_per_user_free": "3",
-                "api_rate_limit_per_user_per_hour_free": "4",
-                "max_style_preferences_per_user_paid": "10",
-                "max_conversations_per_user_paid": "20",
-                "max_bookmarks_per_user_paid": "30",
-                "api_rate_limit_per_user_per_hour_paid": "40",
+                "subscription_tier_free": '{"limits": {"style_preferences": "1", "conversations": "2", "bookmarks": "3", "api_rate_limit_per_hour": "4"}}',
+                "subscription_tier_premium": '{"limits": {"style_preferences": "10", "conversations": "20", "bookmarks": "30", "api_rate_limit_per_hour": "40"}}',
                 # enterprise explicit only for one key
-                "max_style_preferences_per_user_enterprise": "100",
+                "subscription_tier_enterprise": '{"limits": {"style_preferences": "100", "conversations": "60", "bookmarks": "90", "api_rate_limit_per_hour": "120"}}',
             }
 
             def side_effect(key):
@@ -176,24 +170,25 @@ class TestGetLimitsSettings:
             result = await service.get_limits_settings(include_enterprise=True)
             assert result["free"]["max_style_preferences_per_user"] == "1"
             assert result["paid"]["max_style_preferences_per_user"] == "10"
+            assert result["premium"]["max_style_preferences_per_user"] == "10"
             # Enterprise explicit uses value
             assert result["enterprise"]["max_style_preferences_per_user"] == "100"
-            # Derived enterprise = 3x paid (coerced to int)
-            assert result["enterprise"]["max_conversations_per_user"] == 60
-            assert result["enterprise"]["max_bookmarks_per_user"] == 90
-            assert result["enterprise"]["api_rate_limit_per_user_per_hour"] == 120
+            # Derived enterprise = explicit values from JSON
+            assert result["enterprise"]["max_conversations_per_user"] == "60"
+            assert result["enterprise"]["max_bookmarks_per_user"] == "90"
+            assert result["enterprise"]["api_rate_limit_per_user_per_hour"] == "120"
 
     @pytest.mark.asyncio
     async def test_limits_without_enterprise(self, service):
         with patch.object(service, "get_setting", return_value=None):
             result = await service.get_limits_settings(include_enterprise=False)
-            assert result == {"free": {}, "paid": {}}
+            assert result == {"free": {}, "paid": {}, "premium": {}}
 
     @pytest.mark.asyncio
     async def test_limits_derivation_non_numeric_fallback(self, service):
         with patch.object(service, "get_setting") as mock_get:
             key_to_value = {
-                "max_style_preferences_per_user_paid": "not-a-number",
+                "subscription_tier_premium": '{"limits": {"style_preferences": "not-a-number"}}',
             }
 
             def side_effect(key):
@@ -202,7 +197,8 @@ class TestGetLimitsSettings:
             mock_get.side_effect = side_effect
 
             result = await service.get_limits_settings(include_enterprise=True)
-            assert result["enterprise"]["max_style_preferences_per_user"] == "not-a-number"
+            # Since we're not including enterprise and paid has non-numeric, enterprise will be empty
+            assert result["enterprise"] == {}
 
 
 class TestGetFeatureAndCacheAndSubscriptionSettings:
@@ -236,8 +232,20 @@ class TestGetFeatureAndCacheAndSubscriptionSettings:
         with patch.object(service, "get_setting") as mock_get:
             key_to_value = {
                 "subscription_tiers": ["free", "paid"],
-                "subscription_features": {"paid": ["x"]},
+                "subscription_tier_order": None,
+                "subscription_tier_free": '{"limits": {"style_preferences": "1"}}',
+                "subscription_tier_premium": '{"limits": {"style_preferences": "10"}}',
+                "subscription_tier_enterprise": '{"limits": {"style_preferences": "100"}}',
             }
             mock_get.side_effect = lambda k: key_to_value.get(k)
             result = await service.get_subscription_settings()
-            assert result == key_to_value
+            expected_result = {
+                "tiers": {
+                    "free": {"limits": {"style_preferences": "1"}},
+                    "premium": {"limits": {"style_preferences": "10"}},
+                    "enterprise": {"limits": {"style_preferences": "100"}},
+                },
+                "tier_list": ["free", "paid"],
+                "tier_order": None,
+            }
+            assert result == expected_result

@@ -22,7 +22,7 @@ CREATE TABLE public.conversations (
   updated_at timestamp with time zone DEFAULT now(),
   is_archived boolean DEFAULT false, -- Whether conversation is archived
   CONSTRAINT conversations_pkey PRIMARY KEY (id),
-  CONSTRAINT conversations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+  CONSTRAINT conversations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );
 
 -- Track individual chat sessions within conversations
@@ -38,7 +38,7 @@ CREATE TABLE public.chat_sessions (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT chat_sessions_pkey PRIMARY KEY (id),
   CONSTRAINT chat_sessions_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id),
-  CONSTRAINT chat_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+  CONSTRAINT chat_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );
 
 -- Store individual messages within conversations
@@ -68,7 +68,7 @@ CREATE TABLE public.chat_bookmarks (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT chat_bookmarks_pkey PRIMARY KEY (id),
   CONSTRAINT chat_bookmarks_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id),
-  CONSTRAINT chat_bookmarks_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+  CONSTRAINT chat_bookmarks_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );
 
 -- =============================================================================

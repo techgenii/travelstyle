@@ -28,7 +28,7 @@ DROP TABLE IF EXISTS cultural_insights_cache CASCADE;
 DROP TABLE IF EXISTS user_auth_tokens CASCADE;
 DROP TABLE IF EXISTS user_preferences CASCADE;
 DROP TABLE IF EXISTS system_settings CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS profiles CASCADE;
 
 -- Drop all functions
 DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
