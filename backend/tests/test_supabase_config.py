@@ -7,8 +7,33 @@ from unittest.mock import patch
 from app.services.supabase.supabase_config import (
     SupabaseConfig,
     SupabaseTableConfig,
+    SupabaseViewConfig,
     supabase_config,
 )
+
+
+class TestSupabaseViewConfig:
+    """Test SupabaseViewConfig dataclass."""
+
+    def test_supabase_view_config_default_values(self):
+        """Test SupabaseViewConfig with default values."""
+        config = SupabaseViewConfig(name="test_view")
+
+        assert config.name == "test_view"
+        assert config.security_invoker is False
+        assert config.rls_enabled is True
+
+    def test_supabase_view_config_custom_values(self):
+        """Test SupabaseViewConfig with custom values."""
+        config = SupabaseViewConfig(
+            name="custom_view",
+            security_invoker=True,
+            rls_enabled=False,
+        )
+
+        assert config.name == "custom_view"
+        assert config.security_invoker is True
+        assert config.rls_enabled is False
 
 
 class TestSupabaseTableConfig:
@@ -84,8 +109,23 @@ class TestSupabaseConfig:
             "cultural_insights_cache",
             "currency_rates_cache",
             "users",
+            "user_preferences",
+            "user_auth_tokens",
+            "system_settings",
             "conversations",
-            "messages",
+            "chat_sessions",
+            "conversation_messages",
+            "chat_bookmarks",
+            "currency_favorites",
+            "packing_templates",
+            "saved_destinations",
+            "clothing_styles",
+            "user_style_preferences",
+            "api_request_logs",
+            "api_usage_tracking",
+            "recommendation_history",
+            "response_feedback",
+            "ui_analytics",
         ]
 
         for table_name in expected_tables:
@@ -93,6 +133,20 @@ class TestSupabaseConfig:
             table_config = SupabaseConfig.TABLES[table_name]
             assert isinstance(table_config, SupabaseTableConfig)
             assert table_config.name == table_name
+
+    def test_supabase_config_views_structure(self):
+        """Test that VIEWS dictionary contains expected view configs."""
+        expected_views = [
+            "user_profile_view",
+            "user_style_preferences_summary",
+            "api_performance_summary",
+        ]
+
+        for view_name in expected_views:
+            assert view_name in SupabaseConfig.VIEWS
+            view_config = SupabaseConfig.VIEWS[view_name]
+            assert isinstance(view_config, SupabaseViewConfig)
+            assert view_config.name == view_name
 
     def test_supabase_config_error_messages(self):
         """Test that ERROR_MESSAGES contains expected error types."""
@@ -129,6 +183,23 @@ class TestSupabaseConfig:
         assert default_config.primary_key == "id"
         assert default_config.unique_constraints == []
         assert default_config.indexes == []
+        assert default_config.rls_enabled is True
+
+    def test_get_view_config_existing_view(self):
+        """Test get_view_config method returns existing view config."""
+        user_profile_config = SupabaseConfig.get_view_config("user_profile_view")
+
+        assert isinstance(user_profile_config, SupabaseViewConfig)
+        assert user_profile_config.name == "user_profile_view"
+        assert user_profile_config.security_invoker is True
+
+    def test_get_view_config_nonexistent_view(self):
+        """Test get_view_config method returns default config for nonexistent view."""
+        default_config = SupabaseConfig.get_view_config("nonexistent_view")
+
+        assert isinstance(default_config, SupabaseViewConfig)
+        assert default_config.name == "nonexistent_view"
+        assert default_config.security_invoker is False
         assert default_config.rls_enabled is True
 
     @patch("app.services.supabase.supabase_config.settings")

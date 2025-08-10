@@ -42,6 +42,15 @@ class SupabaseTableConfig:
             self.indexes = []
 
 
+@dataclass
+class SupabaseViewConfig:
+    """Configuration for a Supabase view."""
+
+    name: str
+    security_invoker: bool = False
+    rls_enabled: bool = True
+
+
 class SupabaseConfig:
     """Configuration class for Supabase settings."""
 
@@ -66,6 +75,7 @@ class SupabaseConfig:
 
     # Table configurations
     TABLES = {
+        # Cache tables
         "weather_cache": SupabaseTableConfig(
             name="weather_cache",
             unique_constraints=["destination"],
@@ -81,18 +91,103 @@ class SupabaseConfig:
             unique_constraints=["base_currency"],
             indexes=["base_currency", "expires_at"],
         ),
+        # Core user tables
         "users": SupabaseTableConfig(
             name="users",
             unique_constraints=["email", "auth_id"],
             indexes=["email", "auth_id", "created_at"],
         ),
-        "conversations": SupabaseTableConfig(
-            name="conversations",
+        "user_preferences": SupabaseTableConfig(
+            name="user_preferences",
+            unique_constraints=["user_id"],
             indexes=["user_id", "created_at"],
         ),
-        "messages": SupabaseTableConfig(
-            name="messages",
-            indexes=["conversation_id", "created_at"],
+        "user_auth_tokens": SupabaseTableConfig(
+            name="user_auth_tokens",
+            indexes=["user_id", "token_type", "expires_at"],
+        ),
+        "system_settings": SupabaseTableConfig(
+            name="system_settings",
+            unique_constraints=["setting_key"],
+            indexes=["setting_key", "is_public"],
+        ),
+        # Chat and conversation tables
+        "conversations": SupabaseTableConfig(
+            name="conversations",
+            indexes=["user_id", "created_at", "type", "destination"],
+        ),
+        "chat_sessions": SupabaseTableConfig(
+            name="chat_sessions",
+            indexes=["user_id", "conversation_id", "is_active", "expires_at"],
+        ),
+        "conversation_messages": SupabaseTableConfig(
+            name="conversation_messages",
+            indexes=["conversation_id", "created_at", "role", "message_type"],
+        ),
+        "chat_bookmarks": SupabaseTableConfig(
+            name="chat_bookmarks",
+            indexes=["user_id", "conversation_id", "created_at"],
+        ),
+        # User data tables
+        "currency_favorites": SupabaseTableConfig(
+            name="currency_favorites",
+            indexes=["user_id", "from_currency", "to_currency", "is_primary"],
+        ),
+        "packing_templates": SupabaseTableConfig(
+            name="packing_templates",
+            indexes=["user_id", "packing_method", "destination_type", "climate_type"],
+        ),
+        "saved_destinations": SupabaseTableConfig(
+            name="saved_destinations",
+            indexes=["user_id", "destination_name", "is_favorite"],
+        ),
+        # Style and fashion tables
+        "clothing_styles": SupabaseTableConfig(
+            name="clothing_styles",
+            unique_constraints=["style_name"],
+            indexes=["category", "region_applicability", "qloo_entity_id"],
+        ),
+        "user_style_preferences": SupabaseTableConfig(
+            name="user_style_preferences",
+            unique_constraints=["user_id", "style_id"],
+            indexes=["user_id", "style_id", "preference_level"],
+        ),
+        # Analytics and tracking tables
+        "api_request_logs": SupabaseTableConfig(
+            name="api_request_logs",
+            indexes=["user_id", "session_id", "endpoint", "created_at", "response_status"],
+        ),
+        "api_usage_tracking": SupabaseTableConfig(
+            name="api_usage_tracking",
+            indexes=["user_id", "api_name", "date", "endpoint"],
+        ),
+        "recommendation_history": SupabaseTableConfig(
+            name="recommendation_history",
+            indexes=["user_id", "conversation_id", "recommendation_type", "was_used", "created_at"],
+        ),
+        "response_feedback": SupabaseTableConfig(
+            name="response_feedback",
+            indexes=["user_id", "conversation_id", "feedback_type", "created_at"],
+        ),
+        "ui_analytics": SupabaseTableConfig(
+            name="ui_analytics",
+            indexes=["user_id", "session_id", "event_type", "created_at"],
+        ),
+    }
+
+    # View configurations
+    VIEWS = {
+        "user_profile_view": SupabaseViewConfig(
+            name="user_profile_view",
+            security_invoker=True,
+        ),
+        "user_style_preferences_summary": SupabaseViewConfig(
+            name="user_style_preferences_summary",
+            security_invoker=True,
+        ),
+        "api_performance_summary": SupabaseViewConfig(
+            name="api_performance_summary",
+            security_invoker=False,
         ),
     }
 
@@ -114,6 +209,11 @@ class SupabaseConfig:
     def get_table_config(cls, table_name: str) -> SupabaseTableConfig:
         """Get configuration for a specific table."""
         return cls.TABLES.get(table_name, SupabaseTableConfig(name=table_name))
+
+    @classmethod
+    def get_view_config(cls, view_name: str) -> SupabaseViewConfig:
+        """Get configuration for a specific view."""
+        return cls.VIEWS.get(view_name, SupabaseViewConfig(name=view_name))
 
     @classmethod
     def validate_connection_settings(cls) -> bool:

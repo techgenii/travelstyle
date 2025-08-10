@@ -23,11 +23,41 @@ Database constants for TravelStyle AI application.
 class DatabaseTables:
     """Constants for database table names"""
 
-    CONVERSATIONS = "conversations"
-    CONVERSATION_MESSAGES = "conversation_messages"
-    USER_PROFILE_VIEW = "user_profile_view"
+    # Core tables
     USERS = "users"
     USER_PREFERENCES = "user_preferences"
-    RECOMMENDATION_FEEDBACK = "recommendation_feedback"
-    USER_DESTINATIONS = "user_destinations"
+    USER_AUTH_TOKENS = "user_auth_tokens"
     SYSTEM_SETTINGS = "system_settings"
+
+    # Chat and conversation tables
+    CONVERSATIONS = "conversations"
+    CHAT_SESSIONS = "chat_sessions"
+    CONVERSATION_MESSAGES = "conversation_messages"
+    CHAT_BOOKMARKS = "chat_bookmarks"
+
+    # User data tables
+    CURRENCY_FAVORITES = "currency_favorites"
+    PACKING_TEMPLATES = "packing_templates"
+    SAVED_DESTINATIONS = "saved_destinations"
+    USER_DESTINATIONS = "saved_destinations"  # Alias for backward compatibility
+
+    # Style and fashion tables
+    CLOTHING_STYLES = "clothing_styles"
+    USER_STYLE_PREFERENCES = "user_style_preferences"
+
+    # Cache tables
+    WEATHER_CACHE = "weather_cache"
+    CULTURAL_INSIGHTS_CACHE = "cultural_insights_cache"
+    CURRENCY_RATES_CACHE = "currency_rates_cache"
+
+    # Analytics and tracking tables
+    API_REQUEST_LOGS = "api_request_logs"
+    API_USAGE_TRACKING = "api_usage_tracking"
+    RECOMMENDATION_HISTORY = "recommendation_history"
+    RESPONSE_FEEDBACK = "response_feedback"
+    UI_ANALYTICS = "ui_analytics"
+
+    # Views
+    USER_PROFILE_VIEW = "user_profile_view"
+    USER_STYLE_PREFERENCES_SUMMARY = "user_style_preferences_summary"
+    API_PERFORMANCE_SUMMARY = "api_performance_summary"

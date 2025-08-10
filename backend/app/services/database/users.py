@@ -274,7 +274,7 @@ class UserOperations:
 
             await asyncio.to_thread(
                 lambda: (
-                    self.client.table(DatabaseTables.RECOMMENDATION_FEEDBACK)
+                    self.client.table(DatabaseTables.RESPONSE_FEEDBACK)
                     .insert(feedback_data)
                     .execute()
                 )
