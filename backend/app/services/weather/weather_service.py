@@ -86,7 +86,7 @@ class WeatherService:
             params = {
                 "key": self.api_key,
                 "unitGroup": "us",
-                "include": "current,days,hours",
+                "include": "current,days",
             }
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -120,6 +120,7 @@ class WeatherService:
                             "feels_like": current.get("feelslike", current.get("temp", 0)),
                             "humidity": current.get("humidity", 0),
                             "pressure": current.get("pressure", 0),
+                            "uvindex": current.get("uvindex", 0),
                         },
                         "wind": {
                             "speed": current.get("windspeed", 0),
@@ -136,7 +137,6 @@ class WeatherService:
                 forecast_data = None
                 if days:
                     daily_forecasts = []
-                    detailed_forecasts = []
 
                     for day in days[:7]:  # Limit to 7 days
                         # Daily summary
@@ -150,44 +150,15 @@ class WeatherService:
                                 "weather_descriptions": [day.get("conditions", "")],
                                 "conditions": day.get("conditions", ""),
                                 "precipitation_chance": day.get("precipprob", 0),
+                                "uvindex": day.get("uvindex", 0),
                             }
                         )
-
-                        # Hourly data for this day
-                        hours = day.get("hours", [])
-                        for hour in hours:
-                            detailed_forecasts.append(
-                                {
-                                    "dt": hour.get("datetimeEpoch", 0),
-                                    "main": {
-                                        "temp": hour.get("temp", 0),
-                                        "feels_like": hour.get("feelslike", hour.get("temp", 0)),
-                                        "temp_min": hour.get("temp", 0),
-                                        "temp_max": hour.get("temp", 0),
-                                        "pressure": hour.get("pressure", 0),
-                                        "humidity": hour.get("humidity", 0),
-                                    },
-                                    "weather": [
-                                        {
-                                            "main": hour.get("conditions", ""),
-                                            "description": hour.get("conditions", ""),
-                                        }
-                                    ],
-                                    "wind": {
-                                        "speed": hour.get("windspeed", 0),
-                                        "deg": hour.get("winddir", 0),
-                                    },
-                                    "pop": hour.get("precipprob", 0) / 100.0,
-                                    "dt_txt": hour.get("datetime", ""),
-                                }
-                            )
 
                     temp_mins = [f["temp_min"] for f in daily_forecasts]
                     temp_maxs = [f["temp_max"] for f in daily_forecasts]
                     precip_chances = [f["precipitation_chance"] for f in daily_forecasts]
 
                     forecast_data = {
-                        "list": detailed_forecasts,
                         "city": {
                             "name": data.get("resolvedAddress", ""),
                             "coord": {

@@ -65,6 +65,7 @@ async def test_get_weather_data_cache_miss_success(weather_service):
             "cloudcover": 20,
             "visibility": 10000,
             "conditions": "Clear",
+            "uvindex": 5,
         },
         "days": [
             {
@@ -74,7 +75,7 @@ async def test_get_weather_data_cache_miss_success(weather_service):
                 "humidity": 60,
                 "conditions": "Clear",
                 "precipprob": 0,
-                "hours": [],
+                "uvindex": 6,
             }
         ],
     }
@@ -100,8 +101,11 @@ async def test_get_weather_data_cache_miss_success(weather_service):
         result = await weather_service.get_weather_data("Paris")
         assert result is not None
         assert result["current"]["main"]["temp"] == 15
+        assert result["current"]["main"]["uvindex"] == 5
         assert result["destination"] == "Paris"
         assert result["forecast"] is not None
+        assert "list" not in result["forecast"]  # Hourly forecasts removed
+        assert result["forecast"]["daily_forecasts"][0]["uvindex"] == 6
         mock_set_cache.assert_awaited_once()
 
         # Verify URL was constructed correctly (no dates in path)
@@ -149,6 +153,7 @@ async def test_get_weather_data_with_single_date(weather_service):
             "cloudcover": 75,
             "visibility": 5000,
             "conditions": "Rain",
+            "uvindex": 3,
         },
         "days": [
             {
@@ -158,7 +163,7 @@ async def test_get_weather_data_with_single_date(weather_service):
                 "humidity": 50,
                 "conditions": "Rain",
                 "precipprob": 80,
-                "hours": [],
+                "uvindex": 2,
             }
         ],
     }
@@ -184,7 +189,10 @@ async def test_get_weather_data_with_single_date(weather_service):
         result = await weather_service.get_weather_data("London,UK", dates=["2020-10-01"])
         assert result is not None
         assert result["current"]["main"]["temp"] == 20
+        assert result["current"]["main"]["uvindex"] == 3
         assert result["current"]["weather"][0]["main"] == "Rain"
+        assert "list" not in result["forecast"]  # Hourly forecasts removed
+        assert result["forecast"]["daily_forecasts"][0]["uvindex"] == 2
 
         # Verify URL contains date in path
         call_args = mock_client_instance.__aenter__.return_value.get.call_args
@@ -210,7 +218,7 @@ async def test_get_weather_data_with_date_range(weather_service):
                 "humidity": 60,
                 "conditions": "Clear",
                 "precipprob": 0,
-                "hours": [],
+                "uvindex": 7,
             },
             {
                 "datetime": "2020-12-31",
@@ -219,7 +227,7 @@ async def test_get_weather_data_with_date_range(weather_service):
                 "humidity": 70,
                 "conditions": "Snow",
                 "precipprob": 50,
-                "hours": [],
+                "uvindex": 1,
             },
         ],
     }
@@ -248,6 +256,9 @@ async def test_get_weather_data_with_date_range(weather_service):
         assert result is not None
         assert result["forecast"] is not None
         assert len(result["forecast"]["daily_forecasts"]) == 2
+        assert "list" not in result["forecast"]  # Hourly forecasts removed
+        assert result["forecast"]["daily_forecasts"][0]["uvindex"] == 7
+        assert result["forecast"]["daily_forecasts"][1]["uvindex"] == 1
 
         # Verify URL contains both dates in path
         call_args = mock_client_instance.__aenter__.return_value.get.call_args
@@ -350,6 +361,7 @@ async def test_get_weather_data_with_state_country(weather_service):
             "cloudcover": 20,
             "visibility": 10000,
             "conditions": "Clear",
+            "uvindex": 8,
         },
         "days": [
             {
@@ -359,7 +371,7 @@ async def test_get_weather_data_with_state_country(weather_service):
                 "humidity": 50,
                 "conditions": "Clear",
                 "precipprob": 0,
-                "hours": [],
+                "uvindex": 9,
             }
         ],
     }
@@ -385,6 +397,9 @@ async def test_get_weather_data_with_state_country(weather_service):
         result = await weather_service.get_weather_data("New York", state="NY", country="US")
         assert result is not None
         assert result["destination"] == "New York"
+        assert result["current"]["main"]["uvindex"] == 8
+        assert "list" not in result["forecast"]  # Hourly forecasts removed
+        assert result["forecast"]["daily_forecasts"][0]["uvindex"] == 9
 
         # Verify location string includes state and country
         call_args = mock_client_instance.__aenter__.return_value.get.call_args
@@ -392,3 +407,145 @@ async def test_get_weather_data_with_state_country(weather_service):
         assert "New York" in url
         assert "NY" in url
         assert "US" in url
+
+
+@pytest.mark.asyncio
+async def test_get_weather_data_uvindex_missing_defaults_to_zero(weather_service):
+    """Test that uvindex defaults to 0 when not provided by API."""
+    visual_crossing_response = {
+        "latitude": 40.7128,
+        "longitude": -74.0060,
+        "resolvedAddress": "New York, NY, United States",
+        "timezone": "America/New_York",
+        "currentConditions": {
+            "datetimeEpoch": 1753246845,
+            "temp": 20,
+            "feelslike": 19,
+            "humidity": 50,
+            "pressure": 1000,
+            "windspeed": 5,
+            "winddir": 180,
+            "cloudcover": 20,
+            "visibility": 10000,
+            "conditions": "Clear",
+            # uvindex intentionally missing
+        },
+        "days": [
+            {
+                "datetime": "2025-01-23",
+                "tempmin": 15,
+                "tempmax": 25,
+                "humidity": 50,
+                "conditions": "Clear",
+                "precipprob": 0,
+                # uvindex intentionally missing
+            }
+        ],
+    }
+
+    mock_response = MockAsyncResponse(visual_crossing_response)
+    mock_response.raise_for_status = MagicMock()
+
+    with (
+        patch(
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_weather_cache",
+            new=AsyncMock(return_value=None),
+        ),
+        patch("httpx.AsyncClient") as mock_client,
+        patch(
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.set_weather_cache",
+            new=AsyncMock(),
+        ),
+    ):
+        mock_client_instance = MagicMock()
+        mock_client_instance.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+        mock_client.return_value = mock_client_instance
+
+        result = await weather_service.get_weather_data("New York")
+        assert result is not None
+        assert result["current"]["main"]["uvindex"] == 0  # Defaults to 0
+        assert result["forecast"]["daily_forecasts"][0]["uvindex"] == 0  # Defaults to 0
+        assert "list" not in result["forecast"]  # Hourly forecasts removed
+
+
+@pytest.mark.asyncio
+async def test_get_weather_data_forecast_structure_no_hourly(weather_service):
+    """Test that forecast structure doesn't include hourly list."""
+    visual_crossing_response = {
+        "latitude": 48.8566,
+        "longitude": 2.3522,
+        "resolvedAddress": "Paris, France",
+        "timezone": "Europe/Paris",
+        "currentConditions": {
+            "datetimeEpoch": 1753246845,
+            "temp": 15,
+            "feelslike": 14,
+            "humidity": 60,
+            "pressure": 1012,
+            "windspeed": 5,
+            "winddir": 180,
+            "cloudcover": 20,
+            "visibility": 10000,
+            "conditions": "Clear",
+            "uvindex": 4,
+        },
+        "days": [
+            {
+                "datetime": "2025-01-23",
+                "tempmin": 12,
+                "tempmax": 18,
+                "humidity": 60,
+                "conditions": "Clear",
+                "precipprob": 0,
+                "uvindex": 5,
+            },
+            {
+                "datetime": "2025-01-24",
+                "tempmin": 10,
+                "tempmax": 16,
+                "humidity": 65,
+                "conditions": "Cloudy",
+                "precipprob": 20,
+                "uvindex": 3,
+            },
+        ],
+    }
+
+    mock_response = MockAsyncResponse(visual_crossing_response)
+    mock_response.raise_for_status = MagicMock()
+
+    with (
+        patch(
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.get_weather_cache",
+            new=AsyncMock(return_value=None),
+        ),
+        patch("httpx.AsyncClient") as mock_client,
+        patch(
+            "app.services.supabase.supabase_cache_v2.enhanced_supabase_cache.set_weather_cache",
+            new=AsyncMock(),
+        ),
+    ):
+        mock_client_instance = MagicMock()
+        mock_client_instance.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+        mock_client.return_value = mock_client_instance
+
+        result = await weather_service.get_weather_data("Paris")
+        assert result is not None
+        assert result["forecast"] is not None
+
+        # Verify hourly list is not present
+        assert "list" not in result["forecast"]
+
+        # Verify forecast structure
+        assert "city" in result["forecast"]
+        assert "daily_forecasts" in result["forecast"]
+        assert "temp_range" in result["forecast"]
+        assert "precipitation_chance" in result["forecast"]
+
+        # Verify daily forecasts have uvindex
+        assert len(result["forecast"]["daily_forecasts"]) == 2
+        assert result["forecast"]["daily_forecasts"][0]["uvindex"] == 5
+        assert result["forecast"]["daily_forecasts"][1]["uvindex"] == 3
+
+        # Verify current has uvindex
+        assert result["current"]["main"]["uvindex"] == 4
