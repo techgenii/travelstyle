@@ -1,0 +1,160 @@
+name: Check Package Updates
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch: # Allow manual triggering
+
+env:
+  PYTHON_VERSION: '3.13'
+  WORKING_DIR: backend
+
+jobs:
+  check-updates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install current packages
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Check for outdated packages
+        working-directory: ${{ env.WORKING_DIR }}
+        id: check
+        run: |
+          echo "📦 Checking for outdated packages..."
+          pip list --outdated --format=json > outdated.json 2>/dev/null || echo "[]" > outdated.json
+
+          # Check if we have any outdated packages
+          OUTDATED_COUNT=$(python3 -c "import json; data = json.load(open('outdated.json')); print(len(data))" 2>/dev/null || echo "0")
+
+          if [ "$OUTDATED_COUNT" -gt 0 ]; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Outdated packages found!"
+            pip list --outdated
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+            echo "✅ All packages are up to date!"
+          fi
+
+      - name: Upload outdated packages data
+        if: steps.check.outputs.has_updates == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: outdated-packages
+          path: outdated.json
+          retention-days: 1
+
+      - name: Show current versions
+        working-directory: ${{ env.WORKING_DIR }}
+        if: steps.check.outputs.has_updates == 'true'
+        run: make show-versions
+
+      - name: Download outdated packages data
+        if: steps.check.outputs.has_updates == 'true' && github.event_name == 'schedule'
+        uses: actions/download-artifact@v4
+        with:
+          name: outdated-packages
+          path: .
+
+      - name: Create issue for outdated packages
+        if: steps.check.outputs.has_updates == 'true' && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let outdated = [];
+            try {
+              const data = fs.readFileSync('outdated.json', 'utf8');
+              outdated = JSON.parse(data);
+            } catch (e) {
+              console.log('Could not parse outdated packages, skipping issue creation');
+              console.log('Error:', e.message);
+              return;
+            }
+
+            if (!outdated || outdated.length === 0) {
+              console.log('No outdated packages found');
+              return;
+            }
+
+            const packageList = outdated.map(pkg =>
+              `- **${pkg.name}**: \`${pkg.version}\` → \`${pkg.latest_version}\``
+            ).join('\n');
+
+            const body = `## 📦 Package Update Available
+
+            The following packages have newer versions available:
+
+            ${packageList}
+
+            ### To update:
+            \`\`\`bash
+            cd backend
+            make update-packages
+            make test-quick  # Verify everything still works
+            \`\`\`
+
+            ### Or update manually:
+            \`\`\`bash
+            cd backend
+            pip install --upgrade -r requirements.txt
+            pip install --upgrade -r requirements-test.txt
+            make test-quick
+            \`\`\`
+
+            _This issue was automatically created by the package update check workflow._
+            `;
+
+            // Check if an open issue already exists
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'dependencies',
+              per_page: 10
+            });
+
+            const existingIssue = issues.find(issue =>
+              issue.title.includes('Package Updates Available')
+            );
+
+            if (existingIssue) {
+              console.log(`Updating existing issue #${existingIssue.number}`);
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: body
+              });
+            } else {
+              console.log('Creating new issue');
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '📦 Package Updates Available',
+                body: body,
+                labels: ['dependencies', 'automated']
+              });
+            }
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ steps.check.outputs.has_updates }}" == "true" ]; then
+            echo "⚠️ Outdated packages detected. Check the output above or the created issue."
+          else
+            echo "✅ All packages are up to date!"
+          fi
+

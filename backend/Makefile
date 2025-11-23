@@ -31,6 +31,9 @@ help:
 	@echo "$(YELLOW)Setup:$(NC)"
 	@echo "  install        - Install production dependencies"
 	@echo "  install-dev    - Install development dependencies"
+	@echo "  check-updates  - Check for outdated packages"
+	@echo "  update-packages - Update all packages to latest versions"
+	@echo "  show-versions  - Show current versions of key packages"
 	@echo ""
 	@echo "$(YELLOW)Testing:$(NC)"
 	@echo "  test           - Run all tests with warnings disabled"
@@ -64,6 +67,39 @@ install:
 install-dev: install
 	@echo "$(GREEN)Installing development dependencies...$(NC)"
 	$(PIP) install -r requirements-test.txt
+
+# Package update targets
+.PHONY: check-updates update-packages show-versions
+check-updates:
+	@echo "$(BLUE)Checking for outdated packages...$(NC)"
+	@echo ""
+	@if $(PIP) list --outdated 2>/dev/null | grep -q .; then \
+		echo "$(YELLOW)Outdated packages found:$(NC)"; \
+		$(PIP) list --outdated; \
+		echo ""; \
+		echo "$(YELLOW)Run 'make update-packages' to update all packages$(NC)"; \
+	else \
+		echo "$(GREEN)All packages are up to date!$(NC)"; \
+	fi
+
+update-packages:
+	@echo "$(BLUE)Updating all packages to latest versions...$(NC)"
+	$(PIP) install --upgrade pip
+	$(PIP) install --upgrade -r requirements.txt
+	$(PIP) install --upgrade -r requirements-test.txt
+	@echo "$(GREEN)Packages updated! Run 'make test-quick' to verify everything works.$(NC)"
+
+show-versions:
+	@echo "$(BLUE)Current key package versions:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Core packages:$(NC)"
+	@$(PIP) show supabase fastapi pydantic 2>/dev/null | grep -E "^Name:|^Version:" | paste - - | sed 's/Name: //;s/Version: /: /' || echo "  (not installed)"
+	@echo ""
+	@echo "$(YELLOW)Authentication:$(NC)"
+	@$(PIP) show python-jose passlib 2>/dev/null | grep -E "^Name:|^Version:" | paste - - | sed 's/Name: //;s/Version: /: /' || echo "  (not installed)"
+	@echo ""
+	@echo "$(YELLOW)AI & External APIs:$(NC)"
+	@$(PIP) show openai httpx 2>/dev/null | grep -E "^Name:|^Version:" | paste - - | sed 's/Name: //;s/Version: /: /' || echo "  (not installed)"
 
 # Testing targets (improved with warnings disabled)
 .PHONY: test test-quick test-chat test-currency test-orchestrator test-recommendations test-watch test-lint test-security

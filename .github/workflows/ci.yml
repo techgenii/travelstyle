@@ -46,6 +46,16 @@ jobs:
           make install
           make install-dev
 
+      # Check for outdated packages (non-blocking)
+      - name: Check for outdated packages
+        working-directory: ${{ env.WORKING_DIR }}
+        continue-on-error: true
+        run: |
+          echo "📦 Checking for outdated packages..."
+          make check-updates || true
+          echo ""
+          echo "💡 To update packages, run: make update-packages"
+
       # Run lint (produces XML)
       - name: Run lint
         working-directory: ${{ env.WORKING_DIR }}
