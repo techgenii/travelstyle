@@ -307,6 +307,7 @@ class TestAuthEndpoints:
         with patch("app.services.auth_service.auth_service.register") as mock_register:
             mock_register.return_value = {
                 "access_token": "test_access_token",
+                "refresh_token": "test_refresh_token",
                 "token_type": "bearer",
                 "expires_in": 3600,
                 "message": "Registration successful",
@@ -326,6 +327,8 @@ class TestAuthEndpoints:
             assert response.status_code == status.HTTP_201_CREATED
             data = response.json()
             assert "access_token" in data
+            assert "refresh_token" in data
+            assert data["refresh_token"] == "test_refresh_token"
             assert data["message"] == "Registration successful"
             assert data["success"] is True
 

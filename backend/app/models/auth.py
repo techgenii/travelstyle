@@ -108,6 +108,7 @@ class RegisterResponse(BaseModel):
     """User registration response model"""
 
     access_token: str = Field(..., description="JWT access token")
+    refresh_token: str = Field(..., description="JWT refresh token")
     token_type: str = Field(default="bearer", description="Token type")
     expires_in: int = Field(..., description="Token expiration time in seconds")
     message: str = Field(..., description="Registration confirmation message")

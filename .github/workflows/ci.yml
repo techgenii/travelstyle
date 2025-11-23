@@ -82,6 +82,7 @@ jobs:
           echo "::add-mask::$OPENAI_ORG_ID"
           echo "::add-mask::$QLOO_API_KEY"
           echo "::add-mask::$OPENWEATHER_API_KEY"
+          echo "::add-mask::$VISUALCROSSING_API_KEY"
           echo "::add-mask::$EXCHANGE_API_KEY"
           echo "::add-mask::$SUPABASE_URL"
           echo "::add-mask::$SUPABASE_KEY"
@@ -94,6 +95,7 @@ jobs:
           OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
           QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          VISUALCROSSING_API_KEY: ${{ secrets.VISUALCROSSING_API_KEY }}
           EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -109,6 +111,7 @@ jobs:
           OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
           QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          VISUALCROSSING_API_KEY: ${{ secrets.VISUALCROSSING_API_KEY }}
           EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

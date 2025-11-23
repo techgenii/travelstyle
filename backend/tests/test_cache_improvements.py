@@ -108,7 +108,7 @@ class TestCacheImprovements:
             mock_upsert.assert_called_once()
             call_args = mock_upsert.call_args[0][0]  # First argument is the data dict
             assert call_args["destination"] == "Paris"
-            assert call_args["api_source"] == "openweathermap"
+            assert call_args["api_source"] == "visualcrossing"
             assert call_args["weather_data"] == {"temp": 20}
             assert result is True
 

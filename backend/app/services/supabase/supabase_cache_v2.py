@@ -102,7 +102,7 @@ class WeatherCacheService(SupabaseBaseService[CacheEntry]):
                 "weather_data": data,
                 "expires_at": expires_at.isoformat(),
                 "created_at": datetime.now(UTC).isoformat(),
-                "api_source": "openweathermap",  # Add API source for unique constraint
+                "api_source": "visualcrossing",  # Changed to visualcrossing
             }
             result = await self.upsert(cache_data, ["destination", "api_source"])
             return result is not None

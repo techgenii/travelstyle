@@ -470,6 +470,7 @@ class AuthService:
                 user_profile = extract_user_profile(login_response.user) or {}
             return RegisterResponse(
                 access_token=login_response.session.access_token,
+                refresh_token=login_response.session.refresh_token,
                 token_type=DEFAULT_TOKEN_TYPE,
                 expires_in=login_response.session.expires_in,
                 message="Registration successful",

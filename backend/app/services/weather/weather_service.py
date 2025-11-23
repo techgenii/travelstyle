@@ -37,57 +37,24 @@ class WeatherService:
 
     def __init__(self):
         """Initialize the WeatherService with API credentials and timeout."""
-        self.base_url = settings.OPENWEATHER_BASE_URL
-        self.api_key = settings.OPENWEATHER_API_KEY
+        self.base_url = settings.VISUALCROSSING_BASE_URL
+        self.api_key = settings.VISUALCROSSING_API_KEY
         self.timeout = 15.0
-
-    async def get_lat_lon_for_city(
-        self, city: str, state: str | None = None, country: str | None = None, limit: int = 1
-    ):
-        """Get latitude and longitude for a city using OpenStreetMap Nominatim API."""
-        try:
-            # Build the query string
-            q_parts = [city]
-            if state:
-                q_parts.append(state)
-            if country:
-                q_parts.append(country)
-            q = ", ".join(q_parts)
-
-            url = "https://nominatim.openstreetmap.org/search"
-            params = {"q": q, "format": "json", "limit": limit}
-
-            # Add User-Agent header (required by Nominatim usage policy)
-            headers = {
-                "User-Agent": "TravelStyle/1.0"  # Replace with your actual app name
-            }
-
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.get(url, params=params, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-
-                if not data:
-                    return None, None
-
-                # OpenStreetMap returns lat/lon as strings, convert to float
-                return float(data[0]["lat"]), float(data[0]["lon"])
-        except Exception as e:
-            logger.error("Geocoding error: %s", type(e).__name__)
-            return None, None
 
     async def get_weather_data(
         self,
         destination: str,
-        dates: list[str] | None = None,  # pylint: disable=unused-argument
+        dates: list[str] | None = None,
         state: str | None = None,
         country: str | None = None,
     ) -> dict[str, Any] | None:
-        """Get comprehensive weather data for destination.
+        """Get comprehensive weather data for destination using Visual Crossing API.
 
         Args:
-            destination: The destination location.
-            dates: Optional list of dates (unused in current implementation).
+            destination: The destination location (city name, address, or lat,lon).
+            dates: Optional list of dates for date range queries.
+            state: Optional state (used for building location string).
+            country: Optional country (used for building location string).
 
         Returns:
             Weather data dictionary or None if error.
@@ -98,233 +65,185 @@ class WeatherService:
             return cached_data
 
         try:
-            lat, lon = await self.get_lat_lon_for_city(destination, state, country)
-            if lat is None or lon is None:
-                logger.error("Could not geocode destination: %s", destination)
-                return None
+            # Build location string - Visual Crossing accepts addresses directly
+            location_parts = [destination]
+            if state:
+                location_parts.append(state)
+            if country:
+                location_parts.append(country)
+            location = ", ".join(location_parts)
 
-            # Get current weather and forecast
-            current_weather = await self._get_current_weather(lat, lon)
-            forecast_data = await self._get_forecast(lat, lon)
+            # Build URL with dates in the path (not query params)
+            # Format: /timeline/{location} or /timeline/{location}/{date1} or /timeline/{location}/{date1}/{date2}
+            url = f"{self.base_url}{location}"
 
-            if not current_weather:
-                return None
+            # Add dates to URL path if provided
+            if dates and len(dates) >= 1:
+                url = f"{url}/{dates[0]}"
+                if len(dates) >= 2:
+                    url = f"{url}/{dates[1]}"
 
-            weather_data = {
-                "current": current_weather,
-                "forecast": forecast_data,
-                "destination": destination,
-                "retrieved_at": datetime.now(UTC).isoformat(),
+            params = {
+                "key": self.api_key,
+                "unitGroup": "us",
+                "include": "current,days,hours",
             }
 
-            # Cache for 1 hour
-            await enhanced_supabase_cache.set_weather_cache(destination, weather_data, 1)
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                data = response.json()
 
-            return weather_data
+                current = data.get("currentConditions", {})
+                days = data.get("days", [])
+
+                if not current and not days:
+                    return None
+
+                # Process current conditions
+                current_weather = None
+                if current:
+                    current_weather = {
+                        "coord": {
+                            "lon": data.get("longitude", 0),
+                            "lat": data.get("latitude", 0),
+                        },
+                        "weather": [
+                            {
+                                "main": current.get("conditions", ""),
+                                "description": current.get("conditions", ""),
+                                "icon": self._map_conditions_to_icon(current.get("conditions", "")),
+                            }
+                        ],
+                        "main": {
+                            "temp": current.get("temp", 0),
+                            "feels_like": current.get("feelslike", current.get("temp", 0)),
+                            "humidity": current.get("humidity", 0),
+                            "pressure": current.get("pressure", 0),
+                        },
+                        "wind": {
+                            "speed": current.get("windspeed", 0),
+                            "deg": current.get("winddir", 0),
+                        },
+                        "clouds": {"all": current.get("cloudcover", 0)},
+                        "visibility": current.get("visibility", 10000),
+                        "dt": current.get("datetimeEpoch", 0),
+                        "timezone": data.get("timezone", ""),
+                        "name": data.get("resolvedAddress", ""),
+                    }
+
+                # Process forecast
+                forecast_data = None
+                if days:
+                    daily_forecasts = []
+                    detailed_forecasts = []
+
+                    for day in days[:7]:  # Limit to 7 days
+                        # Daily summary
+                        daily_forecasts.append(
+                            {
+                                "date": day.get("datetime", ""),
+                                "temp_min": day.get("tempmin", 0),
+                                "temp_max": day.get("tempmax", 0),
+                                "humidity_min": day.get("humidity", 0),
+                                "humidity_max": day.get("humidity", 0),
+                                "weather_descriptions": [day.get("conditions", "")],
+                                "conditions": day.get("conditions", ""),
+                                "precipitation_chance": day.get("precipprob", 0),
+                            }
+                        )
+
+                        # Hourly data for this day
+                        hours = day.get("hours", [])
+                        for hour in hours:
+                            detailed_forecasts.append(
+                                {
+                                    "dt": hour.get("datetimeEpoch", 0),
+                                    "main": {
+                                        "temp": hour.get("temp", 0),
+                                        "feels_like": hour.get("feelslike", hour.get("temp", 0)),
+                                        "temp_min": hour.get("temp", 0),
+                                        "temp_max": hour.get("temp", 0),
+                                        "pressure": hour.get("pressure", 0),
+                                        "humidity": hour.get("humidity", 0),
+                                    },
+                                    "weather": [
+                                        {
+                                            "main": hour.get("conditions", ""),
+                                            "description": hour.get("conditions", ""),
+                                        }
+                                    ],
+                                    "wind": {
+                                        "speed": hour.get("windspeed", 0),
+                                        "deg": hour.get("winddir", 0),
+                                    },
+                                    "pop": hour.get("precipprob", 0) / 100.0,
+                                    "dt_txt": hour.get("datetime", ""),
+                                }
+                            )
+
+                    temp_mins = [f["temp_min"] for f in daily_forecasts]
+                    temp_maxs = [f["temp_max"] for f in daily_forecasts]
+                    precip_chances = [f["precipitation_chance"] for f in daily_forecasts]
+
+                    forecast_data = {
+                        "list": detailed_forecasts,
+                        "city": {
+                            "name": data.get("resolvedAddress", ""),
+                            "coord": {
+                                "lat": data.get("latitude", 0),
+                                "lon": data.get("longitude", 0),
+                            },
+                            "timezone": data.get("timezone", ""),
+                        },
+                        "daily_forecasts": daily_forecasts,
+                        "temp_range": {
+                            "min": min(temp_mins) if temp_mins else 0,
+                            "max": max(temp_maxs) if temp_maxs else 0,
+                        },
+                        "precipitation_chance": max(precip_chances) if precip_chances else 0,
+                    }
+
+                weather_data = {
+                    "current": current_weather,
+                    "forecast": forecast_data,
+                    "destination": destination,
+                    "retrieved_at": datetime.now(UTC).isoformat(),
+                }
+
+                # Cache for 1 hour
+                await enhanced_supabase_cache.set_weather_cache(destination, weather_data, 1)
+
+                return weather_data
 
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Weather service error: %s", type(e).__name__)
             return None
 
-    async def _get_current_weather(self, lat: float, lon: float) -> dict[str, Any] | None:
-        """Get current weather conditions.
+    def _map_conditions_to_icon(self, conditions: str) -> str:
+        """Map Visual Crossing conditions to icon codes.
 
         Args:
-            lat: Latitude coordinate.
-            lon: Longitude coordinate.
+            conditions: Weather conditions string from Visual Crossing API.
 
         Returns:
-            Current weather data or None if error.
+            Icon code string.
         """
-        try:
-            # Fix: Use correct URL construction
-            url = f"{self.base_url}data/2.5/weather"
-            params = {"lat": lat, "lon": lon, "appid": self.api_key, "units": "imperial"}
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url, params=params)
-                response.raise_for_status()
-
-                data = response.json()
-
-                # Return complete current weather data
-                return {
-                    "coord": {"lon": data["coord"]["lon"], "lat": data["coord"]["lat"]},
-                    "weather": [
-                        {
-                            "id": data["weather"][0]["id"],
-                            "main": data["weather"][0]["main"],
-                            "description": data["weather"][0]["description"],
-                            "icon": data["weather"][0]["icon"],
-                        }
-                    ],
-                    "base": data.get("base", "stations"),
-                    "main": {
-                        "temp": data["main"]["temp"],
-                        "feels_like": data["main"]["feels_like"],
-                        "temp_min": data["main"]["temp_min"],
-                        "temp_max": data["main"]["temp_max"],
-                        "pressure": data["main"]["pressure"],
-                        "humidity": data["main"]["humidity"],
-                        "sea_level": data["main"].get("sea_level", 0),
-                        "grnd_level": data["main"].get("grnd_level", 0),
-                    },
-                    "visibility": data.get("visibility", 10000),
-                    "wind": {"speed": data["wind"]["speed"], "deg": data["wind"]["deg"]},
-                    "clouds": {"all": data["clouds"]["all"]},
-                    "dt": data["dt"],
-                    "sys": {
-                        "type": data["sys"].get("type", 0),
-                        "id": data["sys"].get("id", 0),
-                        "country": data["sys"].get("country", ""),
-                        "sunrise": data["sys"].get("sunrise", 0),
-                        "sunset": data["sys"].get("sunset", 0),
-                    },
-                    "timezone": data.get("timezone", 0),
-                    "id": data.get("id", 0),
-                    "name": data.get("name", ""),
-                }
-
-        except Exception as e:  # pylint: disable=broad-except
-            logger.error("Current weather error: %s", type(e).__name__)
-            return None
-
-    async def _get_forecast(self, lat: float, lon: float) -> dict[str, Any] | None:
-        """Get 5-day weather forecast.
-
-        Args:
-            lat: Latitude coordinate.
-            lon: Longitude coordinate.
-
-        Returns:
-            Forecast data or None if error.
-        """
-        # pylint: disable=too-many-locals
-        try:
-            # Fix: Use correct URL construction
-            url = f"{self.base_url}data/2.5/forecast"
-            params = {"lat": lat, "lon": lon, "appid": self.api_key, "units": "imperial"}
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url, params=params)
-                response.raise_for_status()
-
-                data = response.json()
-
-                # Process detailed forecast data
-                detailed_forecasts = []
-                daily_forecasts = []
-
-                # Group by day and get daily summaries
-                current_date = None
-                daily_temps = []
-                daily_conditions = []
-                daily_humidity = []
-                daily_descriptions = []
-
-                for item in data["list"]:
-                    # Create detailed forecast entry
-                    detailed_forecast = {
-                        "dt": item["dt"],
-                        "main": {
-                            "temp": item["main"]["temp"],
-                            "feels_like": item["main"]["feels_like"],
-                            "temp_min": item["main"]["temp_min"],
-                            "temp_max": item["main"]["temp_max"],
-                            "pressure": item["main"]["pressure"],
-                            "sea_level": item["main"].get("sea_level", 0),
-                            "grnd_level": item["main"].get("grnd_level", 0),
-                            "humidity": item["main"]["humidity"],
-                            "temp_kf": item["main"].get("temp_kf", 0),
-                        },
-                        "weather": [
-                            {
-                                "id": item["weather"][0]["id"],
-                                "main": item["weather"][0]["main"],
-                                "description": item["weather"][0]["description"],
-                                "icon": item["weather"][0]["icon"],
-                            }
-                        ],
-                        "clouds": {"all": item["clouds"]["all"]},
-                        "wind": {
-                            "speed": item["wind"]["speed"],
-                            "deg": item["wind"]["deg"],
-                            "gust": item["wind"].get("gust", 0),
-                        },
-                        "visibility": item.get("visibility", 10000),
-                        "pop": item.get("pop", 0),
-                        "sys": {"pod": item["sys"]["pod"]},
-                        "dt_txt": item["dt_txt"],
-                    }
-                    detailed_forecasts.append(detailed_forecast)
-
-                    # Process for daily summaries
-                    dt = datetime.fromtimestamp(item["dt"])
-                    date_str = dt.strftime("%Y-%m-%d")
-
-                    if current_date != date_str:
-                        if current_date is not None:
-                            daily_forecasts.append(
-                                {
-                                    "date": current_date,
-                                    "temp_min": min(daily_temps),
-                                    "temp_max": max(daily_temps),
-                                    "humidity_min": min(daily_humidity),
-                                    "humidity_max": max(daily_humidity),
-                                    "weather_descriptions": list(set(daily_descriptions)),
-                                    "conditions": max(
-                                        set(daily_conditions), key=daily_conditions.count
-                                    ),
-                                    "precipitation_chance": self._calculate_precipitation_chance(
-                                        daily_conditions
-                                    ),
-                                }
-                            )
-                        current_date = date_str
-                        daily_temps = []
-                        daily_conditions = []
-                        daily_humidity = []
-                        daily_descriptions = []
-
-                    daily_temps.append(item["main"]["temp"])
-                    daily_conditions.append(item["weather"][0]["main"])
-                    daily_humidity.append(item["main"]["humidity"])
-                    daily_descriptions.append(item["weather"][0]["description"])
-
-                # Add the last day if exists
-                if current_date is not None:
-                    daily_forecasts.append(
-                        {
-                            "date": current_date,
-                            "temp_min": min(daily_temps),
-                            "temp_max": max(daily_temps),
-                            "humidity_min": min(daily_humidity),
-                            "humidity_max": max(daily_humidity),
-                            "weather_descriptions": list(set(daily_descriptions)),
-                            "conditions": max(set(daily_conditions), key=daily_conditions.count),
-                            "precipitation_chance": self._calculate_precipitation_chance(
-                                daily_conditions
-                            ),
-                        }
-                    )
-
-                # Use generators for better performance
-                temp_mins = (f["temp_min"] for f in daily_forecasts[:7])
-                temp_maxs = (f["temp_max"] for f in daily_forecasts[:7])
-                precip_chances = (f["precipitation_chance"] for f in daily_forecasts[:7])
-
-                return {
-                    "list": detailed_forecasts,
-                    "city": data.get("city", {}),
-                    "daily_forecasts": daily_forecasts[:7],  # 7 days max
-                    "temp_range": {
-                        "min": min(temp_mins) if daily_forecasts else 0,
-                        "max": max(temp_maxs) if daily_forecasts else 0,
-                    },
-                    "precipitation_chance": (max(precip_chances) if daily_forecasts else 0),
-                }
-
-        except Exception as e:  # pylint: disable=broad-except
-            logger.error("Forecast error: %s", type(e).__name__)
-            return None
+        if not conditions:
+            return "02d"
+        conditions_lower = conditions.lower()
+        if "clear" in conditions_lower or "sunny" in conditions_lower:
+            return "01d"
+        elif "cloud" in conditions_lower:
+            return "03d"
+        elif "rain" in conditions_lower:
+            return "09d"
+        elif "snow" in conditions_lower:
+            return "13d"
+        elif "thunder" in conditions_lower:
+            return "11d"
+        else:
+            return "02d"
 
     def _calculate_precipitation_chance(self, conditions: list[str]) -> int:
         """Calculate precipitation chance from conditions.

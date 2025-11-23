@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     OPENAI_ORG_ID: str | None = None
     QLOO_API_KEY: str = ""
     OPENWEATHER_API_KEY: str = ""
+    VISUALCROSSING_API_KEY: str = ""
     EXCHANGE_API_KEY: str = ""
 
     # Supabase Configuration
@@ -67,6 +68,9 @@ class Settings(BaseSettings):
     QLOO_BASE_URL: str = "https://hackathon.api.qloo.com/v2/"
     OPENWEATHER_BASE_URL: str = "https://api.openweathermap.org/"
     EXCHANGE_BASE_URL: str = "https://v6.exchangerate-api.com/v6/"
+    VISUALCROSSING_BASE_URL: str = (
+        "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/"
+    )
 
     model_config = {
         "env_file": ".env",

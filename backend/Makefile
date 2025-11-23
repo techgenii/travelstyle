@@ -38,6 +38,7 @@ help:
 	@echo "$(YELLOW)Testing:$(NC)"
 	@echo "  test           - Run all tests with warnings disabled"
 	@echo "  test-quick     - Run tests quickly (no coverage)"
+	@echo "  test-coverage  - Run tests with coverage report only"
 	@echo "  test-chat      - Run chat-related tests only"
 	@echo "  test-currency  - Run currency-related tests only"
 	@echo "  test-orchestrator - Run orchestrator tests only"
@@ -45,6 +46,7 @@ help:
 	@echo "  test-watch     - Run tests in watch mode"
 	@echo "  test-lint      - Run ruff linting"
 	@echo "  test-security  - Run bandit security scan"
+	@echo "  clean-tests    - Clean test files (coverage, cache, reports)"
 	@echo ""
 	@echo "$(YELLOW)Development (Local Testing):$(NC)"
 	@echo "  dev            - Run all dev checks (lint, security, test)"
@@ -102,7 +104,7 @@ show-versions:
 	@$(PIP) show openai httpx 2>/dev/null | grep -E "^Name:|^Version:" | paste - - | sed 's/Name: //;s/Version: /: /' || echo "  (not installed)"
 
 # Testing targets (improved with warnings disabled)
-.PHONY: test test-quick test-chat test-currency test-orchestrator test-recommendations test-watch test-lint test-security
+.PHONY: test test-quick test-coverage test-chat test-currency test-orchestrator test-recommendations test-watch test-lint test-security
 test: | $(REPORT_DIR)
 	@echo "$(BLUE)Running all tests with warnings disabled...$(NC)"
 	pytest --tb=short -v --disable-warnings \
@@ -116,6 +118,17 @@ test: | $(REPORT_DIR)
 test-quick:
 	@echo "$(BLUE)Running tests quickly (no coverage)...$(NC)"
 	pytest --tb=short -v --disable-warnings
+
+test-coverage: | $(REPORT_DIR)
+	@echo "$(BLUE)Running tests with coverage report...$(NC)"
+	pytest --tb=short -v --disable-warnings \
+		--cov=$(APP_DIR) \
+		--cov-report=term \
+		--cov-report=html \
+		--cov-report=json:$(REPORT_DIR)/pytest-coverage.json
+	@echo "$(GREEN)Coverage report generated!$(NC)"
+	@echo "$(YELLOW)HTML report: htmlcov/index.html$(NC)"
+	@echo "$(YELLOW)JSON report: $(REPORT_DIR)/pytest-coverage.json$(NC)"
 
 test-chat:
 	@echo "$(BLUE)Running chat-related tests...$(NC)"
@@ -209,9 +222,17 @@ run:
 	uvicorn $(APP_DIR).travelstyle:travelstyle_app --reload --host $(HOST) --port $(PORT)
 
 # Cleanup (dev only)
-.PHONY: clean clean-reports clean-cache
+.PHONY: clean clean-reports clean-cache clean-tests
 clean: clean-reports clean-cache
 	@echo "$(YELLOW)Cleanup completed$(NC)"
+
+clean-tests:
+	@echo "$(YELLOW)Cleaning test files...$(NC)"
+	rm -rf htmlcov
+	rm -rf .pytest_cache
+	rm -f .coverage*
+	rm -rf $(REPORT_DIR)/pytest-*
+	rm -f $(REPORT_DIR)/pytest-coverage.*
 
 clean-reports:
 	@echo "$(YELLOW)Cleaning reports...$(NC)"
