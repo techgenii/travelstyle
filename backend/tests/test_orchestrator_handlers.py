@@ -16,14 +16,13 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Additional tests for TravelOrchestratorService handlers and error branches to improve coverage.
+Additional tests for TravelOrchestratorService handlers, routing, and AI classification functionality.
 """
 
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from app.models.responses import ChatResponse, ConversationContext
-from app.services.currency_conversion_service import currency_conversion_service
 from app.services.openai.openai_service import openai_service
 from app.services.orchestrator import TravelOrchestratorService
 from app.services.qloo import qloo_service
@@ -102,12 +101,14 @@ async def test_handle_currency_help_request_with_quick_replies(
     }
     with (
         patch.object(
-            currency_conversion_service,
+            orchestrator.currency_service,
             "handle_currency_help_request",
             new=AsyncMock(return_value=help_resp),
         ),
         patch.object(
-            currency_conversion_service, "handle_currency_request", new=AsyncMock(return_value=None)
+            orchestrator.currency_service,
+            "handle_currency_request",
+            new=AsyncMock(return_value=None),
         ),
     ):
         res = await orchestrator._handle_currency_request("help currency", base_context)
@@ -124,12 +125,12 @@ async def test_handle_currency_invalid_data_format(
 ):
     with (
         patch.object(
-            currency_conversion_service,
+            orchestrator.currency_service,
             "handle_currency_help_request",
             new=AsyncMock(return_value=None),
         ),
         patch.object(
-            currency_conversion_service,
+            orchestrator.currency_service,
             "handle_currency_request",
             new=AsyncMock(return_value={"success": True, "data": [1, 2, 3]}),
         ),
@@ -145,12 +146,12 @@ async def test_handle_currency_failure_path(
 ):
     with (
         patch.object(
-            currency_conversion_service,
+            orchestrator.currency_service,
             "handle_currency_help_request",
             new=AsyncMock(return_value=None),
         ),
         patch.object(
-            currency_conversion_service,
+            orchestrator.currency_service,
             "handle_currency_request",
             new=AsyncMock(return_value={"success": False}),
         ),
@@ -395,3 +396,238 @@ def test_parse_trip_context_uses_context_fallbacks(orchestrator: TravelOrchestra
     assert out["destination"] == "Zurich"
     assert out["travel_dates"] == ["2025-01-01", "2025-01-05"]
     assert out["trip_purpose"] == "leisure"
+
+
+# ---- Routing Tests ----
+
+
+class TestOrchestratorRouting:
+    """Test the routing functionality of the orchestrator."""
+
+    def test_determine_message_type_currency(self, orchestrator):
+        """Test that currency messages are correctly identified."""
+        assert orchestrator._determine_message_type("Convert USD to EUR") == "currency"
+        assert orchestrator._determine_message_type("What's the exchange rate?") == "currency"
+        assert orchestrator._determine_message_type("currency_convert") == "currency"
+
+    def test_determine_message_type_weather(self, orchestrator):
+        """Test that weather messages are correctly identified."""
+        assert orchestrator._determine_message_type("What's the weather like?") == "weather"
+        assert orchestrator._determine_message_type("weather_info") == "weather"
+        assert orchestrator._determine_message_type("Temperature forecast") == "weather"
+
+    def test_determine_message_type_wardrobe(self, orchestrator):
+        """Test that wardrobe messages are correctly identified."""
+        assert orchestrator._determine_message_type("What should I pack?") == "wardrobe"
+        assert orchestrator._determine_message_type("wardrobe_planning") == "wardrobe"
+        assert orchestrator._determine_message_type("Packing tips") == "wardrobe"
+
+    def test_determine_message_type_style(self, orchestrator):
+        """Test that style messages are correctly identified."""
+        assert orchestrator._determine_message_type("What's the dress code?") == "style"
+        assert orchestrator._determine_message_type("style_etiquette") == "style"
+        assert orchestrator._determine_message_type("Fashion advice") == "style"
+
+    def test_determine_message_type_destination(self, orchestrator):
+        """Test that destination messages are correctly identified."""
+        assert orchestrator._determine_message_type("Tell me about Paris") == "destination"
+        assert orchestrator._determine_message_type("destination_info") == "destination"
+        assert orchestrator._determine_message_type("Going to Tokyo") == "destination"
+
+    def test_determine_message_type_general(self, orchestrator):
+        """Test that general messages fall back to general type."""
+        assert orchestrator._determine_message_type("Hello") == "general"
+        assert orchestrator._determine_message_type("How are you?") == "general"
+
+    def test_extract_destination(self, orchestrator):
+        """Test destination extraction from messages."""
+        assert orchestrator._extract_destination("I'm going to Paris") == "Paris"
+        assert orchestrator._extract_destination("Visiting Tokyo next week") == "Tokyo"
+        assert orchestrator._extract_destination("Trip to New York") == "New York"
+        assert orchestrator._extract_destination("Hello there") is None
+
+    @pytest.mark.asyncio
+    async def test_route_message_currency(self, orchestrator, base_context):
+        """Test routing to currency handler."""
+        with patch.object(orchestrator, "_handle_currency_request") as mock_handler:
+            mock_handler.return_value = "currency_response"
+
+            result = await orchestrator.route_message(
+                "Convert 100 USD to EUR", base_context, [], None
+            )
+
+            mock_handler.assert_called_once()
+            assert result == "currency_response"
+
+    @pytest.mark.asyncio
+    async def test_route_message_weather(self, orchestrator, base_context):
+        """Test routing to weather handler."""
+        with patch.object(orchestrator, "_handle_weather_request") as mock_handler:
+            mock_handler.return_value = "weather_response"
+
+            result = await orchestrator.route_message(
+                "What's the weather like in Paris?", base_context, [], None
+            )
+
+            mock_handler.assert_called_once()
+            assert result == "weather_response"
+
+    @pytest.mark.asyncio
+    async def test_route_message_wardrobe(self, orchestrator, base_context):
+        """Test routing to wardrobe handler."""
+        with patch.object(orchestrator, "_handle_wardrobe_request") as mock_handler:
+            mock_handler.return_value = "wardrobe_response"
+
+            result = await orchestrator.route_message(
+                "What should I pack for my trip?", base_context, [], None
+            )
+
+            mock_handler.assert_called_once()
+            assert result == "wardrobe_response"
+
+    @pytest.mark.asyncio
+    async def test_route_message_style(self, orchestrator, base_context):
+        """Test routing to style handler."""
+        with patch.object(orchestrator, "_handle_style_request") as mock_handler:
+            mock_handler.return_value = "style_response"
+
+            result = await orchestrator.route_message(
+                "What's the dress code for restaurants?", base_context, [], None
+            )
+
+            mock_handler.assert_called_once()
+            assert result == "style_response"
+
+    @pytest.mark.asyncio
+    async def test_route_message_destination(self, orchestrator, base_context):
+        """Test routing to destination handler."""
+        with patch.object(orchestrator, "_handle_destination_request") as mock_handler:
+            mock_handler.return_value = "destination_response"
+
+            result = await orchestrator.route_message("Tell me about Tokyo", base_context, [], None)
+
+            mock_handler.assert_called_once()
+            assert result == "destination_response"
+
+    @pytest.mark.asyncio
+    async def test_route_message_general(self, orchestrator, base_context):
+        """Test routing to general handler."""
+        with patch.object(orchestrator, "_handle_general_request") as mock_handler:
+            mock_handler.return_value = "general_response"
+
+            result = await orchestrator.route_message("Hello, how are you?", base_context, [], None)
+
+            mock_handler.assert_called_once()
+            assert result == "general_response"
+
+    def test_backward_compatibility(self, orchestrator):
+        """Test that the old method still works for backward compatibility."""
+        assert hasattr(orchestrator, "generate_travel_recommendations")
+        assert callable(orchestrator.generate_travel_recommendations)
+
+
+# ---- AI Classification Tests ----
+
+
+class TestOrchestratorAIClassification:
+    """Test the AI-based message classification functionality."""
+
+    @pytest.mark.asyncio
+    async def test_classify_currency_message(self, orchestrator):
+        """Test classification of currency-related messages."""
+        with patch("app.services.orchestrator.openai_service") as mock_openai:
+            mock_openai.get_completion.return_value = "currency"
+
+            result = await orchestrator._classify_message("I want to convert USD to EUR")
+
+            assert result == "currency"
+            mock_openai.get_completion.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_classify_weather_message(self, orchestrator):
+        """Test classification of weather-related messages."""
+        with patch("app.services.orchestrator.openai_service") as mock_openai:
+            mock_openai.get_completion.return_value = "weather"
+
+            result = await orchestrator._classify_message("What's the weather like in Paris?")
+
+            assert result == "weather"
+            mock_openai.get_completion.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_classify_logistics_message(self, orchestrator):
+        """Test classification of logistics-related messages."""
+        with patch("app.services.orchestrator.openai_service") as mock_openai:
+            mock_openai.get_completion.return_value = "logistics"
+
+            result = await orchestrator._classify_message(
+                "I would like to go to London from 2025-09-02 until 2025-09-09 and manage the currency exchange for the British Pound"
+            )
+
+            assert result == "logistics"
+            mock_openai.get_completion.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_classify_general_message(self, orchestrator):
+        """Test classification of general messages."""
+        with patch("app.services.orchestrator.openai_service") as mock_openai:
+            mock_openai.get_completion.return_value = "general"
+
+            result = await orchestrator._classify_message("Hello, how are you?")
+
+            assert result == "general"
+            mock_openai.get_completion.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_classify_fallback_on_error(self, orchestrator):
+        """Test that classification falls back to general on error."""
+        with patch("app.services.orchestrator.openai_service") as mock_openai:
+            mock_openai.get_completion.side_effect = Exception("API Error")
+
+            result = await orchestrator._classify_message("Some message")
+
+            assert result == "general"
+
+    @pytest.mark.asyncio
+    async def test_classify_invalid_response(self, orchestrator):
+        """Test classification handles invalid responses."""
+        with patch("app.services.orchestrator.openai_service") as mock_openai:
+            mock_openai.get_completion.return_value = "invalid_category"
+
+            result = await orchestrator._classify_message("Some message")
+
+            assert result == "general"
+
+    @pytest.mark.asyncio
+    async def test_route_message_with_ai_classification(self, orchestrator, base_context):
+        """Test that routing uses AI classification."""
+        with patch.object(orchestrator, "_classify_message") as mock_classify:
+            with patch.object(orchestrator, "_handle_currency_request") as mock_handler:
+                mock_classify.return_value = "currency"
+                mock_handler.return_value = "currency_response"
+
+                result = await orchestrator.route_message(
+                    "Convert 100 USD to EUR", base_context, [], None
+                )
+
+                mock_classify.assert_called_once_with("Convert 100 USD to EUR")
+                mock_handler.assert_called_once()
+                assert result == "currency_response"
+
+    def test_extract_travel_dates(self, orchestrator):
+        """Test travel date extraction."""
+        # Test "until" format
+        dates = orchestrator._extract_travel_dates("2025-09-02 until 2025-09-09")
+        assert dates == ["2025-09-02", "2025-09-09"]
+
+        # Test "from...to" format
+        dates = orchestrator._extract_travel_dates("from 2025-09-02 to 2025-09-09")
+        assert dates == ["2025-09-02", "2025-09-09"]
+
+        # Test "to" format
+        dates = orchestrator._extract_travel_dates("2025-09-02 to 2025-09-09")
+        assert dates == ["2025-09-02", "2025-09-09"]
+
+        # Test no dates
+        dates = orchestrator._extract_travel_dates("Hello there")
+        assert dates is None

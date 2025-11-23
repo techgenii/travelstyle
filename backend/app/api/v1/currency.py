@@ -24,8 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_user
 from app.models.responses import ChatResponse, QuickReply
 from app.models.travel import CurrencyConvertRequest, CurrencyPairRequest
-from app.services.currency_conversion_service import currency_conversion_service
-from app.services.currency_service import currency_service
+from app.services.currency import CurrencyService
 from app.utils.rate_limiter import rate_limit
 
 router = APIRouter()
@@ -33,6 +32,9 @@ logger = logging.getLogger(__name__)
 
 # Local dependency to avoid linter warnings
 current_user_dependency = Depends(get_current_user)
+
+# Create a single instance of the modular currency service
+currency_service = CurrencyService()
 
 
 @router.get("/rates/{base_currency}")
@@ -119,35 +121,96 @@ async def convert_currency(
         if not user_message:
             raise HTTPException(status_code=400, detail="Message is required")
 
-        # Handle the currency request
-        result = await currency_conversion_service.handle_currency_request(user_message)
+        # Handle the currency request using the unified service
+        result = await currency_service.handle_currency_request(user_message)
 
-        if result and "rate" in result:
-            # Format the response message
-            original = result["original"]
-            converted = result["converted"]
-            rate = result["rate"]
-
-            message = (
-                f"{original['amount']:.2f} {original['currency']} = "
-                f"{converted['amount']:.2f} {converted['currency']} (Rate: {rate:.4f})"
-            )
-
-            quick_replies = [
-                QuickReply(text="Convert different amount", action="currency_convert"),
-                QuickReply(text="Other currencies", action="currency_list"),
-            ]
-
-            # Add specific quick reply if amount was provided
-            if original.get("amount", 0) > 0:
-                quick_replies.insert(
-                    0, QuickReply(text="Show rate only", action="currency_rate_only")
-                )
-
-            return ChatResponse(message=message, confidence_score=0.9, quick_replies=quick_replies)
-        else:
+        # Handle case where result is None (service error)
+        if result is None:
             return ChatResponse(
                 message="Sorry, I couldn't process that currency conversion request.",
+                confidence_score=0.0,
+            )
+
+        # Check if this is the new format (with success field)
+        if isinstance(result, dict) and result.get("success"):
+            # New format - handle structured response
+            request_type = result.get("request_type", "conversion")
+
+            if request_type == "conversion" and "data" in result:
+                # Handle conversion response
+                conversion_data = result["data"]
+                original = conversion_data.get("original", {})
+                converted = conversion_data.get("converted", {})
+                rate = conversion_data.get("rate")
+
+                if all([original, converted, rate is not None]):
+                    message = (
+                        f"{original.get('amount', 0):.2f} {original.get('currency', '')} = "
+                        f"{converted.get('amount', 0):.2f} {converted.get('currency', '')} "
+                        f"(Rate: {rate:.4f})"
+                    )
+
+                    quick_replies = [
+                        QuickReply(text="Convert different amount", action="currency_convert"),
+                        QuickReply(text="Other currencies", action="currency_list"),
+                    ]
+
+                    # Add specific quick reply if amount was provided
+                    if original.get("amount", 0) > 0:
+                        quick_replies.insert(
+                            0, QuickReply(text="Show rate only", action="currency_rate_only")
+                        )
+
+                    return ChatResponse(
+                        message=message, confidence_score=0.9, quick_replies=quick_replies
+                    )
+
+            elif request_type == "rate" and "data" in result:
+                # Handle rate response
+                rate_data = result["data"]
+                base_code = rate_data.get("base_code", "")
+                target_code = rate_data.get("target_code", "")
+                rate = rate_data.get("rate")
+
+                if all([base_code, target_code, rate is not None]):
+                    message = f"Exchange rate: 1 {base_code} = {rate:.4f} {target_code}"
+
+                    quick_replies = [
+                        QuickReply(text="Convert amount", action="currency_convert"),
+                        QuickReply(text="Other currencies", action="currency_list"),
+                    ]
+
+                    return ChatResponse(
+                        message=message, confidence_score=0.9, quick_replies=quick_replies
+                    )
+
+            elif request_type == "help":
+                # Handle help response
+                message = result.get("message", "Currency conversion help")
+                quick_replies = [
+                    QuickReply(text="Convert currency", action="currency_convert"),
+                    QuickReply(text="Check rates", action="currency_rates"),
+                ]
+
+                return ChatResponse(
+                    message=message, confidence_score=0.9, quick_replies=quick_replies
+                )
+
+            # Fallback for other successful responses
+            return ChatResponse(
+                message=result.get("message", "Currency request processed successfully"),
+                confidence_score=0.8,
+            )
+        else:
+            # Handle failed requests
+            error_message = (
+                result.get("message", "Sorry, I couldn't process that currency conversion request.")
+                if isinstance(result, dict)
+                else "Sorry, I couldn't process that currency conversion request."
+            )
+
+            return ChatResponse(
+                message=error_message,
                 confidence_score=0.0,
             )
 
@@ -160,7 +223,7 @@ async def convert_currency(
 async def get_supported_currencies(current_user: dict = current_user_dependency):
     """Get list of supported currencies"""
     try:
-        currencies = currency_conversion_service.get_supported_currencies()
+        currencies = currency_service.get_supported_currencies()
         return {"currencies": currencies}
     except Exception as e:
         logger.error("Get supported currencies error: %s", type(e).__name__)
@@ -179,7 +242,7 @@ async def validate_currency_code(
         if not currency_code:
             raise HTTPException(status_code=400, detail="Currency code is required")
 
-        is_valid = currency_conversion_service.validate_currency_code(currency_code)
+        is_valid = currency_service.validate_currency_code(currency_code)
 
         return {"currency_code": currency_code.upper(), "is_valid": is_valid, "supported": is_valid}
 
@@ -200,7 +263,7 @@ async def parse_currency_message(
         if not user_message:
             raise HTTPException(status_code=400, detail="Message is required")
 
-        parsed_data = await currency_conversion_service.parse_currency_request(user_message)
+        parsed_data = await currency_service.parse_currency_request(user_message)
 
         return {
             "parsed_data": parsed_data,
@@ -208,12 +271,8 @@ async def parse_currency_message(
                 [
                     parsed_data.get("first_country"),
                     parsed_data.get("second_country"),
-                    currency_conversion_service.validate_currency_code(
-                        parsed_data.get("first_country", "")
-                    ),
-                    currency_conversion_service.validate_currency_code(
-                        parsed_data.get("second_country", "")
-                    ),
+                    currency_service.validate_currency_code(parsed_data.get("first_country", "")),
+                    currency_service.validate_currency_code(parsed_data.get("second_country", "")),
                 ]
             ),
         }

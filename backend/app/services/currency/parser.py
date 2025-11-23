@@ -220,10 +220,33 @@ class CurrencyParser:
 
     def _extract_json_from_text(self, text: str) -> str:
         """Extract JSON from text that may contain additional content."""
-        # Look for JSON object in the text
-        json_match = re.search(r"\{.*\}", text, re.DOTALL)
-        if json_match:
-            return json_match.group(0)
+        import json
+
+        # Look for all potential JSON objects in the text
+        # Find all positions of { and try to extract valid JSON from each
+        start_positions = []
+        for i, char in enumerate(text):
+            if char == "{":
+                start_positions.append(i)
+
+        # Try each potential JSON start position
+        for start_pos in start_positions:
+            # Count braces to find the matching closing brace
+            brace_count = 0
+            for i, char in enumerate(text[start_pos:], start_pos):
+                if char == "{":
+                    brace_count += 1
+                elif char == "}":
+                    brace_count -= 1
+                    if brace_count == 0:
+                        # Found a complete JSON object, try to parse it
+                        json_candidate = text[start_pos : i + 1]
+                        try:
+                            json.loads(json_candidate)
+                            return json_candidate  # Return the first valid JSON found
+                        except json.JSONDecodeError:
+                            continue  # Try the next potential JSON object
+
         return ""
 
     def _clean_parsed_data(self, data: dict) -> dict | None:

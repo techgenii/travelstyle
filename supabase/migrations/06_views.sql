@@ -27,8 +27,12 @@ SELECT
     p.currency_preferences,
     u.created_at,
     u.updated_at,
-    -- Remove the non-existent column u.last_login
-    COALESCE(p.style_preferences->>'selected_styles', '[]')::text[] AS selected_style_names,
+    u.last_login,
+    CASE
+        WHEN p.style_preferences IS NULL THEN '{}'::text[]
+        WHEN p.style_preferences->>'selected_styles' IS NULL THEN '{}'::text[]
+        ELSE (p.style_preferences->>'selected_styles')::text[]
+    END AS selected_style_names,
     u.default_location,
     u.max_bookmarks,
     u.max_conversations,

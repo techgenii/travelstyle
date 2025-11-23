@@ -337,7 +337,7 @@ async def test_auth_service_init_client_failure():
         "app.services.supabase.SupabaseClientManager._create_client",
         side_effect=Exception("Connection failed"),
     ):
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             from app.services.auth_service import AuthService
 
             AuthService()
@@ -493,6 +493,69 @@ async def test_register_exception(auth_service):
 
         with pytest.raises(RegistrationError, match="Registration failed"):
             await auth_service.register("test@example.com", "password")
+
+
+@pytest.mark.asyncio
+async def test_register_weak_password_error(auth_service):
+    """Test register when Supabase raises AuthWeakPasswordError."""
+
+    # Create a mock exception with the weak password error type name
+    class AuthWeakPasswordError(Exception):
+        """Mock AuthWeakPasswordError exception."""
+
+        pass
+
+    with patch.object(
+        auth_service.client.auth,
+        "sign_up",
+        side_effect=AuthWeakPasswordError("Password is too weak"),
+    ):
+        from app.services.auth.constants import WEAK_PASSWORD_MSG
+        from app.services.auth.exceptions import RegistrationError
+
+        with pytest.raises(RegistrationError, match=WEAK_PASSWORD_MSG):
+            # Use a password that passes local validation (6+ chars) but Supabase rejects
+            await auth_service.register("test@example.com", "password123")
+
+
+@pytest.mark.asyncio
+async def test_register_weak_password_error_by_message(auth_service):
+    """Test register when error message contains 'weak password'."""
+    with patch.object(
+        auth_service.client.auth, "sign_up", side_effect=Exception("Password is too weak")
+    ):
+        from app.services.auth.constants import WEAK_PASSWORD_MSG
+        from app.services.auth.exceptions import RegistrationError
+
+        with pytest.raises(RegistrationError, match=WEAK_PASSWORD_MSG):
+            # Use a password that passes local validation (6+ chars) but Supabase rejects
+            await auth_service.register("test@example.com", "password123")
+
+
+@pytest.mark.asyncio
+async def test_register_email_already_in_use(auth_service):
+    """Test register when email is already in use."""
+    with patch.object(
+        auth_service.client.auth, "sign_up", side_effect=Exception("Email already exists")
+    ):
+        from app.services.auth.constants import EMAIL_ALREADY_IN_USE_MSG
+        from app.services.auth.exceptions import RegistrationError
+
+        with pytest.raises(RegistrationError, match=EMAIL_ALREADY_IN_USE_MSG):
+            await auth_service.register("existing@example.com", "password")
+
+
+@pytest.mark.asyncio
+async def test_register_email_already_taken(auth_service):
+    """Test register when email is already taken (different wording)."""
+    with patch.object(
+        auth_service.client.auth, "sign_up", side_effect=Exception("Email is already taken")
+    ):
+        from app.services.auth.constants import EMAIL_ALREADY_IN_USE_MSG
+        from app.services.auth.exceptions import RegistrationError
+
+        with pytest.raises(RegistrationError, match=EMAIL_ALREADY_IN_USE_MSG):
+            await auth_service.register("existing@example.com", "password")
 
 
 @pytest.mark.asyncio

@@ -26,7 +26,7 @@ import re
 from typing import Any
 
 from app.models.responses import ChatResponse, ConversationContext, QuickReply
-from app.services.currency_conversion_service import currency_conversion_service
+from app.services.currency import CurrencyService
 from app.services.openai.openai_service import openai_service
 from app.services.qloo import qloo_service
 from app.services.weather import weather_service
@@ -39,7 +39,7 @@ class TravelOrchestratorService:
 
     def __init__(self):
         """Initialize the orchestrator."""
-        pass
+        self.currency_service = CurrencyService()
 
     async def route_message(
         self,
@@ -217,9 +217,7 @@ class TravelOrchestratorService:
         """Handle currency conversion and exchange rate requests."""
         try:
             # Check for currency help requests first
-            help_response = await currency_conversion_service.handle_currency_help_request(
-                user_message
-            )
+            help_response = await self.currency_service.handle_currency_help_request(user_message)
             if help_response:
                 quick_replies = []
                 if "quick_replies" in help_response:
@@ -234,7 +232,7 @@ class TravelOrchestratorService:
                 )
 
             # Process currency request
-            result = await currency_conversion_service.handle_currency_request(user_message)
+            result = await self.currency_service.handle_currency_request(user_message)
 
             if result and result.get("success") and "data" in result:
                 data = result["data"]

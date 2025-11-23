@@ -41,6 +41,14 @@ class CurrencyFormatter:
     ) -> str:
         """Format a currency conversion response."""
         try:
+            # Check for invalid values (infinity, NaN, etc.)
+            if not all(
+                isinstance(x, int | float)
+                and not (x != x or x == float("inf") or x == float("-inf"))
+                for x in [amount, rate, converted_amount]
+            ):
+                return "Sorry, I encountered an error formatting the currency conversion."
+
             # Format the response with proper currency formatting
             response = (
                 f"💱 **Currency Conversion**\n\n"
@@ -64,6 +72,13 @@ class CurrencyFormatter:
     ) -> str:
         """Format an exchange rate response."""
         try:
+            # Check for invalid values (infinity, NaN, etc.)
+            if not (
+                isinstance(rate, int | float)
+                and not (rate != rate or rate == float("inf") or rate == float("-inf"))
+            ):
+                return "Sorry, I encountered an error formatting the exchange rate."
+
             response = (
                 f"📊 **Exchange Rate**\n\n**1 {from_currency}** = **{rate:.4f} {to_currency}**\n\n"
             )

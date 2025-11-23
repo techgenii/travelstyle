@@ -575,9 +575,19 @@ class TestDatabaseHelpersComprehensive:
         users_response = MagicMock()
         users_response.data = [{"id": "test-user"}]
 
-        # Mock user_profile_view update
-        update_response = MagicMock()
-        update_response.data = [
+        # Mock profiles table update response
+        profiles_response = MagicMock()
+        profiles_response.data = [{"id": "test-user", "first_name": "John"}]
+
+        # Mock user_preferences table update response
+        preferences_response = MagicMock()
+        preferences_response.data = [
+            {"user_id": "test-user", "selected_style_names": ["Bohemian", "Minimalist"]}
+        ]
+
+        # Mock user_profile_view final query response
+        profile_view_response = MagicMock()
+        profile_view_response.data = [
             {
                 "id": "test-user",
                 "email": "test@example.com",
@@ -598,11 +608,46 @@ class TestDatabaseHelpersComprehensive:
             }
         ]
 
-        # Setup table mock
+        # Setup table mock to return different responses based on table name
         table_mock = MagicMock()
-        table_mock.select.return_value.eq.return_value.execute.return_value = users_response
-        table_mock.update.return_value.eq.return_value.execute.return_value = update_response
-        mock_client.table.return_value = table_mock
+
+        # Mock the users table query
+        users_table_mock = MagicMock()
+        users_table_mock.select.return_value.eq.return_value.execute.return_value = users_response
+
+        # Mock the profiles table update
+        profiles_table_mock = MagicMock()
+        profiles_table_mock.update.return_value.eq.return_value.execute.return_value = (
+            profiles_response
+        )
+
+        # Mock the user_preferences table operations
+        prefs_table_mock = MagicMock()
+        prefs_table_mock.select.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[]
+        )
+        prefs_table_mock.insert.return_value.execute.return_value = preferences_response
+
+        # Mock the user_profile_view final query
+        profile_view_table_mock = MagicMock()
+        profile_view_table_mock.select.return_value.eq.return_value.execute.return_value = (
+            profile_view_response
+        )
+
+        # Configure table mock to return different mocks based on table name
+        def table_side_effect(table_name):
+            if table_name == "users":
+                return users_table_mock
+            elif table_name == "profiles":
+                return profiles_table_mock
+            elif table_name == "user_preferences":
+                return prefs_table_mock
+            elif table_name == "user_profile_view":
+                return profile_view_table_mock
+            else:
+                return table_mock
+
+        mock_client.table.side_effect = table_side_effect
 
         profile_data = {
             "first_name": "John",
@@ -651,9 +696,22 @@ class TestDatabaseHelpersComprehensive:
         users_response = MagicMock()
         users_response.data = [{"id": "test-user"}]
 
-        # Mock user_profile_view update
-        update_response = MagicMock()
-        update_response.data = [
+        # Mock profiles table update response
+        profiles_response = MagicMock()
+        profiles_response.data = [{"id": "test-user", "first_name": "John"}]
+
+        # Mock user_preferences table operations (no existing preferences, so insert)
+        prefs_select_response = MagicMock()
+        prefs_select_response.data = []  # No existing preferences
+
+        prefs_insert_response = MagicMock()
+        prefs_insert_response.data = [
+            {"user_id": "test-user", "selected_style_names": ["Bohemian", "Minimalist"]}
+        ]
+
+        # Mock user_profile_view final query response
+        profile_view_response = MagicMock()
+        profile_view_response.data = [
             {
                 "id": "test-user",
                 "email": "test@example.com",
@@ -664,9 +722,44 @@ class TestDatabaseHelpersComprehensive:
 
         # Setup table mock to return different responses based on table name
         table_mock = MagicMock()
-        table_mock.select.return_value.eq.return_value.execute.return_value = users_response
-        table_mock.update.return_value.eq.return_value.execute.return_value = update_response
-        mock_client.table.return_value = table_mock
+
+        # Mock the users table query
+        users_table_mock = MagicMock()
+        users_table_mock.select.return_value.eq.return_value.execute.return_value = users_response
+
+        # Mock the profiles table update
+        profiles_table_mock = MagicMock()
+        profiles_table_mock.update.return_value.eq.return_value.execute.return_value = (
+            profiles_response
+        )
+
+        # Mock the user_preferences table operations
+        prefs_table_mock = MagicMock()
+        prefs_table_mock.select.return_value.eq.return_value.execute.return_value = (
+            prefs_select_response
+        )
+        prefs_table_mock.insert.return_value.execute.return_value = prefs_insert_response
+
+        # Mock the user_profile_view final query
+        profile_view_table_mock = MagicMock()
+        profile_view_table_mock.select.return_value.eq.return_value.execute.return_value = (
+            profile_view_response
+        )
+
+        # Configure table mock to return different mocks based on table name
+        def table_side_effect(table_name):
+            if table_name == "users":
+                return users_table_mock
+            elif table_name == "profiles":
+                return profiles_table_mock
+            elif table_name == "user_preferences":
+                return prefs_table_mock
+            elif table_name == "user_profile_view":
+                return profile_view_table_mock
+            else:
+                return table_mock
+
+        mock_client.table.side_effect = table_side_effect
 
         profile_data = {
             "first_name": "John",
@@ -675,8 +768,8 @@ class TestDatabaseHelpersComprehensive:
         result = await db.save_user_profile("test-user", profile_data)
         assert result["selected_style_names"] == ["Bohemian", "Minimalist"]
 
-        # Verify that the view was used for the update
-        table_mock.update.assert_called_once()
+        # Verify that the view was used for the final query
+        profile_view_table_mock.select.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_save_user_profile_exception(self):

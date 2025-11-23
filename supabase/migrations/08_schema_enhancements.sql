@@ -236,7 +236,12 @@ SELECT
     p.currency_preferences,
     u.created_at,
     u.updated_at,
-    COALESCE(p.style_preferences->>'selected_styles', '[]')::text[] AS selected_style_names,
+    u.last_login,
+    CASE
+        WHEN p.style_preferences IS NULL THEN '{}'::text[]
+        WHEN p.style_preferences->>'selected_styles' IS NULL THEN '{}'::text[]
+        ELSE (p.style_preferences->>'selected_styles')::text[]
+    END AS selected_style_names,
     u.default_location,
     u.max_bookmarks,
     u.max_conversations,
@@ -290,7 +295,8 @@ BEGIN
             max_conversations,
             subscription_tier,
             subscription_expires_at,
-            is_premium
+            is_premium,
+            last_login
         ) VALUES (
             COALESCE(NEW.id, extensions.uuid_generate_v4()),
             NEW.email,
@@ -303,7 +309,8 @@ BEGIN
             NEW.max_conversations,
             NEW.subscription_tier,
             NEW.subscription_expires_at,
-            NEW.is_premium
+            NEW.is_premium,
+            NEW.last_login
         )
         RETURNING id INTO NEW.id;
 
@@ -326,6 +333,8 @@ BEGIN
             NEW.currency_preferences
         );
 
+        RETURN NEW;
+
     -- For UPDATE operations
     ELSIF TG_OP = 'UPDATE' THEN
         -- Update profiles table
@@ -338,7 +347,8 @@ BEGIN
            NEW.max_conversations IS DISTINCT FROM OLD.max_conversations OR
            NEW.subscription_tier IS DISTINCT FROM OLD.subscription_tier OR
            NEW.subscription_expires_at IS DISTINCT FROM OLD.subscription_expires_at OR
-           NEW.is_premium IS DISTINCT FROM OLD.is_premium THEN
+           NEW.is_premium IS DISTINCT FROM OLD.is_premium OR
+           NEW.last_login IS DISTINCT FROM OLD.last_login THEN
 
             UPDATE profiles SET
                 first_name = NEW.first_name,
@@ -351,6 +361,7 @@ BEGIN
                 subscription_tier = NEW.subscription_tier,
                 subscription_expires_at = NEW.subscription_expires_at,
                 is_premium = NEW.is_premium,
+                last_login = NEW.last_login,
                 updated_at = NOW()
             WHERE id = NEW.id;
         END IF;
@@ -394,6 +405,16 @@ BEGIN
                 );
             END IF;
         END IF;
+
+    -- For DELETE operations
+    ELSIF TG_OP = 'DELETE' THEN
+        -- Delete from user_preferences first (due to foreign key constraint)
+        DELETE FROM user_preferences WHERE user_id = OLD.id;
+
+        -- Delete from profiles
+        DELETE FROM profiles WHERE id = OLD.id;
+
+        RETURN OLD;
     END IF;
 
     RETURN NEW;
@@ -410,5 +431,11 @@ CREATE TRIGGER user_profile_view_insert_trigger
 DROP TRIGGER IF EXISTS user_profile_view_update_trigger ON user_profile_view;
 CREATE TRIGGER user_profile_view_update_trigger
     INSTEAD OF UPDATE ON user_profile_view
+    FOR EACH ROW
+    EXECUTE FUNCTION handle_user_profile_view_update();
+
+DROP TRIGGER IF EXISTS user_profile_view_delete_trigger ON user_profile_view;
+CREATE TRIGGER user_profile_view_delete_trigger
+    INSTEAD OF DELETE ON user_profile_view
     FOR EACH ROW
     EXECUTE FUNCTION handle_user_profile_view_update();

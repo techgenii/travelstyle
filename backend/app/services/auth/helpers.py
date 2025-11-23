@@ -25,6 +25,8 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from postgrest import APIError
+
 from app.models.auth import (
     ForgotPasswordResponse,
     LoginRequest,
@@ -38,6 +40,7 @@ from app.services.auth.constants import (
     AUTH_RATE_LIMIT_KEY,
     CLIENT_NOT_INITIALIZED_MSG,
     DEFAULT_TOKEN_TYPE,
+    EMAIL_ALREADY_IN_USE_MSG,
     FAILED_CREATE_USER_MSG,
     FIRST_NAME_FIELD,
     ID_FIELD,
@@ -55,6 +58,7 @@ from app.services.auth.constants import (
     USER_ID_FIELD,
     USER_PREFERENCES_TABLE,
     USER_PROFILE_VIEW,
+    WEAK_PASSWORD_MSG,
 )
 from app.services.auth.exceptions import (
     AuthenticationError,
@@ -137,27 +141,16 @@ class AuthService:
                 update_data = {LAST_LOGIN_FIELD: current_time}
                 logger.info(f"Update data: {update_data}")
 
-                # First try the view
-                try:
-                    response_update = await asyncio.to_thread(
-                        lambda: self.client.table(USER_PROFILE_VIEW)
-                        .update(update_data)
-                        .eq(ID_FIELD, user_id)
-                        .execute()
-                    )
-                    logger.info(f"Successfully updated last_login via view for user {user_id}")
-                except Exception as view_error:
-                    logger.warning(f"View update failed, trying users table directly: {view_error}")
-                    # Fallback to users table
-                    response_update = await asyncio.to_thread(
-                        lambda: self.client.table("users")
-                        .update(update_data)
-                        .eq(ID_FIELD, user_id)
-                        .execute()
-                    )
-                    logger.info(
-                        f"Successfully updated last_login via users table for user {user_id}"
-                    )
+                # Update profiles table directly for last_login (simpler and more reliable)
+                await asyncio.to_thread(
+                    lambda: self.client.table("profiles")
+                    .update(update_data)
+                    .eq(ID_FIELD, user_id)
+                    .execute()
+                )
+                logger.info(
+                    f"Successfully updated last_login via profiles table for user {user_id}"
+                )
 
             except Exception as e:
                 logger.warning(f"Failed to update last_login for user {user_id}: {e}")
@@ -176,10 +169,139 @@ class AuthService:
                 if not user_profile:
                     # Fallback to extracted profile if view doesn't have data yet
                     user_profile = extract_user_profile(response.user) or {}
+
+                # Always ensure user preferences are included by fetching them separately
+                try:
+                    logger.info("Fetching user preferences separately to ensure they're included")
+                    preferences_response = await asyncio.to_thread(
+                        lambda: (
+                            self.client.table("user_preferences")
+                            .select("*")
+                            .eq("user_id", user_id)
+                            .single()
+                            .execute()
+                        )
+                    )
+
+                    if preferences_response.data:
+                        logger.info(f"Retrieved user preferences: {preferences_response.data}")
+                        # Merge preferences with user profile
+                        user_profile.update(preferences_response.data)
+                        logger.info(
+                            f"Updated profile with preferences, final keys: {list(user_profile.keys())}"
+                        )
+                    else:
+                        logger.info("No user preferences found in database, using defaults")
+                        # Add default preference fields
+                        default_preferences = {
+                            "style_preferences": {},
+                            "size_info": {},
+                            "travel_patterns": {},
+                            "quick_reply_preferences": {"enabled": True},
+                            "packing_methods": {},
+                            "currency_preferences": {},
+                        }
+                        user_profile.update(default_preferences)
+                        logger.info("Added default preferences to profile")
+
+                except Exception as pref_error:
+                    logger.warning(f"Failed to fetch user preferences separately: {pref_error}")
+                    # Add default preference fields as fallback
+                    default_preferences = {
+                        "style_preferences": {},
+                        "size_info": {},
+                        "travel_patterns": {},
+                        "quick_reply_preferences": {"enabled": True},
+                        "packing_methods": {},
+                        "currency_preferences": {},
+                    }
+                    user_profile.update(default_preferences)
+                    logger.info("Added default preferences to profile after error")
+
+                # Ensure all preference fields exist
+                preference_fields = [
+                    "style_preferences",
+                    "size_info",
+                    "travel_patterns",
+                    "quick_reply_preferences",
+                    "packing_methods",
+                    "currency_preferences",
+                ]
+
+                for field in preference_fields:
+                    if field not in user_profile:
+                        logger.info(f"Adding missing preference field: {field} with default value")
+                        if field == "quick_reply_preferences":
+                            user_profile[field] = {"enabled": True}
+                        else:
+                            user_profile[field] = {}
+
+                logger.info(f"Final user profile for login response: {user_profile}")
+
             except Exception as e:
                 logger.warning(f"Failed to get user profile from view for user {user_id}: {e}")
                 # Fallback to extracted profile
                 user_profile = extract_user_profile(response.user) or {}
+
+                # Always try to fetch preferences even in fallback
+                try:
+                    logger.info("Attempting to fetch preferences in fallback mode")
+                    preferences_response = await asyncio.to_thread(
+                        lambda: (
+                            self.client.table("user_preferences")
+                            .select("*")
+                            .eq("user_id", user_id)
+                            .single()
+                            .execute()
+                        )
+                    )
+
+                    if preferences_response.data:
+                        logger.info(
+                            f"Retrieved user preferences in fallback: {preferences_response.data}"
+                        )
+                        user_profile.update(preferences_response.data)
+                    else:
+                        logger.info("No preferences found in fallback, using defaults")
+                        default_preferences = {
+                            "style_preferences": {},
+                            "size_info": {},
+                            "travel_patterns": {},
+                            "quick_reply_preferences": {"enabled": True},
+                            "packing_methods": {},
+                            "currency_preferences": {},
+                        }
+                        user_profile.update(default_preferences)
+
+                except Exception as pref_error:
+                    logger.warning(f"Failed to fetch preferences in fallback: {pref_error}")
+                    default_preferences = {
+                        "style_preferences": {},
+                        "size_info": {},
+                        "travel_patterns": {},
+                        "quick_reply_preferences": {"enabled": True},
+                        "packing_methods": {},
+                        "currency_preferences": {},
+                    }
+                    user_profile.update(default_preferences)
+
+                # Ensure basic preference fields exist even in fallback
+                preference_fields = [
+                    "style_preferences",
+                    "size_info",
+                    "travel_patterns",
+                    "quick_reply_preferences",
+                    "packing_methods",
+                    "currency_preferences",
+                ]
+
+                for field in preference_fields:
+                    if field not in user_profile:
+                        if field == "quick_reply_preferences":
+                            user_profile[field] = {"enabled": True}
+                        else:
+                            user_profile[field] = {}
+
             return LoginResponse(
                 access_token=response.session.access_token,
                 refresh_token=response.session.refresh_token,
@@ -348,7 +470,27 @@ class AuthService:
                 user=user_profile,
             )
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("User registration failed: %s", type(e).__name__)
+            logger.error("User registration failed: %s - %s", type(e).__name__, str(e))
+
+            # Check for specific error types
+            error_type_name = type(e).__name__
+            error_message = str(e).lower()
+
+            # Handle weak password error
+            if (
+                "weakpassword" in error_type_name.lower()
+                or "weak password" in error_message
+                or ("weak" in error_message and "password" in error_message)
+            ):
+                raise RegistrationError(WEAK_PASSWORD_MSG) from e
+
+            # Handle email already in use
+            if "email" in error_message and (
+                "already" in error_message or "exists" in error_message or "taken" in error_message
+            ):
+                raise RegistrationError(EMAIL_ALREADY_IN_USE_MSG) from e
+
+            # Generic fallback
             raise RegistrationError(REGISTRATION_FAILED_MSG) from e
 
     async def get_user_profile(self, user_id: str) -> dict[str, Any] | None:
@@ -391,28 +533,266 @@ class AuthService:
             # - Currency preferences
             # - Packing templates
             # - And other related data
-            response = await asyncio.to_thread(
-                lambda: (
-                    self.client.table(USER_PROFILE_VIEW)
-                    .select("*")
-                    .eq(ID_FIELD, user_id)
-                    .single()
-                    .execute()
-                )
-            )
+            logger.info(f"Attempting to query user_profile_view for user {user_id}")
+            logger.info(f"Using table: {USER_PROFILE_VIEW}, ID field: {ID_FIELD}")
 
-            if response.data:
-                logger.info(f"Retrieved complete profile for user {user_id}")
-                return response.data
-            else:
-                logger.warning(f"No profile data found for user {user_id}")
+            # First check if the user exists in the profiles table
+            try:
+                profile_check = await asyncio.to_thread(
+                    lambda: (self.client.table("profiles").select("id").eq("id", user_id).execute())
+                )
+                if not profile_check.data or len(profile_check.data) == 0:
+                    logger.warning(
+                        f"User {user_id} not found in profiles table - attempting to create profile"
+                    )
+                    # Try to create a profile for this user
+                    await self._ensure_user_profile_exists(user_id)
+                    # Check again after creation attempt
+                    profile_check = await asyncio.to_thread(
+                        lambda: (
+                            self.client.table("profiles").select("id").eq("id", user_id).execute()
+                        )
+                    )
+
+                logger.info(
+                    f"Profile check result: {profile_check.data if profile_check.data else 'No data'}"
+                )
+            except Exception as profile_check_error:
+                logger.warning(
+                    f"Failed to check profiles table for user {user_id}: {profile_check_error}"
+                )
+
+            # Try to get profile from the view first
+            try:
+                logger.info(f"Querying {USER_PROFILE_VIEW} for user {user_id}")
+                response = await asyncio.to_thread(
+                    lambda: (
+                        self.client.table(USER_PROFILE_VIEW)
+                        .select("*")
+                        .eq(ID_FIELD, user_id)
+                        .single()
+                        .execute()
+                    )
+                )
+
+                if response.data:
+                    logger.info(f"Retrieved complete profile for user {user_id}")
+                    logger.info(f"Profile data keys: {list(response.data.keys())}")
+                    # Check if user preferences are present
+                    preference_fields = [
+                        "style_preferences",
+                        "size_info",
+                        "travel_patterns",
+                        "quick_reply_preferences",
+                        "packing_methods",
+                        "currency_preferences",
+                    ]
+                    for field in preference_fields:
+                        if field in response.data:
+                            logger.info(f"Found preference field '{field}': {response.data[field]}")
+                        else:
+                            logger.warning(f"Missing preference field '{field}' in profile data")
+                    return response.data
+                else:
+                    logger.warning(f"No profile data found for user {user_id} in view")
+                    # Log additional response info for debugging
+                    if hasattr(response, "error") and response.error:
+                        logger.warning(f"Response error: {response.error}")
+                    if hasattr(response, "status") and response.status:
+                        logger.warning(f"Response status: {response.status}")
+            except Exception as view_error:
+                logger.warning(f"Failed to get profile from view for user {user_id}: {view_error}")
+                # Log more details about the view error
+                if hasattr(view_error, "response") and view_error.response:
+                    logger.warning(
+                        f"View error response status: {getattr(view_error.response, 'status_code', 'N/A')}"
+                    )
+                    logger.warning(
+                        f"View error response text: {getattr(view_error.response, 'text', 'N/A')}"
+                    )
+                # Log the specific error details for debugging
+                if hasattr(view_error, "message"):
+                    logger.warning(f"View error message: {view_error.message}")
+                if hasattr(view_error, "details"):
+                    logger.warning(f"View error details: {view_error.details}")
+                if hasattr(view_error, "code"):
+                    logger.warning(f"View error code: {view_error.code}")
+                if hasattr(view_error, "hint"):
+                    logger.warning(f"View error hint: {view_error.hint}")
+
+            # Fallback to basic profile data if view fails
+            try:
+                logger.info("Attempting fallback to basic profile data")
+                basic_profile = await asyncio.to_thread(
+                    lambda: (
+                        self.client.table("profiles")
+                        .select("*")
+                        .eq("id", user_id)
+                        .single()
+                        .execute()
+                    )
+                )
+                if basic_profile.data:
+                    logger.info(f"Retrieved basic profile for user {user_id} via fallback")
+                    logger.info(f"Basic profile data keys: {list(basic_profile.data.keys())}")
+
+                    # Try to manually fetch user preferences if they're not in the basic profile
+                    try:
+                        logger.info("Attempting to manually fetch user preferences")
+                        preferences_response = await asyncio.to_thread(
+                            lambda: (
+                                self.client.table("user_preferences")
+                                .select("*")
+                                .eq("user_id", user_id)
+                                .single()
+                                .execute()
+                            )
+                        )
+
+                        if preferences_response.data:
+                            logger.info(f"Retrieved user preferences: {preferences_response.data}")
+                            # Merge preferences with basic profile
+                            basic_profile.data.update(preferences_response.data)
+                            logger.info(
+                                f"Updated profile with preferences, final keys: {list(basic_profile.data.keys())}"
+                            )
+                        else:
+                            logger.info("No user preferences found, will use defaults")
+                            # Add default preference fields
+                            default_preferences = {
+                                "style_preferences": {},
+                                "size_info": {},
+                                "travel_patterns": {},
+                                "quick_reply_preferences": {"enabled": True},
+                                "packing_methods": {},
+                                "currency_preferences": {},
+                            }
+                            basic_profile.data.update(default_preferences)
+                            logger.info("Added default preferences to profile")
+                    except Exception as pref_error:
+                        logger.warning(f"Failed to fetch user preferences manually: {pref_error}")
+                        # Add default preference fields as fallback
+                        default_preferences = {
+                            "style_preferences": {},
+                            "size_info": {},
+                            "travel_patterns": {},
+                            "quick_reply_preferences": {"enabled": True},
+                            "packing_methods": {},
+                            "currency_preferences": {},
+                        }
+                        basic_profile.data.update(default_preferences)
+                        logger.info("Added default preferences to profile after error")
+
+                    return basic_profile.data
+                else:
+                    logger.warning(f"No basic profile data found for user {user_id}")
+                    return None
+            except Exception as fallback_error:
+                logger.error(f"Fallback profile retrieval also failed: {fallback_error}")
                 return None
 
+        except APIError as api_e:
+            # Handle specific Supabase API errors
+            logger.error(
+                "Supabase API error getting complete user profile for %s: %s - %s",
+                user_id,
+                type(api_e).__name__,
+                str(api_e),
+            )
+            if hasattr(api_e, "response") and api_e.response:
+                logger.error(
+                    f"API Response status: {getattr(api_e.response, 'status_code', 'N/A')}"
+                )
+                logger.error(f"API Response text: {getattr(api_e.response, 'text', 'N/A')}")
+            if hasattr(api_e, "message"):
+                logger.error(f"API Error message: {api_e.message}")
+            if hasattr(api_e, "details"):
+                logger.error(f"API Error details: {api_e.details}")
+            if hasattr(api_e, "hint"):
+                logger.error(f"API Error hint: {api_e.hint}")
+            return None
         except Exception as e:  # pylint: disable=broad-except
             logger.error(
-                "Failed to get complete user profile for %s: %s", user_id, type(e).__name__
+                "Failed to get complete user profile for %s: %s - %s",
+                user_id,
+                type(e).__name__,
+                str(e),
             )
+            # Log additional context for debugging
+            if hasattr(e, "__cause__") and e.__cause__:
+                logger.error("Caused by: %s - %s", type(e.__cause__).__name__, str(e.__cause__))
+
+            # Log additional Supabase-specific error details
+            if hasattr(e, "response") and e.response:
+                logger.error(f"Response status: {getattr(e.response, 'status_code', 'N/A')}")
+                logger.error(f"Response text: {getattr(e.response, 'text', 'N/A')}")
+            if hasattr(e, "message"):
+                logger.error(f"Error message: {e.message}")
+            if hasattr(e, "details"):
+                logger.error(f"Error details: {e.details}")
+            if hasattr(e, "hint"):
+                logger.error(f"Error hint: {e.hint}")
+
             return None
+
+    async def _ensure_user_profile_exists(self, user_id: str) -> bool:
+        """Ensure that a user profile exists in the profiles table."""
+        try:
+            # Try to get user data from auth.users (requires admin privileges)
+            auth_user = await asyncio.to_thread(
+                lambda: self.client.auth.admin.get_user_by_id(user_id)
+            )
+
+            if not auth_user.user:
+                logger.error(f"User {user_id} not found in auth.users")
+                return False
+
+            # Create profile record
+            profile_data = {
+                "id": user_id,
+                "email": auth_user.user.email,
+                "first_name": auth_user.user.user_metadata.get("first_name")
+                if auth_user.user.user_metadata
+                else None,
+                "last_name": auth_user.user.user_metadata.get("last_name")
+                if auth_user.user.user_metadata
+                else None,
+                "profile_completed": bool(
+                    auth_user.user.user_metadata
+                    and auth_user.user.user_metadata.get("first_name")
+                    and auth_user.user.user_metadata.get("last_name")
+                ),
+                "created_at": auth_user.user.created_at,
+                "updated_at": auth_user.user.updated_at,
+            }
+
+            await asyncio.to_thread(
+                lambda: self.client.table("profiles").insert(profile_data).execute()
+            )
+
+            # Create user preferences record
+            await asyncio.to_thread(
+                lambda: self.client.table(USER_PREFERENCES_TABLE)
+                .insert(
+                    {
+                        "user_id": user_id,
+                        "style_preferences": {},
+                        "size_info": {},
+                        "travel_patterns": {},
+                        "quick_reply_preferences": {"enabled": True},
+                        "packing_methods": {},
+                        "currency_preferences": {},
+                    }
+                )
+                .execute()
+            )
+
+            logger.info(f"Created profile and preferences for user {user_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to create profile for user {user_id}: {e}")
+            return False
 
     async def update_user_profile(
         self, user_id: str, updates: dict[str, Any]
@@ -435,7 +815,11 @@ class AuthService:
                 return extract_user_profile(response.user)
             return None
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Failed to update user profile for %s: %s", user_id, type(e).__name__)
+            logger.error(
+                "Failed to update user profile for %s: %s - %s", user_id, type(e).__name__, str(e)
+            )
+            if hasattr(e, "__cause__") and e.__cause__:
+                logger.error("Caused by: %s - %s", type(e.__cause__).__name__, str(e.__cause__))
             return None
 
     async def update_user_profile_sync(
@@ -489,7 +873,11 @@ class AuthService:
             return response.data[0]
 
         except Exception as e:  # pylint: disable=broad-except
-            logger.error("Failed to update user profile for %s: %s", user_id, type(e).__name__)
+            logger.error(
+                "Failed to update user profile for %s: %s - %s", user_id, type(e).__name__, str(e)
+            )
+            if hasattr(e, "__cause__") and e.__cause__:
+                logger.error("Caused by: %s - %s", type(e.__cause__).__name__, str(e.__cause__))
             return None
 
     async def update_user_preferences(self, user_id: str, preferences: dict[str, Any]) -> bool:

@@ -79,14 +79,14 @@ async def update_current_user_profile(
     profile_update: UserProfileBase, current_user: dict = current_user_dependency
 ):
     """
-    Update the current user's profile using the user_profile_view.
+    Update the current user's profile.
 
     Supports updating:
     - Basic profile fields (first_name, last_name, etc.)
     - Style preferences (selected_style_names)
     - Other profile-related fields
 
-    The user_profile_view uses database triggers to update underlying tables.
+    Updates are made directly to the underlying tables for reliability.
     """
     try:
         user_id = current_user.get("id")

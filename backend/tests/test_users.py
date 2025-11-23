@@ -99,23 +99,57 @@ class TestUserOperations:
     @pytest.mark.asyncio
     async def test_save_user_profile_success(self, user_operations, mock_client):
         """Test save_user_profile success."""
-        user_response = MagicMock()
-        user_response.data = [{"id": "test-user"}]
+        # Mock the table operations
+        table_mock = MagicMock()
 
-        update_response = MagicMock()
-        update_response.data = [{"id": "test-user", "name": "Updated User"}]
+        # Mock users table check - user exists
+        users_response = MagicMock()
+        users_response.data = [{"id": "test-user"}]
+
+        # Mock profiles table update
+        profiles_response = MagicMock()
+        profiles_response.data = [{"id": "test-user"}]
+
+        # Mock user_preferences table operations
+        prefs_select_response = MagicMock()
+        prefs_select_response.data = []  # No existing preferences
+
+        prefs_insert_response = MagicMock()
+        prefs_insert_response.data = [{"user_id": "test-user"}]
+
+        # Mock user_profile_view final query
+        profile_view_response = MagicMock()
+        profile_view_response.data = [{"id": "test-user", "name": "Updated User"}]
+
+        # Configure table mock to return different responses based on table name
+        def table_side_effect(table_name):
+            if table_name == "users":
+                return table_mock
+            elif table_name == "profiles":
+                return table_mock
+            elif table_name == "user_preferences":
+                return table_mock
+            elif table_name == "user_profile_view":
+                return table_mock
+            else:
+                return table_mock
+
+        mock_client.table.side_effect = table_side_effect
+
+        # Configure the table mock methods
+        table_mock.select.return_value.eq.return_value.execute.return_value = users_response
+        table_mock.update.return_value.eq.return_value.execute.return_value = profiles_response
+        table_mock.insert.return_value.execute.return_value = prefs_insert_response
+
+        # For the final profile view query
+        table_mock.select.return_value.eq.return_value.execute.return_value = profile_view_response
 
         with patch("app.services.rate_limiter.db_rate_limiter.acquire") as mock_rate_limit:
             mock_rate_limit.return_value = True
 
-            with patch("asyncio.to_thread") as mock_to_thread:
-                mock_to_thread.side_effect = [user_response, update_response]
+            result = await user_operations.save_user_profile("test-user", {"name": "Updated User"})
 
-                result = await user_operations.save_user_profile(
-                    "test-user", {"name": "Updated User"}
-                )
-
-                assert result == {"id": "test-user", "name": "Updated User"}
+            assert result == {"id": "test-user", "name": "Updated User"}
 
     @pytest.mark.asyncio
     async def test_save_user_profile_invalid_user_id(self, user_operations):
@@ -156,23 +190,57 @@ class TestUserOperations:
     @pytest.mark.asyncio
     async def test_save_user_profile_create_preferences(self, user_operations, mock_client):
         """Test save_user_profile when creating new preferences via view."""
-        user_response = MagicMock()
-        user_response.data = [{"id": "test-user"}]
+        # Mock the table operations
+        table_mock = MagicMock()
 
-        update_response = MagicMock()
-        update_response.data = [{"id": "test-user", "name": "Updated User"}]
+        # Mock users table check - user exists
+        users_response = MagicMock()
+        users_response.data = [{"id": "test-user"}]
+
+        # Mock profiles table update
+        profiles_response = MagicMock()
+        profiles_response.data = [{"id": "test-user"}]
+
+        # Mock user_preferences table operations (no existing preferences, so insert)
+        prefs_select_response = MagicMock()
+        prefs_select_response.data = []  # No existing preferences
+
+        prefs_insert_response = MagicMock()
+        prefs_insert_response.data = [{"user_id": "test-user"}]
+
+        # Mock user_profile_view final query
+        profile_view_response = MagicMock()
+        profile_view_response.data = [{"id": "test-user", "name": "Updated User"}]
+
+        # Configure table mock to return different responses based on table name
+        def table_side_effect(table_name):
+            if table_name == "users":
+                return table_mock
+            elif table_name == "profiles":
+                return table_mock
+            elif table_name == "user_preferences":
+                return table_mock
+            elif table_name == "user_profile_view":
+                return table_mock
+            else:
+                return table_mock
+
+        mock_client.table.side_effect = table_side_effect
+
+        # Configure the table mock methods
+        table_mock.select.return_value.eq.return_value.execute.return_value = users_response
+        table_mock.update.return_value.eq.return_value.execute.return_value = profiles_response
+        table_mock.insert.return_value.execute.return_value = prefs_insert_response
+
+        # For the final profile view query
+        table_mock.select.return_value.eq.return_value.execute.return_value = profile_view_response
 
         with patch("app.services.rate_limiter.db_rate_limiter.acquire") as mock_rate_limit:
             mock_rate_limit.return_value = True
 
-            with patch("asyncio.to_thread") as mock_to_thread:
-                mock_to_thread.side_effect = [user_response, update_response]
+            result = await user_operations.save_user_profile("test-user", {"name": "Updated User"})
 
-                result = await user_operations.save_user_profile(
-                    "test-user", {"name": "Updated User"}
-                )
-
-                assert result == {"id": "test-user", "name": "Updated User"}
+            assert result == {"id": "test-user", "name": "Updated User"}
 
     @pytest.mark.asyncio
     async def test_save_user_profile_update_failed(self, user_operations, mock_client):

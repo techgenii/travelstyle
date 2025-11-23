@@ -70,13 +70,25 @@
 \i 08_schema_enhancements.sql
 
 -- ============================================================================
--- STEP 11: ROW LEVEL SECURITY (Security policies)
+-- STEP 11: ADD MISSING LAST_LOGIN COLUMN (Fix for user_profile_view)
+-- ============================================================================
+\echo 'Adding missing last_login column...'
+\i 11_add_last_login_column.sql
+
+-- ============================================================================
+-- STEP 12: FIX PROFILE CREATION TRIGGER (Ensures profiles are created automatically)
+-- ============================================================================
+\echo 'Fixing profile creation trigger...'
+\i 12_fix_profile_creation_trigger.sql
+
+-- ============================================================================
+-- STEP 13: ROW LEVEL SECURITY (Security policies)
 -- ============================================================================
 \echo 'Setting up Row Level Security...'
 \i 09_row_level_security.sql
 
 -- ============================================================================
--- STEP 12: SUBSCRIPTION LIMITS (Final configuration)
+-- STEP 14: SUBSCRIPTION LIMITS (Final configuration)
 -- ============================================================================
 \echo 'Setting up subscription limits...'
 \i 10_subscription_limits.sql

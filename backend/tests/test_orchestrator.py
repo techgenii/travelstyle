@@ -23,8 +23,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from app.models.responses import ChatResponse, ConversationContext
-from app.services.currency_conversion_service import currency_conversion_service
-from app.services.currency_service import currency_service
+from app.services.currency import CurrencyService
 from app.services.openai.openai_service import openai_service
 from app.services.orchestrator import TravelOrchestratorService, orchestrator_service
 from app.services.qloo import qloo_service
@@ -45,7 +44,7 @@ async def test_generate_travel_recommendations_success():
             qloo_service, "get_style_recommendations", new=AsyncMock(return_value={"style": "data"})
         ),
         patch.object(
-            currency_service, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
+            CurrencyService, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
         ),
         patch.object(
             openai_service,
@@ -80,7 +79,7 @@ async def test_generate_travel_recommendations_error():
         patch.object(weather_service, "get_weather_data", new=AsyncMock(return_value=None)),
         patch.object(qloo_service, "get_style_recommendations", new=AsyncMock(return_value=None)),
         patch.object(
-            currency_service, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
+            CurrencyService, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
         ),
         patch.object(
             openai_service,
@@ -145,7 +144,7 @@ async def test_generate_travel_recommendations_orchestration_error():
         ),
         patch.object(weather_service, "get_weather_data", new=AsyncMock(return_value=None)),
         patch.object(qloo_service, "get_style_recommendations", new=AsyncMock(return_value=None)),
-        patch.object(currency_service, "get_exchange_rates", new=AsyncMock(return_value=None)),
+        patch.object(CurrencyService, "get_exchange_rates", new=AsyncMock(return_value=None)),
         patch.object(
             openai_service,
             "generate_response",
@@ -322,7 +321,7 @@ async def test_generate_travel_recommendations_no_destination():
         patch.object(qloo_service, "get_cultural_insights", new=AsyncMock(return_value=None)),
         patch.object(weather_service, "get_weather_data", new=AsyncMock(return_value=None)),
         patch.object(qloo_service, "get_style_recommendations", new=AsyncMock(return_value=None)),
-        patch.object(currency_service, "get_exchange_rates", new=AsyncMock(return_value=None)),
+        patch.object(CurrencyService, "get_exchange_rates", new=AsyncMock(return_value=None)),
         patch.object(
             openai_service,
             "generate_response",
@@ -357,7 +356,7 @@ async def test_generate_travel_recommendations_no_user_profile():
             qloo_service, "get_style_recommendations", new=AsyncMock(return_value={"style": "data"})
         ),
         patch.object(
-            currency_service, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
+            CurrencyService, "get_exchange_rates", new=AsyncMock(return_value={"USD": 1.0})
         ),
         patch.object(
             openai_service,
@@ -388,14 +387,14 @@ async def test_generate_travel_recommendations_no_user_profile():
 async def test_generate_travel_recommendations_currency_request_with_amount():
     """Test currency request handling with amount."""
     with (
-        patch.object(currency_conversion_service, "is_currency_request", return_value=True),
+        patch.object(CurrencyService, "is_currency_request", return_value=True),
         patch.object(
-            currency_conversion_service,
+            CurrencyService,
             "handle_currency_help_request",
             new=AsyncMock(return_value=None),
         ),
         patch.object(
-            currency_conversion_service,
+            CurrencyService,
             "handle_currency_request",
             new=AsyncMock(
                 return_value={
@@ -424,14 +423,14 @@ async def test_generate_travel_recommendations_currency_request_with_amount():
 async def test_generate_travel_recommendations_currency_request_without_amount():
     """Test currency request handling without amount."""
     with (
-        patch.object(currency_conversion_service, "is_currency_request", return_value=True),
+        patch.object(CurrencyService, "is_currency_request", return_value=True),
         patch.object(
-            currency_conversion_service,
+            CurrencyService,
             "handle_currency_help_request",
             new=AsyncMock(return_value=None),
         ),
         patch.object(
-            currency_conversion_service,
+            CurrencyService,
             "handle_currency_request",
             new=AsyncMock(
                 return_value={
@@ -456,14 +455,14 @@ async def test_generate_travel_recommendations_currency_request_without_amount()
 async def test_generate_travel_recommendations_currency_request_non_rate_type():
     """Test currency request handling with non-rate type."""
     with (
-        patch.object(currency_conversion_service, "is_currency_request", return_value=True),
+        patch.object(CurrencyService, "is_currency_request", return_value=True),
         patch.object(
-            currency_conversion_service,
+            CurrencyService,
             "handle_currency_help_request",
             new=AsyncMock(return_value=None),
         ),
         patch.object(
-            currency_conversion_service,
+            CurrencyService,
             "handle_currency_request",
             new=AsyncMock(
                 return_value={
@@ -506,7 +505,7 @@ async def test_generate_travel_recommendations_exception_handling():
             new=AsyncMock(side_effect=Exception("Style API Error")),
         ),
         patch.object(
-            currency_service,
+            CurrencyService,
             "get_exchange_rates",
             new=AsyncMock(side_effect=Exception("Currency API Error")),
         ),
@@ -537,7 +536,7 @@ async def test_generate_travel_recommendations_exception_handling_alternative():
         patch.object(qloo_service, "get_cultural_insights", new=AsyncMock(return_value=None)),
         patch.object(weather_service, "get_weather_data", new=AsyncMock(return_value=None)),
         patch.object(qloo_service, "get_style_recommendations", new=AsyncMock(return_value=None)),
-        patch.object(currency_service, "get_exchange_rates", new=AsyncMock(return_value=None)),
+        patch.object(CurrencyService, "get_exchange_rates", new=AsyncMock(return_value=None)),
         patch.object(
             openai_service,
             "generate_response",

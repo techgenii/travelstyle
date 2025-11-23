@@ -114,7 +114,7 @@ class UserOperations:
             return {}
 
     async def save_user_profile(self, user_id: str, profile_data: dict) -> dict | None:
-        """Save user profile data using the user_profile_view."""
+        """Save user profile data by updating underlying tables directly."""
         if not validate_user_id(user_id):
             logger.error(f"Invalid user_id format: {user_id}")
             return None
@@ -142,11 +142,86 @@ class UserOperations:
             # Add updated_at timestamp
             profile_data["updated_at"] = datetime.now(UTC).isoformat()
 
-            # Update through the user_profile_view - the triggers will handle data separation
+            # Update profiles table directly (more reliable than complex view triggers)
+            profiles_data = {}
+            preferences_data = {}
+
+            # Separate profile fields from preference fields
+            profile_fields = [
+                "first_name",
+                "last_name",
+                "profile_completed",
+                "profile_picture_url",
+                "default_location",
+                "max_bookmarks",
+                "max_conversations",
+                "subscription_tier",
+                "subscription_expires_at",
+                "is_premium",
+            ]
+
+            for key, value in profile_data.items():
+                if key in profile_fields:
+                    profiles_data[key] = value
+                else:
+                    preferences_data[key] = value
+
+            # Update profiles table if we have profile data
+            if profiles_data:
+                profiles_response = await asyncio.to_thread(
+                    lambda: (
+                        self.client.table(DatabaseTables.USERS)
+                        .update(profiles_data)
+                        .eq("id", user_id)
+                        .execute()
+                    )
+                )
+                if not profiles_response.data:
+                    logger.error(f"Failed to update profiles table for user {user_id}")
+                    return None
+
+            # Update user_preferences table if we have preference data
+            if preferences_data:
+                # Check if preferences record exists
+                existing_prefs = await asyncio.to_thread(
+                    lambda: (
+                        self.client.table(DatabaseTables.USER_PREFERENCES)
+                        .select("id")
+                        .eq("user_id", user_id)
+                        .execute()
+                    )
+                )
+
+                if existing_prefs.data:
+                    # Update existing preferences
+                    prefs_response = await asyncio.to_thread(
+                        lambda: (
+                            self.client.table(DatabaseTables.USER_PREFERENCES)
+                            .update(preferences_data)
+                            .eq("user_id", user_id)
+                            .execute()
+                        )
+                    )
+                else:
+                    # Insert new preferences
+                    preferences_data["user_id"] = user_id
+                    prefs_response = await asyncio.to_thread(
+                        lambda: (
+                            self.client.table(DatabaseTables.USER_PREFERENCES)
+                            .insert(preferences_data)
+                            .execute()
+                        )
+                    )
+
+                if not prefs_response.data:
+                    logger.error(f"Failed to update user_preferences for user {user_id}")
+                    return None
+
+            # Get the updated profile to return
             response = await asyncio.to_thread(
                 lambda: (
                     self.client.table(DatabaseTables.USER_PROFILE_VIEW)
-                    .update(profile_data)
+                    .select("*")
                     .eq("id", user_id)
                     .execute()
                 )
