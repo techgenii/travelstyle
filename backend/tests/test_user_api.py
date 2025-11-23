@@ -191,11 +191,11 @@ class TestUserEndpoints:
     def test_user_endpoints_no_auth(self, client):
         """Test user endpoints without authentication."""
         response = client.get("/api/v1/users/me")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
         response = client.get("/api/v1/users/preferences")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
         response = client.put("/api/v1/users/preferences", json={})
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_update_user_preferences_invalid_data(self, authenticated_client):
         """Test user preferences update with invalid data."""
@@ -218,7 +218,7 @@ class TestUserEndpoints:
     def test_save_destination_no_auth(self, client):
         """Test destination saving without authentication."""
         response = client.post("/api/v1/users/destinations/save", json={})
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     @patch("app.api.v1.user.db_helpers.save_destination")
     def test_save_destination_endpoint_generic_exception(self, mock_save, authenticated_client):
@@ -354,7 +354,7 @@ class TestUserEndpoints:
         """Test profile picture upload without authentication."""
         files = {"file": ("test.jpg", io.BytesIO(b"fake content"), "image/jpeg")}
         response = client.post("/api/v1/users/me/profile-picture", files=files)
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_upload_profile_picture_invalid_file_type(self, authenticated_client):
         """Test profile picture upload with invalid file type."""
@@ -428,7 +428,7 @@ class TestUserEndpoints:
     def test_delete_profile_picture_no_auth(self, client):
         """Test profile picture deletion without authentication."""
         response = client.delete("/api/v1/users/me/profile-picture")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     @patch("app.api.v1.user.db_helpers.get_user_profile")
     def test_delete_profile_picture_profile_not_found(self, mock_get_profile, authenticated_client):
@@ -505,7 +505,7 @@ class TestUserEndpoints:
     def test_get_initials_avatar_no_auth(self, client):
         """Test initials avatar generation without authentication."""
         response = client.get("/api/v1/users/me/profile-picture/initials")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     @patch("app.api.v1.user.db_helpers.get_user_profile")
     def test_get_initials_avatar_profile_not_found(self, mock_get_profile, authenticated_client):
@@ -579,7 +579,7 @@ class TestUserEndpoints:
             "/api/v1/users/me/profile-picture-url",
             json={"profile_picture_url": "https://example.com/image.jpg"},
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_update_profile_picture_url_missing_url(self, authenticated_client):
         """Test profile picture URL update with missing URL."""

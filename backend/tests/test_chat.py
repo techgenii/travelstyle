@@ -54,7 +54,7 @@ class TestChatEndpoints:
     def test_chat_endpoint_no_auth(self, client, mock_chat_request):
         """Test chat request without authentication."""
         response = client.post("/api/v1/chat/", json=mock_chat_request)
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_chat_endpoint_invalid_request(self, authenticated_client):
         """Test chat request with invalid data."""
@@ -84,7 +84,7 @@ class TestChatEndpoints:
     def test_get_conversation_history_no_auth(self, client):
         """Test conversation history without authentication."""
         response = client.get("/api/v1/chat/dialog/test-conversation-123/history")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_conversation_history_error(self, authenticated_client):
         """Test conversation history when database fails."""
@@ -127,7 +127,7 @@ class TestChatEndpoints:
     def test_get_user_conversations_no_auth(self, client):
         """Test user conversations without authentication."""
         response = client.get("/api/v1/chat/dialog")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_user_conversations_error(self, authenticated_client):
         """Test user conversations when database fails."""
@@ -154,7 +154,7 @@ class TestChatEndpoints:
     def test_delete_conversation_no_auth(self, client):
         """Test conversation deletion without authentication."""
         response = client.delete("/api/v1/chat/dialog/test-conversation-123")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_delete_conversation_failure(self, authenticated_client):
         """Test conversation deletion when database fails."""
@@ -191,7 +191,7 @@ class TestChatEndpoints:
     def test_archive_conversation_no_auth(self, client):
         """Test conversation archiving without authentication."""
         response = client.put("/api/v1/chat/dialog/test-conversation-123/archive")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_archive_conversation_failure(self, authenticated_client):
         """Test conversation archiving when database fails."""
@@ -238,7 +238,7 @@ class TestChatEndpoints:
         """Test conversation start without authentication."""
         conversation_data = {"destination": "Paris"}
         response = client.post("/api/v1/chat/start", json=conversation_data)
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_start_conversation_with_conversation_id(self, authenticated_client):
         """Test conversation start with provided conversation ID."""
@@ -289,7 +289,7 @@ class TestChatEndpoints:
             "feedback_type": "positive",
         }
         response = client.post("/api/v1/chat/feedback", json=feedback_data)
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_save_feedback_missing_fields(self, authenticated_client):
         """Test feedback saving with missing required fields."""

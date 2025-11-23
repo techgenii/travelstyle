@@ -22,18 +22,14 @@ Provides endpoints for user authentication, registration, and password managemen
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer
-
-from app.api.deps import get_current_user
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from app.core.config import settings
 from app.models.auth import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     LoginRequest,
     LoginResponse,
-    LogoutRequest,
     LogoutResponse,
-    RefreshTokenRequest,
     RefreshTokenResponse,
     RegisterRequest,
     RegisterResponse,
@@ -42,27 +38,40 @@ from app.models.auth import (
 )
 from app.services.auth.exceptions import AuthenticationError, RegistrationError, TokenError
 from app.services.auth_service import auth_service
+from app.utils.cookies import (
+    clear_auth_cookies,
+    get_refresh_token_from_cookie,
+    set_auth_cookies,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-security = HTTPBearer()
-
-# Local dependency to avoid linter warnings
-current_user_dependency = Depends(get_current_user)
 
 
 # pylint: disable=line-too-long
 @router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
-async def login(login_data: LoginRequest):
+async def login(login_data: LoginRequest, response: Response):
     """
     Authenticate user with email and password.
 
-    Returns JWT access token and refresh token for authenticated requests.
+    Sets HttpOnly cookies for access and refresh tokens.
+    Does not return tokens in response body.
     """
     try:
-        response = await auth_service.login(login_data)
-        return response
+        login_response, token_pair = await auth_service.login(login_data)
+
+        # Set secure cookies
+        set_auth_cookies(
+            response=response,
+            access_token=token_pair.access_token,
+            refresh_token=token_pair.refresh_token,
+            access_ttl=token_pair.expires_in,
+            secure=settings.TS_ENVIRONMENT != "development",
+            same_site=settings.COOKIE_SAME_SITE,
+        )
+
+        return login_response
     except AuthenticationError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -76,19 +85,26 @@ async def login(login_data: LoginRequest):
 
 
 @router.post("/logout", response_model=LogoutResponse, status_code=status.HTTP_200_OK)
-async def logout(
-    logout_data: LogoutRequest | None = None, current_user: dict = current_user_dependency
-):
+async def logout(request: Request, response: Response):
     """
     Logout user and revoke authentication tokens.
 
-    Requires valid JWT token in Authorization header.
+    Clears cookies and optionally revokes refresh token server-side.
     """
     try:
-        refresh_token_value = logout_data.refresh_token if logout_data else None
-        response = await auth_service.logout(refresh_token_value)
-        return response
+        refresh_token_value = get_refresh_token_from_cookie(request)
+
+        # Revoke token server-side if present
+        if refresh_token_value:
+            await auth_service.logout(refresh_token_value)
+
+        # Clear cookies
+        clear_auth_cookies(response)
+
+        return LogoutResponse(message="Successfully logged out", success=True)
     except Exception as e:  # pylint: disable=broad-except
+        # Clear cookies even if logout fails
+        clear_auth_cookies(response)
         logger.error("Logout error: %s", type(e).__name__)
         return LogoutResponse(message="Logged out successfully", success=True)
 
@@ -134,43 +150,79 @@ async def reset_password(reset_data: ResetPasswordRequest):
 
 
 @router.post("/refresh", response_model=RefreshTokenResponse, status_code=status.HTTP_200_OK)
-async def refresh_token(refresh_data: RefreshTokenRequest):
+async def refresh_token(request: Request, response: Response):
     """
-    Refresh access token using refresh token.
+    Refresh access token using refresh token from cookie.
 
-    Returns new access token and refresh token pair.
+    Rotates both access and refresh tokens.
     """
     try:
-        response = await auth_service.refresh_token(refresh_data.refresh_token)
+        refresh_token_value = get_refresh_token_from_cookie(request)
+
+        if not refresh_token_value:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token not found",
+            )
+
+        refresh_response, token_pair = await auth_service.refresh_token(refresh_token_value)
+
+        # Rotate cookies with new tokens
+        set_auth_cookies(
+            response=response,
+            access_token=token_pair.access_token,
+            refresh_token=token_pair.refresh_token,
+            access_ttl=token_pair.expires_in,
+            secure=settings.TS_ENVIRONMENT != "development",
+            same_site=settings.COOKIE_SAME_SITE,
+        )
+
         logger.info("Token refreshed successfully")
-        return response
+        return refresh_response
+    except HTTPException:
+        # Re-raise HTTPException so FastAPI can handle it properly
+        raise
     except TokenError as e:
+        # Clear cookies on refresh failure
+        clear_auth_cookies(response)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},  # pylint: disable=line-too-long
         ) from e
     except Exception as e:  # pylint: disable=broad-except
+        clear_auth_cookies(response)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         ) from e
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
-async def register(register_data: RegisterRequest):
+async def register(register_data: RegisterRequest, response: Response):
     """
     Register new user account.
 
-    Creates a new user account and sends email confirmation.
+    Optionally signs in after registration and sets cookies.
     """
     try:
-        response = await auth_service.register(
+        register_response, token_pair = await auth_service.register(
             email=register_data.email,
             password=register_data.password,
             first_name=register_data.first_name,
             last_name=register_data.last_name,
         )
-        return response
+
+        # Set secure cookies after registration
+        set_auth_cookies(
+            response=response,
+            access_token=token_pair.access_token,
+            refresh_token=token_pair.refresh_token,
+            access_ttl=token_pair.expires_in,
+            secure=settings.TS_ENVIRONMENT != "development",
+            same_site=settings.COOKIE_SAME_SITE,
+        )
+
+        return register_response
     except RegistrationError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -1549,40 +1549,40 @@ class TestCurrencyEndpoints:
         """Test currency endpoints without authentication."""
         # Test exchange rates endpoint
         response = client.get("/api/v1/currency/rates/USD")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
         # Test currency conversion endpoint
         response = client.post(
             "/api/v1/currency/convert-amount",
             json={"amount": 100.0, "from_currency": "USD", "to_currency": "EUR"},
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
         # Test pair exchange rate endpoint
         response = client.post(
             "/api/v1/currency/pair",
             json={"base_currency": "USD", "target_currency": "EUR"},
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
         # Test chat conversion endpoint
         response = client.post(
             "/api/v1/currency/convert",
             json={"message": "convert 100 USD to EUR"},
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
         # Test supported currencies endpoint
         response = client.get("/api/v1/currency/supported")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
         # Test validate currency endpoint
         response = client.post("/api/v1/currency/validate", json={"currency_code": "USD"})
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
         # Test parse message endpoint
         response = client.post(
             "/api/v1/currency/parse",
             json={"message": "convert 100 USD to EUR"},
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED

@@ -33,17 +33,11 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     """Login response model"""
 
-    access_token: str = Field(..., description="JWT access token")
-    refresh_token: str = Field(..., description="JWT refresh token")
-    token_type: str = Field(default="bearer", description="Token type")
-    expires_in: int = Field(..., description="Token expiration time in seconds")
+    message: str = Field(default="Login successful", description="Login confirmation message")
     user: dict = Field(..., description="User information")
+    success: bool = Field(default=True, description="Login success status")
 
 
-class LogoutRequest(BaseModel):
-    """Logout request model"""
-
-    refresh_token: str | None = Field(None, description="Refresh token to revoke")
 
 
 class LogoutResponse(BaseModel):
@@ -80,19 +74,13 @@ class ResetPasswordResponse(BaseModel):
     success: bool = Field(..., description="Password reset success status")
 
 
-class RefreshTokenRequest(BaseModel):
-    """Refresh token request model"""
-
-    refresh_token: str = Field(..., description="Refresh token")
-
-
 class RefreshTokenResponse(BaseModel):
     """Refresh token response model"""
 
-    access_token: str = Field(..., description="New JWT access token")
-    refresh_token: str = Field(..., description="New JWT refresh token")
-    token_type: str = Field(default="bearer", description="Token type")
-    expires_in: int = Field(..., description="Token expiration time in seconds")
+    message: str = Field(
+        default="Token refreshed successfully", description="Refresh confirmation"
+    )
+    success: bool = Field(default=True, description="Refresh success status")
 
 
 class RegisterRequest(BaseModel):
@@ -107,10 +95,6 @@ class RegisterRequest(BaseModel):
 class RegisterResponse(BaseModel):
     """User registration response model"""
 
-    access_token: str = Field(..., description="JWT access token")
-    refresh_token: str = Field(..., description="JWT refresh token")
-    token_type: str = Field(default="bearer", description="Token type")
-    expires_in: int = Field(..., description="Token expiration time in seconds")
     message: str = Field(..., description="Registration confirmation message")
     user_id: str = Field(..., description="New user ID")
     success: bool = Field(..., description="Registration success status")

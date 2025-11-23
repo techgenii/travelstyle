@@ -145,13 +145,13 @@ class TestRecommendationsEndpoints:
         """Test recommendations endpoints without authentication."""
         # Test cultural insights
         response = client.get("/api/v1/recs/cultural/Paris")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
         # Test weather forecast
         response = client.post(
             "/api/v1/recs/weather",
             json={"destination": "Paris"},
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.asyncio

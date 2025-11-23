@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from app.models.auth import LoginRequest
@@ -68,9 +68,9 @@ async def test_login_success(mock_extract, auth_service):
     auth_service.client.table = Mock(return_value=mock_table)
 
     login_data = LoginRequest(email="test@example.com", password="password")
-    result = await auth_service.login(login_data)
-    assert result.access_token == "token"
-    assert result.user["id"] == "user-1"
+    login_response, token_pair = await auth_service.login(login_data)
+    assert token_pair.access_token == "token"
+    assert login_response.user["id"] == "user-1"
 
 
 @pytest.mark.asyncio
@@ -172,23 +172,42 @@ async def test_reset_password_exception_original(auth_service):
 
 @pytest.mark.asyncio
 async def test_refresh_token_success(auth_service):
-    mock_auth = Mock()
-    mock_session = Mock(access_token="token", refresh_token="refresh", expires_in=3600)
-    mock_auth.refresh_session.return_value = Mock(session=mock_session)
-    auth_service.client.auth = mock_auth
-    result = await auth_service.refresh_token("refresh")
-    assert result.access_token == "token"
+    """Test successful token refresh via direct HTTP API."""
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "access_token": "new_access_token",
+        "refresh_token": "new_refresh_token",
+        "expires_in": 3600,
+    }
+    mock_response.raise_for_status = MagicMock()
+
+    with patch("httpx.AsyncClient") as mock_client:
+        mock_client_instance = MagicMock()
+        mock_client_instance.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
+        mock_client.return_value = mock_client_instance
+
+        refresh_response, token_pair = await auth_service.refresh_token("old_refresh_token")
+        assert token_pair.access_token == "new_access_token"
+        assert token_pair.refresh_token == "new_refresh_token"
+        assert token_pair.expires_in == 3600
 
 
 @pytest.mark.asyncio
 async def test_refresh_token_no_session_original(auth_service):
-    mock_auth = Mock()
-    mock_auth.refresh_session.return_value = Mock(session=None)
-    auth_service.client.auth = mock_auth
-    from app.services.auth.exceptions import TokenError
+    """Test refresh_token when response has no access_token."""
+    mock_response = MagicMock()
+    mock_response.json.return_value = {}  # Empty response
+    mock_response.raise_for_status = MagicMock()
 
-    with pytest.raises(TokenError):
-        await auth_service.refresh_token("refresh")
+    with patch("httpx.AsyncClient") as mock_client:
+        mock_client_instance = MagicMock()
+        mock_client_instance.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
+        mock_client.return_value = mock_client_instance
+
+        from app.services.auth.exceptions import TokenError
+
+        with pytest.raises(TokenError):
+            await auth_service.refresh_token("refresh")
 
 
 @pytest.mark.asyncio
@@ -223,12 +242,12 @@ async def test_register_success(auth_service):
         "app.services.auth.helpers.extract_user_profile",
         return_value=mock_user_profile,
     ):
-        result = await auth_service.register("test@example.com", "password", "Jane", "Doe")
-        assert result.access_token == "token"
-        assert result.refresh_token == "refresh_token"
-        assert result.user["id"] == "user-1"
-        assert result.user_id == "user-1"
-        assert result.success is True
+        register_response, token_pair = await auth_service.register("test@example.com", "password", "Jane", "Doe")
+        assert token_pair.access_token == "token"
+        assert token_pair.refresh_token == "refresh_token"
+        assert register_response.user["id"] == "user-1"
+        assert register_response.user_id == "user-1"
+        assert register_response.success is True
 
 
 @pytest.mark.asyncio
@@ -398,12 +417,12 @@ async def test_login_no_user_profile(auth_service):
         with patch.object(
             auth_service.client.auth, "sign_in_with_password", return_value=mock_response
         ):
-            result = await auth_service.login(
+            login_response, token_pair = await auth_service.login(
                 LoginRequest(email="test@example.com", password="password")
             )
             # The service should return the profile data from the database when extract_user_profile returns None
-            assert result.user["id"] == "user-1"
-            assert result.user["email"] == "test@example.com"
+            assert login_response.user["id"] == "user-1"
+            assert login_response.user["email"] == "test@example.com"
 
 
 @pytest.mark.asyncio
@@ -451,27 +470,49 @@ async def test_reset_password_exception(auth_service):
 
 @pytest.mark.asyncio
 async def test_refresh_token_no_session(auth_service):
-    """Test refresh_token when no session is created."""
+    """Test refresh_token when response has no access_token."""
     mock_response = MagicMock()
-    mock_response.session = None
+    mock_response.json.return_value = {}  # Empty response
+    mock_response.raise_for_status = MagicMock()
 
-    with patch.object(auth_service.client.auth, "refresh_session", return_value=mock_response):
+    with patch("httpx.AsyncClient") as mock_client:
+        mock_client_instance = MagicMock()
+        mock_client_instance.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
+        mock_client.return_value = mock_client_instance
+
         from app.services.auth.exceptions import TokenError
 
-        with pytest.raises(TokenError, match="Invalid refresh token"):
+        with pytest.raises(TokenError):
             await auth_service.refresh_token("refresh_token")
 
 
 @pytest.mark.asyncio
 async def test_refresh_token_exception(auth_service):
-    """Test refresh_token when Supabase raises an exception."""
-    with patch.object(
-        auth_service.client.auth, "refresh_session", side_effect=Exception("Refresh error")
-    ):
+    """Test refresh_token when HTTP request raises an exception."""
+    import httpx
+
+    with patch("httpx.AsyncClient") as mock_client:
+        mock_client_instance = MagicMock()
+        mock_client_instance.__aenter__.return_value.post = AsyncMock(
+            side_effect=httpx.HTTPStatusError(
+                "Error", request=MagicMock(), response=MagicMock(status_code=401)
+            )
+        )
+        mock_client.return_value = mock_client_instance
+
         from app.services.auth.exceptions import TokenError
 
-        with pytest.raises(TokenError, match="Invalid refresh token"):
+        with pytest.raises(TokenError):
             await auth_service.refresh_token("refresh_token")
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_empty_token(auth_service):
+    """Test refresh_token when refresh_token is empty."""
+    from app.services.auth.exceptions import TokenError
+
+    with pytest.raises(TokenError):
+        await auth_service.refresh_token("")
 
 
 @pytest.mark.asyncio
@@ -902,8 +943,8 @@ async def test_login_last_login_update_failure(auth_service):
             return_value={"id": "user-1", "email": "test@example.com"},
         ):
             login_data = LoginRequest(email="test@example.com", password="password")
-            result = await auth_service.login(login_data)
-            assert result.access_token == "token"
+            login_response, token_pair = await auth_service.login(login_data)
+            assert token_pair.access_token == "token"
 
 
 @pytest.mark.asyncio
@@ -939,8 +980,8 @@ async def test_login_last_login_update_failure_with_message(auth_service):
             return_value={"id": "user-1", "email": "test@example.com"},
         ):
             login_data = LoginRequest(email="test@example.com", password="password")
-            result = await auth_service.login(login_data)
-            assert result.access_token == "token"
+            login_response, token_pair = await auth_service.login(login_data)
+            assert token_pair.access_token == "token"
 
 
 @pytest.mark.asyncio
@@ -976,8 +1017,8 @@ async def test_login_last_login_update_failure_with_details(auth_service):
             return_value={"id": "user-1", "email": "test@example.com"},
         ):
             login_data = LoginRequest(email="test@example.com", password="password")
-            result = await auth_service.login(login_data)
-            assert result.access_token == "token"
+            login_response, token_pair = await auth_service.login(login_data)
+            assert token_pair.access_token == "token"
 
 
 @pytest.mark.asyncio
@@ -1008,9 +1049,9 @@ async def test_login_get_complete_profile_returns_none(auth_service):
             return_value={"id": "user-1", "email": "test@example.com"},
         ):
             login_data = LoginRequest(email="test@example.com", password="password")
-            result = await auth_service.login(login_data)
-            assert result.access_token == "token"
-            assert "style_preferences" in result.user
+            login_response, token_pair = await auth_service.login(login_data)
+            assert token_pair.access_token == "token"
+            assert "style_preferences" in login_response.user
 
 
 @pytest.mark.asyncio
@@ -1043,12 +1084,12 @@ async def test_login_preferences_fetch_no_data(auth_service):
         auth_service, "get_complete_user_profile", return_value=mock_profile_response.data
     ):
         login_data = LoginRequest(email="test@example.com", password="password")
-        result = await auth_service.login(login_data)
-        assert result.access_token == "token"
+        login_response, token_pair = await auth_service.login(login_data)
+        assert token_pair.access_token == "token"
         # Should have default preferences
-        assert "style_preferences" in result.user
-        assert "quick_reply_preferences" in result.user
-        assert result.user["quick_reply_preferences"] == {"enabled": True}
+        assert "style_preferences" in login_response.user
+        assert "quick_reply_preferences" in login_response.user
+        assert login_response.user["quick_reply_preferences"] == {"enabled": True}
 
 
 @pytest.mark.asyncio
@@ -1079,11 +1120,11 @@ async def test_login_preferences_fetch_exception(auth_service):
         auth_service, "get_complete_user_profile", return_value=mock_profile_response.data
     ):
         login_data = LoginRequest(email="test@example.com", password="password")
-        result = await auth_service.login(login_data)
-        assert result.access_token == "token"
+        login_response, token_pair = await auth_service.login(login_data)
+        assert token_pair.access_token == "token"
         # Should have default preferences after exception
-        assert "style_preferences" in result.user
-        assert "quick_reply_preferences" in result.user
+        assert "style_preferences" in login_response.user
+        assert "quick_reply_preferences" in login_response.user
 
 
 @pytest.mark.asyncio
@@ -1116,9 +1157,9 @@ async def test_login_get_complete_profile_exception(auth_service):
             return_value={"id": "user-1", "email": "test@example.com"},
         ):
             login_data = LoginRequest(email="test@example.com", password="password")
-            result = await auth_service.login(login_data)
-            assert result.access_token == "token"
-            assert "style_preferences" in result.user
+            login_response, token_pair = await auth_service.login(login_data)
+            assert token_pair.access_token == "token"
+            assert "style_preferences" in login_response.user
 
 
 @pytest.mark.asyncio
@@ -1147,11 +1188,11 @@ async def test_login_preferences_fallback_exception(auth_service):
             return_value={"id": "user-1", "email": "test@example.com"},
         ):
             login_data = LoginRequest(email="test@example.com", password="password")
-            result = await auth_service.login(login_data)
-            assert result.access_token == "token"
+            login_response, token_pair = await auth_service.login(login_data)
+            assert token_pair.access_token == "token"
             # Should have default preferences after exception
-            assert "style_preferences" in result.user
-            assert "quick_reply_preferences" in result.user
+            assert "style_preferences" in login_response.user
+            assert "quick_reply_preferences" in login_response.user
 
 
 @pytest.mark.asyncio
@@ -1187,15 +1228,15 @@ async def test_login_missing_preference_fields(auth_service):
 
     with patch.object(auth_service, "get_complete_user_profile", return_value=profile_data):
         login_data = LoginRequest(email="test@example.com", password="password")
-        result = await auth_service.login(login_data)
-        assert result.access_token == "token"
+        login_response, token_pair = await auth_service.login(login_data)
+        assert token_pair.access_token == "token"
         # Should have all preference fields added
-        assert "style_preferences" in result.user
-        assert "size_info" in result.user
-        assert "travel_patterns" in result.user
-        assert "quick_reply_preferences" in result.user
-        assert "packing_methods" in result.user
-        assert "currency_preferences" in result.user
+        assert "style_preferences" in login_response.user
+        assert "size_info" in login_response.user
+        assert "travel_patterns" in login_response.user
+        assert "quick_reply_preferences" in login_response.user
+        assert "packing_methods" in login_response.user
+        assert "currency_preferences" in login_response.user
 
 
 # ============================================================================
@@ -1825,9 +1866,9 @@ async def test_register_sign_out_failure(auth_service):
     with patch.object(
         auth_service, "get_complete_user_profile", return_value=mock_profile_response.data
     ):
-        result = await auth_service.register("test@example.com", "password", "Jane", "Doe")
-        assert result.success is True
-        assert result.access_token == "token"
+        register_response, token_pair = await auth_service.register("test@example.com", "password", "Jane", "Doe")
+        assert register_response.success is True
+        assert token_pair.access_token == "token"
 
 
 @pytest.mark.asyncio
@@ -1857,9 +1898,9 @@ async def test_register_preferences_creation_failure(auth_service):
     with patch.object(
         auth_service, "get_complete_user_profile", return_value=mock_profile_response.data
     ):
-        result = await auth_service.register("test@example.com", "password", "Jane", "Doe")
-        assert result.success is True
-        assert result.access_token == "token"
+        register_response, token_pair = await auth_service.register("test@example.com", "password", "Jane", "Doe")
+        assert register_response.success is True
+        assert token_pair.access_token == "token"
 
 
 @pytest.mark.asyncio
@@ -1885,10 +1926,10 @@ async def test_register_get_complete_profile_failure(auth_service):
             "app.services.auth.helpers.extract_user_profile",
             return_value={"id": "user-1", "email": "test@example.com"},
         ):
-            result = await auth_service.register("test@example.com", "password", "Jane", "Doe")
-            assert result.success is True
-            assert result.access_token == "token"
-            assert result.user["id"] == "user-1"
+            register_response, token_pair = await auth_service.register("test@example.com", "password", "Jane", "Doe")
+            assert register_response.success is True
+            assert token_pair.access_token == "token"
+            assert register_response.user["id"] == "user-1"
 
 
 @pytest.mark.asyncio
@@ -1912,10 +1953,10 @@ async def test_register_get_complete_profile_returns_none(auth_service):
             "app.services.auth.helpers.extract_user_profile",
             return_value={"id": "user-1", "email": "test@example.com"},
         ):
-            result = await auth_service.register("test@example.com", "password", "Jane", "Doe")
-            assert result.success is True
-            assert result.access_token == "token"
-            assert result.user["id"] == "user-1"
+            register_response, token_pair = await auth_service.register("test@example.com", "password", "Jane", "Doe")
+            assert register_response.success is True
+            assert token_pair.access_token == "token"
+            assert register_response.user["id"] == "user-1"
 
 
 # ============================================================================

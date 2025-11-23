@@ -72,9 +72,17 @@ class Settings(BaseSettings):
         "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/"
     )
 
+    # Environment
+    TS_ENVIRONMENT: str = "production"  # development, staging, production
+
+    # Cookie settings
+    COOKIE_SECURE: bool = True  # Set to False for local development
+    COOKIE_SAME_SITE: str = "Strict"  # or "Lax" if needed
+
     model_config = {
         "env_file": ".env",
         "case_sensitive": True,
+        "extra": "ignore",  # Ignore extra environment variables not defined in the model
     }
 
 

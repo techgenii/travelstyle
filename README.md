@@ -29,7 +29,7 @@ TravelStyle AI is an intelligent travel companion chat application that provides
 - **AI & APIs:**
   - Qloo Taste AI™ (cultural intelligence, style, etiquette)
   - OpenAI ChatGPT (conversational interface)
-  - OpenWeatherMap (weather data)
+  - Visual Crossing (weather data)
   - ExchangeRate-API (currency data)
   - Cloudinary (image processing and storage)
 - **Frontend:** React/Next.js (not included in this repo)
@@ -75,19 +75,19 @@ Database Layer (Supabase/PostgreSQL)
 
 #### **Development Tools**
 - **AWS CLI** (for Lambda deployment)
-- **Vercel CLI** (for frontend deployment)
+- **Bolt.new** (for frontend deployment)
 - **Make** (for backend development commands)
 
 #### **Accounts & Services**
 - **GitHub account** (for repository and CI/CD)
 - **Supabase account** (for database)
-- **Vercel account** (for frontend hosting)
+- **Bolt.new account** (for frontend hosting)
 - **AWS account** (for Lambda deployment)
 
 ### API Keys Required
 - **OpenAI:** https://platform.openai.com/api-keys
 - **Qloo:** https://www.qloo.com/api
-- **OpenWeather:** https://openweathermap.org/api
+- **VisualCrossing:** https://www.visualcrossing.com/
 - **Exchange Rate API:** https://www.exchangerate-api.com/
 - **Cloudinary:** https://cloudinary.com/ (for profile picture processing)
 - **Supabase:** https://supabase.com/dashboard

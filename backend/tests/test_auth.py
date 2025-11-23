@@ -235,22 +235,28 @@ class TestAuthEndpoints:
     def test_login_success(self, authenticated_client):
         """Test successful login."""
         with patch("app.services.auth_service.auth_service.login") as mock_login:
-            mock_login.return_value = {
-                "access_token": "test_access_token",
-                "refresh_token": "test_refresh_token",
-                "token_type": "bearer",
-                "expires_in": 3600,
-                "user": {"id": "user-1", "email": "test@example.com"},
-            }
+            from app.models.auth import LoginResponse
+            from app.services.auth.helpers import TokenPair
+
+            login_response = LoginResponse(
+                message="Login successful",
+                user={"id": "user-1", "email": "test@example.com"},
+                success=True
+            )
+            token_pair = TokenPair(
+                access_token="test_access_token",
+                refresh_token="test_refresh_token",
+                expires_in=3600
+            )
+            mock_login.return_value = (login_response, token_pair)
             response = authenticated_client.post(
                 "/api/v1/auth/login",
                 json={"email": "test@example.com", "password": "password123"},
             )
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            assert "access_token" in data
-            assert "refresh_token" in data
-            assert data["token_type"] == "bearer"
+            assert "user" in data
+            assert data["user"]["id"] == "user-1"
 
     def test_login_invalid_credentials(self, authenticated_client):
         """Test login with invalid credentials."""
@@ -278,17 +284,20 @@ class TestAuthEndpoints:
     def test_logout_success(self, authenticated_client):
         """Test successful logout."""
         with patch("app.services.auth_service.auth_service.logout") as mock_logout:
-            mock_logout.return_value = {
-                "message": "Logged out successfully",
-                "success": True,
-            }
+            from app.models.auth import LogoutResponse
+
+            logout_response = LogoutResponse(
+                message="Successfully logged out",
+                success=True
+            )
+            mock_logout.return_value = logout_response
             response = authenticated_client.post(
                 "/api/v1/auth/logout",
                 json={"refresh_token": "test_refresh_token"},
             )
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            assert data["message"] == "Logged out successfully"
+            assert data["message"] == "Successfully logged out"
             assert data["success"] is True
 
     def test_logout_service_exception(self, authenticated_client):
@@ -305,16 +314,21 @@ class TestAuthEndpoints:
     def test_register_success(self, authenticated_client):
         """Test successful user registration."""
         with patch("app.services.auth_service.auth_service.register") as mock_register:
-            mock_register.return_value = {
-                "access_token": "test_access_token",
-                "refresh_token": "test_refresh_token",
-                "token_type": "bearer",
-                "expires_in": 3600,
-                "message": "Registration successful",
-                "user_id": "user-1",
-                "success": True,
-                "user": {"id": "user-1", "email": "test@example.com"},
-            }
+            from app.models.auth import RegisterResponse
+            from app.services.auth.helpers import TokenPair
+
+            register_response = RegisterResponse(
+                message="Registration successful",
+                user_id="user-1",
+                success=True,
+                user={"id": "user-1", "email": "test@example.com"}
+            )
+            token_pair = TokenPair(
+                access_token="test_access_token",
+                refresh_token="test_refresh_token",
+                expires_in=3600
+            )
+            mock_register.return_value = (register_response, token_pair)
             response = authenticated_client.post(
                 "/api/v1/auth/register",
                 json={
@@ -326,9 +340,8 @@ class TestAuthEndpoints:
             )
             assert response.status_code == status.HTTP_201_CREATED
             data = response.json()
-            assert "access_token" in data
-            assert "refresh_token" in data
-            assert data["refresh_token"] == "test_refresh_token"
+            assert "user" in data
+            assert data["user"]["id"] == "user-1"
             assert data["message"] == "Registration successful"
             assert data["success"] is True
 
@@ -434,21 +447,27 @@ class TestAuthEndpoints:
     def test_refresh_token_success(self, authenticated_client):
         """Test successful token refresh."""
         with patch("app.services.auth_service.auth_service.refresh_token") as mock_refresh:
-            mock_refresh.return_value = {
-                "access_token": "new_access_token",
-                "refresh_token": "new_refresh_token",
-                "token_type": "bearer",
-                "expires_in": 3600,
-            }
+            from app.models.auth import RefreshTokenResponse
+            from app.services.auth.helpers import TokenPair
+
+            refresh_response = RefreshTokenResponse(
+                message="Token refreshed successfully",
+                success=True
+            )
+            token_pair = TokenPair(
+                access_token="new_access_token",
+                refresh_token="new_refresh_token",
+                expires_in=3600
+            )
+            mock_refresh.return_value = (refresh_response, token_pair)
             response = authenticated_client.post(
                 "/api/v1/auth/refresh",
-                json={"refresh_token": "valid_refresh_token"},
+                cookies={"refresh": "valid_refresh_token"},
             )
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            assert "access_token" in data
-            assert "refresh_token" in data
-            assert data["token_type"] == "bearer"
+            assert "message" in data
+            assert data["success"] is True
 
     def test_refresh_token_invalid_token(self, authenticated_client):
         """Test token refresh with invalid refresh token."""
@@ -458,8 +477,9 @@ class TestAuthEndpoints:
             mock_refresh.side_effect = TokenError("Invalid refresh token")
             response = authenticated_client.post(
                 "/api/v1/auth/refresh",
-                json={"refresh_token": "invalid_refresh_token"},
+                cookies={"refresh": "invalid_refresh_token"},
             )
+            # TokenError should be caught and return 401
             assert response.status_code == status.HTTP_401_UNAUTHORIZED
             assert "Invalid refresh token" in response.json()["detail"]
 
@@ -469,7 +489,7 @@ class TestAuthEndpoints:
             mock_refresh.side_effect = Exception("Service error")
             response = authenticated_client.post(
                 "/api/v1/auth/refresh",
-                json={"refresh_token": "valid_refresh_token"},
+                cookies={"refresh": "valid_refresh_token"},
             )
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -504,20 +524,29 @@ class TestAuthEndpoints:
             # Register should fail if user exists, not because of missing auth
             assert response.status_code in [400, 409]  # Validation error or user already exists
 
-        # Test logout (requires auth)
+        # Test logout (doesn't require auth - just clears cookies)
         response = client.post(
             "/api/v1/auth/logout",
-            json={"refresh_token": "test_refresh_token"},
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        # Logout should work without auth (just clears cookies)
+        assert response.status_code == status.HTTP_200_OK
 
         # Test refresh (should work without auth, but fail with invalid token)
+        # First test with no refresh token cookie
+        response = client.post(
+            "/api/v1/auth/refresh",
+        )
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "Refresh token not found" in response.json()["detail"]
+
+        # Then test with invalid refresh token
         with patch("app.services.auth_service.auth_service.refresh_token") as mock_refresh:
             from app.services.auth.exceptions import TokenError
 
             mock_refresh.side_effect = TokenError("Invalid refresh token")
             response = client.post(
                 "/api/v1/auth/refresh",
-                json={"refresh_token": "invalid_refresh_token"},
+                cookies={"refresh": "invalid_refresh_token"},
             )
-            assert response.status_code in [401, 400]  # Invalid refresh token
+            assert response.status_code == status.HTTP_401_UNAUTHORIZED
+            assert "Invalid refresh token" in response.json()["detail"]

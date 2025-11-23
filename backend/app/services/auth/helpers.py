@@ -23,10 +23,12 @@ Contains the core AuthService class and utility functions.
 import asyncio
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, NamedTuple
 
+import httpx
 from postgrest import APIError
 
+from app.core.config import settings
 from app.models.auth import (
     ForgotPasswordResponse,
     LoginRequest,
@@ -76,6 +78,14 @@ from supabase import Client
 logger = logging.getLogger(__name__)
 
 
+class TokenPair(NamedTuple):
+    """Container for access and refresh token pair."""
+
+    access_token: str
+    refresh_token: str
+    expires_in: int
+
+
 class AuthService:
     """Supabase authentication service for user management."""
 
@@ -109,7 +119,7 @@ class AuthService:
             raise RateLimitError(RATE_LIMITED_MSG)
         return True
 
-    async def login(self, login_data: LoginRequest) -> LoginResponse:
+    async def login(self, login_data: LoginRequest) -> tuple[LoginResponse, TokenPair]:
         """Authenticate user with email and password."""
         self._check_client()
         await self._check_rate_limit("login")
@@ -123,6 +133,30 @@ class AuthService:
                     {"email": login_data.email, "password": login_data.password}
                 )
             )
+
+            # Log Supabase auth response for debugging
+            logger.info("Supabase auth response received")
+            logger.info(f"Response has user: {response.user is not None}")
+            logger.info(f"Response has session: {response.session is not None}")
+
+            if response.session:
+                logger.info(
+                    f"Session access_token present: {response.session.access_token is not None}"
+                )
+                logger.info(
+                    f"Session refresh_token present: {response.session.refresh_token is not None}"
+                )
+                if response.session.refresh_token:
+                    logger.info(
+                        f"Session refresh_token value: {response.session.refresh_token[:20]}..."
+                    )
+                else:
+                    logger.error("Session refresh_token is None or empty!")
+                logger.info(f"Session expires_in: {response.session.expires_in}")
+                # Log full session object structure (be careful with sensitive data in production)
+                logger.debug(f"Full session object: {response.session}")
+            else:
+                logger.error("No session in Supabase auth response!")
 
             if not response.user:
                 raise AuthenticationError(INVALID_CREDENTIALS_MSG)
@@ -302,13 +336,32 @@ class AuthService:
                         else:
                             user_profile[field] = {}
 
-            return LoginResponse(
+            # Log tokens before returning
+            logger.info("Preparing login response")
+            if response.session.access_token:
+                logger.info(f"Access token: {response.session.access_token[:20]}...")
+            else:
+                logger.error("Access token is None or empty!")
+            if response.session.refresh_token:
+                logger.info(f"Refresh token: {response.session.refresh_token[:20]}...")
+            else:
+                logger.error("Refresh token is None or empty!")
+            logger.info(f"Token type: {DEFAULT_TOKEN_TYPE}")
+            logger.info(f"Expires in: {response.session.expires_in}")
+
+            token_pair = TokenPair(
                 access_token=response.session.access_token,
                 refresh_token=response.session.refresh_token,
-                token_type=DEFAULT_TOKEN_TYPE,
                 expires_in=response.session.expires_in,
-                user=user_profile,
             )
+
+            login_response = LoginResponse(
+                message="Login successful",
+                user=user_profile,
+                success=True,
+            )
+
+            return login_response, token_pair
         except Exception as e:  # pylint: disable=broad-except
             logger.error(
                 "Login failed for email %s: %s - %s", login_data.email, type(e).__name__, str(e)
@@ -365,25 +418,86 @@ class AuthService:
             logger.error("Password reset failed: %s", type(e).__name__)
             raise TokenError(INVALID_TOKEN_MSG) from e
 
-    async def refresh_token(self, refresh_token: str) -> RefreshTokenResponse:
-        """Refresh access token using refresh token."""
+    async def refresh_token(self, refresh_token: str) -> tuple[RefreshTokenResponse, TokenPair]:
+        """Refresh access token using refresh token via direct Supabase HTTP API."""
         self._check_client()
         await self._check_rate_limit("refresh_token")
 
+        # Validate presence of refresh_token
+        if not refresh_token:
+            raise TokenError(INVALID_REFRESH_TOKEN_MSG)
+
         try:
-            response = await asyncio.to_thread(
-                lambda: self.client.auth.refresh_session(refresh_token)
+            logger.info(
+                f"Attempting to refresh token with: {refresh_token[:20] if refresh_token else 'None'}..."
             )
-            if not response.session:
-                raise TokenError(NO_SESSION_MSG)
-            return RefreshTokenResponse(
-                access_token=response.session.access_token,
-                refresh_token=response.session.refresh_token,
-                token_type=DEFAULT_TOKEN_TYPE,
-                expires_in=response.session.expires_in,
-            )
+
+            # Build the Supabase auth endpoint URL
+            auth_url = f"{settings.SUPABASE_URL}/auth/v1/token"
+
+            # Prepare the request headers
+            headers = {
+                "Content-Type": "application/json",
+                "apikey": settings.SUPABASE_KEY,  # Supabase anon key
+                "Authorization": f"Bearer {settings.SUPABASE_KEY}",  # Bearer token with anon key
+            }
+
+            # Request payload
+            payload = {"refresh_token": refresh_token}
+
+            # Query parameters
+            params = {"grant_type": "refresh_token"}
+
+            # Make the HTTP POST request to Supabase
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    auth_url,
+                    json=payload,
+                    params=params,
+                    headers=headers,
+                )
+
+                # Check for HTTP errors
+                response.raise_for_status()
+
+                # Parse the JSON response from Supabase
+                data = response.json()
+
+                logger.info("Supabase refresh response received")
+                logger.info(f"Response has access_token: {data.get('access_token') is not None}")
+                logger.info(f"Response has refresh_token: {data.get('refresh_token') is not None}")
+
+                # Extract the response fields
+                access_token = data.get("access_token")
+                new_refresh_token = data.get("refresh_token")
+                expires_in = data.get("expires_in", 3600)  # Default to 1 hour if not provided
+
+                if not access_token:
+                    logger.error("No access_token in refresh response!")
+                    raise TokenError(NO_SESSION_MSG)
+
+                if not new_refresh_token:
+                    logger.warning("No refresh_token in refresh response, using provided one")
+                    new_refresh_token = refresh_token  # Fallback to original if not provided
+
+                token_pair = TokenPair(
+                    access_token=access_token,
+                    refresh_token=new_refresh_token,
+                    expires_in=expires_in,
+                )
+
+                refresh_response = RefreshTokenResponse(
+                    message="Token refreshed successfully",
+                    success=True,
+                )
+
+                return refresh_response, token_pair
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Token refresh HTTP error: {e.response.status_code} - {e.response.text}")
+            raise TokenError(INVALID_REFRESH_TOKEN_MSG) from e
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Token refresh failed: %s", type(e).__name__)
+            logger.error(f"Token refresh error details: {str(e)}")
             raise TokenError(INVALID_REFRESH_TOKEN_MSG) from e
 
     async def register(
@@ -392,7 +506,7 @@ class AuthService:
         password: str,
         first_name: str | None = None,
         last_name: str | None = None,
-    ) -> RegisterResponse:
+    ) -> tuple[RegisterResponse, TokenPair]:
         """Register new user."""
         self._check_client()
         await self._check_rate_limit("register")
@@ -468,16 +582,21 @@ class AuthService:
                 logger.warning(f"Failed to get user profile from view for user {user_id}: {e}")
                 # Fallback to extracted profile
                 user_profile = extract_user_profile(login_response.user) or {}
-            return RegisterResponse(
+
+            token_pair = TokenPair(
                 access_token=login_response.session.access_token,
                 refresh_token=login_response.session.refresh_token,
-                token_type=DEFAULT_TOKEN_TYPE,
                 expires_in=login_response.session.expires_in,
+            )
+
+            register_response = RegisterResponse(
                 message="Registration successful",
                 user_id=user_profile.get("id", ""),
                 success=True,
                 user=user_profile,
             )
+
+            return register_response, token_pair
         except Exception as e:  # pylint: disable=broad-except
             logger.error("User registration failed: %s - %s", type(e).__name__, str(e))
 

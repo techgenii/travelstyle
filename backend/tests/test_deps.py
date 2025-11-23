@@ -19,60 +19,73 @@ from unittest.mock import Mock, patch
 
 import pytest
 from app.api.deps import get_current_active_user, get_current_user
-from fastapi import HTTPException
-from fastapi.security import HTTPAuthorizationCredentials
+from app.utils.cookies import ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE
+from fastapi import HTTPException, Request
 
 
 @pytest.fixture
-def mock_credentials():
-    credentials = Mock(spec=HTTPAuthorizationCredentials)
-    credentials.credentials = "valid.jwt.token"
-    return credentials
+def mock_request():
+    """Create a mock Request object with cookies."""
+    request = Mock(spec=Request)
+    request.cookies = Mock()
+    return request
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_valid_token(mock_credentials):
+async def test_get_current_user_valid_token(mock_request):
+    mock_request.cookies.get.return_value = "valid.jwt.token"
     with patch("app.api.deps.supabase_auth.verify_jwt_token") as mock_verify:
         mock_verify.return_value = {
             "id": "user-123",
             "email": "test@example.com",
             "is_active": True,
         }
-        result = await get_current_user(mock_credentials)
+        result = await get_current_user(mock_request)
         assert result["id"] == "user-123"
         assert result["email"] == "test@example.com"
         mock_verify.assert_called_once_with("valid.jwt.token")
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_invalid_token(mock_credentials):
+async def test_get_current_user_invalid_token(mock_request):
+    # Mock cookies.get to return access token but no refresh token
+    def cookies_get_side_effect(key):
+        if key == ACCESS_TOKEN_COOKIE:
+            return "invalid.jwt.token"
+        elif key == REFRESH_TOKEN_COOKIE:
+            return None  # No refresh token
+        return None
+
+    mock_request.cookies.get.side_effect = cookies_get_side_effect
     with patch("app.api.deps.supabase_auth.verify_jwt_token") as mock_verify:
         mock_verify.return_value = None
         with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(mock_credentials)
+            await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
         assert "Could not validate credentials" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_exception(mock_credentials):
+async def test_get_current_user_exception(mock_request):
+    mock_request.cookies.get.return_value = "valid.jwt.token"
     with patch("app.api.deps.supabase_auth.verify_jwt_token") as mock_verify:
         mock_verify.side_effect = Exception("Token verification failed")
         with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(mock_credentials)
+            await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
         assert "Could not validate credentials" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
 async def test_get_current_user_missing_credentials():
-    # Create a mock credentials object with None credentials
-    credentials = Mock(spec=HTTPAuthorizationCredentials)
-    credentials.credentials = None
+    # Create a mock request with no cookies
+    request = Mock(spec=Request)
+    request.cookies = Mock()
+    request.cookies.get.return_value = None
     with patch("app.api.deps.supabase_auth.verify_jwt_token") as mock_verify:
         mock_verify.return_value = None
         with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(credentials)
+            await get_current_user(request)
         assert exc_info.value.status_code == 401
         assert "Could not validate credentials" in exc_info.value.detail
 
@@ -117,23 +130,25 @@ async def test_get_current_active_user_none_is_active():
 
 @pytest.mark.asyncio
 async def test_get_current_user_empty_credentials():
-    credentials = Mock(spec=HTTPAuthorizationCredentials)
-    credentials.credentials = ""
+    request = Mock(spec=Request)
+    request.cookies = Mock()
+    request.cookies.get.return_value = ""
     with patch("app.api.deps.supabase_auth.verify_jwt_token") as mock_verify:
         mock_verify.return_value = None
         with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(credentials)
+            await get_current_user(request)
         assert exc_info.value.status_code == 401
         assert "Could not validate credentials" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
 async def test_get_current_user_none_credentials():
-    credentials = Mock(spec=HTTPAuthorizationCredentials)
-    credentials.credentials = None
+    request = Mock(spec=Request)
+    request.cookies = Mock()
+    request.cookies.get.return_value = None
     with patch("app.api.deps.supabase_auth.verify_jwt_token") as mock_verify:
         mock_verify.return_value = None
         with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(credentials)
+            await get_current_user(request)
         assert exc_info.value.status_code == 401
         assert "Could not validate credentials" in exc_info.value.detail
