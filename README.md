@@ -112,19 +112,21 @@ npm run dev
 
 #### **Environment Setup**
 - **Backend**: Copy `backend/env.example` to `backend/.env` and configure API keys
-- **Frontend**: Environment variables are configured in Vercel dashboard
+- **Frontend**: Environment variables are configured in Bolt.new dashboard
 - **Database**: Supabase project setup required for full functionality
 
 **📖 For detailed setup instructions, see [Backend Documentation](backend/README.md#development) and [Frontend Documentation](frontend/README.md)**
 
 ## 🚀 Deployment
 
-### Frontend (Vercel)
-```bash
-npm install -g vercel
-vercel link
-vercel --prod
-```
+### Frontend (Bolt.new)
+The frontend is deployed using Bolt.new. For deployment instructions, see the [Frontend Documentation](frontend/README.md) or refer to the Bolt.new platform documentation.
+
+**Typical deployment process:**
+1. Push your frontend code to GitHub
+2. Connect your repository to Bolt.new
+3. Configure environment variables in Bolt.new dashboard
+4. Deploy through Bolt.new interface
 
 ### Backend (AWS Lambda)
 The backend automatically deploys to AWS Lambda via GitHub Actions when you push to `main`.

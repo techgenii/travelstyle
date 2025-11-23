@@ -36,36 +36,142 @@ The application automatically deploys to AWS Lambda via GitHub Actions when you 
 - **Framework**: FastAPI with Mangum for Lambda compatibility
 - **Runtime**: Python 3.11
 - **Deployment**: AWS Lambda with API Gateway
-- **Database**: Supabase (PostgreSQL)
-- **AI**: OpenAI GPT-4
-- **External APIs**: Qloo, OpenWeather, Exchange Rate API
+- **Database**: Supabase (PostgreSQL) with Row-Level Security (RLS)
+- **AI**: OpenAI GPT-4 (via OpenAI API)
+- **External APIs**:
+  - Qloo (cultural insights)
+  - OpenWeather / VisualCrossing (weather forecasts)
+  - Exchange Rate API (currency conversion)
+- **Image Storage**: Cloudinary (avatar and image uploads)
+- **Authentication**: JWT tokens with cookie-based session management
 
 ### Project Structure
 ```
 backend/
 ├── app/
-│   ├── api/v1/          # API endpoints
+│   ├── api/v1/          # API endpoints (auth, chat, currency, recommendations, user)
 │   ├── core/            # Configuration and security
-│   ├── models/          # Data models
+│   ├── models/          # Data models (auth, travel, user, responses)
 │   ├── services/        # Business logic
-│   └── utils/           # Utilities
-├── tests/               # Test suite
-├── requirements.txt     # Dependencies
+│   │   ├── auth/        # Authentication helpers and validators
+│   │   ├── currency/    # Currency conversion service
+│   │   ├── database/    # Database operations and helpers
+│   │   ├── openai/      # OpenAI integration
+│   │   ├── qloo/        # Qloo cultural insights
+│   │   ├── supabase/    # Supabase client and caching
+│   │   └── weather/     # Weather service
+│   └── utils/           # Utilities (cookies, error handlers, rate limiter)
+├── tests/               # Comprehensive test suite
+├── requirements.txt     # Production dependencies
+├── requirements-test.txt # Development dependencies
 └── Makefile            # Development commands
 ```
+
+### Core Services
+
+#### **Orchestrator Service** (`app/services/orchestrator.py`)
+- Routes user messages to specialized handlers
+- Classifies message types (currency, weather, cultural, wardrobe, style, destination, logistics)
+- Coordinates between multiple services for comprehensive travel recommendations
+
+#### **Currency Service** (`app/services/currency/`)
+- Exchange rate retrieval and conversion
+- Natural language parsing of currency requests
+- Support for 150+ currencies
+- Caching for improved performance
+
+#### **Weather Service** (`app/services/weather/`)
+- Weather forecasts via OpenWeather and VisualCrossing APIs
+- Multi-day forecasts for travel planning
+- Caching to reduce API calls
+
+#### **Qloo Service** (`app/services/qloo/`)
+- Cultural insights and style recommendations
+- Fashion, etiquette, and social norms data
+- Context-aware recommendations (leisure, business, formal, active)
+
+#### **OpenAI Service** (`app/services/openai/`)
+- GPT-4 integration for AI-powered recommendations
+- Message classification and natural language understanding
+- Travel wardrobe and style suggestions
+
+#### **Database Services** (`app/services/database/`)
+- User profile and preferences management
+- Conversation history and chat sessions
+- Saved destinations and packing templates
+- Analytics and usage tracking
+
+#### **Supabase Services** (`app/services/supabase/`)
+- Enhanced caching layer (weather, currency, cultural insights)
+- Row-Level Security (RLS) integration
+- Optimized database queries
+
+#### **Cloudinary Service** (`app/services/cloudinary_service.py`)
+- Avatar and image uploads
+- Image transformation and optimization
+- Secure file storage
+
+#### **Auth Service** (`app/services/auth_service.py`)
+- User registration and authentication
+- JWT token management
+- Password reset and recovery
+- Session management with secure cookies
 
 ## 🛠️ Development
 
 ### Prerequisites
 - Python 3.11+
-- AWS CLI configured
-- GitHub repository with secrets configured
+- AWS CLI configured (for deployment)
+- GitHub repository with secrets configured (for CI/CD)
+- Supabase project with database migrations applied
+- API keys for external services (see Environment Variables)
+
+### Environment Variables
+
+Create a `.env` file in the `backend/` directory with the following variables:
+
+```bash
+# API Configuration
+API_V1_STR=/api/v1
+PROJECT_NAME=TravelStyle AI
+VERSION=1.0.0
+
+# External API Keys
+OPENAI_API_KEY=your-openai-api-key-here
+OPENAI_ORG_ID=your-openai-org-id-here  # Optional
+QLOO_API_KEY=your-qloo-api-key-here
+OPENWEATHER_API_KEY=your-openweather-api-key-here
+VISUALCROSSING_API_KEY=your-visualcrossing-api-key-here  # Optional, fallback for weather
+EXCHANGE_API_KEY=your-exchange-rate-api-key-here
+
+# Supabase Configuration
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-supabase-anon-key-here
+
+# Cloudinary Configuration (for image uploads)
+CLOUDINARY_CLOUD_NAME=your-cloudinary-cloud-name
+CLOUDINARY_API_KEY=your-cloudinary-api-key
+CLOUDINARY_API_SECRET=your-cloudinary-api-secret
+
+# Environment
+TS_ENVIRONMENT=development  # development, staging, production
+
+# Cookie settings (for local development)
+COOKIE_SECURE=False  # Set to True in production
+COOKIE_SAME_SITE=Lax  # or "Strict" for production
+```
+
+See `env.example` for a template.
 
 ### Local Setup
 ```bash
 # Clone and setup
 git clone <repository>
 cd backend
+
+# Copy environment template
+cp env.example .env
+# Edit .env with your API keys
 
 # Install dependencies
 make install-dev
@@ -75,6 +181,8 @@ make test-quick
 
 # Start development server
 make run
+# Server will be available at http://127.0.0.1:8000
+# API docs at http://127.0.0.1:8000/docs
 ```
 
 ### Available Commands
@@ -120,6 +228,61 @@ make prod
 # Run prod checks with clean test output
 make prod-clean
 ```
+
+#### **Package Management Commands**
+```bash
+# Check for outdated packages
+make check-updates
+
+# Update all packages to latest versions
+make update-packages
+
+# Show current versions of key packages
+make show-versions
+```
+
+## 📡 API Endpoints
+
+### Authentication (`/api/v1/auth`)
+- `POST /login` - User login with email/password
+- `POST /register` - User registration
+- `POST /logout` - User logout
+- `POST /refresh` - Refresh access token
+- `POST /forgot-password` - Request password reset
+- `POST /reset-password` - Reset password with token
+
+### Chat (`/api/v1/chat`)
+- `POST /` - Main chat endpoint for travel recommendations (rate limited: 30/min)
+- `GET /dialog/{conversation_id}/history` - Get conversation history
+
+### Currency (`/api/v1/currency`)
+- `GET /rates` - Get exchange rates for a base currency
+- `POST /convert` - Convert currency amounts
+- `POST /pair` - Get exchange rate for a currency pair
+- `POST /` - Natural language currency conversion
+- `GET /supported` - Get list of supported currencies
+- `POST /validate` - Validate currency codes
+
+### Recommendations (`/api/v1/recs`)
+- `GET /cultural/{destination}` - Get cultural insights (rate limited: 20/min)
+- `GET /weather/{destination}` - Get weather forecast
+
+### User Management (`/api/v1/users`)
+- `GET /me` - Get current user profile
+- `PUT /me` - Update user profile
+- `POST /me/avatar` - Upload user avatar
+- `GET /me/preferences` - Get user preferences
+- `PUT /me/preferences` - Update user preferences
+- `GET /me/destinations` - Get saved destinations
+- `POST /me/destinations` - Save a destination
+- `GET /settings` - Get user settings
+- `GET /system-settings` - Get system settings
+
+### Health & Status
+- `GET /` - API welcome message
+- `GET /health` - Health check endpoint
+
+All endpoints (except `/` and `/health`) require authentication via JWT tokens.
 
 ## 🧪 Testing
 
@@ -205,25 +368,36 @@ The GitHub Actions workflow (`.github/workflows/lambda-deploy.yml`) handles the 
 
 Configure these secrets in your GitHub repository:
 
+**AWS Configuration:**
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_REGION`
 - `LAMBDA_FUNCTION_NAME`
+
+**API Keys:**
 - `OPENAI_API_KEY`
-- `OPENAI_ORG_ID`
+- `OPENAI_ORG_ID` (optional)
 - `QLOO_API_KEY`
-- `OPENWEATHER_API_KEY`
+- `VISUALCROSSING_API_KEY`
 - `EXCHANGE_API_KEY`
+
+**Database:**
 - `SUPABASE_URL`
 - `SUPABASE_KEY`
 
+**Image Storage:**
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+
 ### Lambda Configuration
 
-- **Handler**: `lambda_function.handler`
+- **Handler**: `app.travelstyle.handler` (defined in `app/travelstyle.py`)
 - **Runtime**: `python3.11`
-- **Timeout**: 30 seconds
-- **Memory**: 512 MB (minimum recommended)
+- **Timeout**: 30 seconds (recommended)
+- **Memory**: 512 MB (minimum recommended, increase for heavy workloads)
 - **Architecture**: Lambda Layers for optimized deployment
+- **Environment Variables**: All secrets from GitHub Secrets are automatically injected
 
 ### Manual Deployment (Alternative)
 
@@ -448,13 +622,50 @@ make prod-clean          # Full production check
 3. Update documentation
 4. Test with `make prod-clean`
 
+## 🔐 Security Features
+
+### Authentication & Authorization
+- JWT-based authentication with secure cookie storage
+- Row-Level Security (RLS) in Supabase for data isolation
+- Password hashing with bcrypt
+- Token refresh mechanism for secure sessions
+
+### Rate Limiting
+- Chat endpoint: 30 requests per minute
+- Recommendations endpoint: 20 requests per minute
+- Configurable per-endpoint rate limits
+
+### Data Protection
+- Environment variable management for sensitive data
+- Secure cookie configuration (HttpOnly, Secure, SameSite)
+- Input validation and sanitization
+- SQL injection protection via parameterized queries
+
+## 💾 Caching Strategy
+
+The application uses Supabase-based caching to reduce external API calls:
+
+- **Weather Cache**: Cached for 24 hours
+- **Currency Cache**: Cached for 1 hour
+- **Cultural Insights Cache**: Cached for 7 days
+
+Cache invalidation is handled automatically based on TTL (Time To Live) settings.
+
 ## 🎉 Summary
 
 This backend provides:
 - ✅ **FastAPI-based API** with Lambda deployment
+- ✅ **AI-powered travel recommendations** via OpenAI GPT-4
+- ✅ **Multi-service orchestration** for comprehensive travel planning
+- ✅ **Currency conversion** with natural language support
+- ✅ **Weather forecasting** with multi-day predictions
+- ✅ **Cultural insights** via Qloo integration
+- ✅ **User management** with profiles, preferences, and saved destinations
+- ✅ **Image uploads** via Cloudinary integration
 - ✅ **Comprehensive testing** with organized test suites
 - ✅ **Automated CI/CD** with quality checks
 - ✅ **Optimized Lambda packages** (50% size reduction)
+- ✅ **Rate limiting** and caching for performance
 - ✅ **Clean development experience** with warnings suppressed
 - ✅ **Production-ready** quality and monitoring
 
