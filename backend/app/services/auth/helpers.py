@@ -418,6 +418,14 @@ class AuthService:
             if not response.user:
                 raise RegistrationError(FAILED_CREATE_USER_MSG)
 
+            # Clear any session that might have been set by sign_up to prevent
+            # automatic token refresh attempts with invalid refresh tokens
+            try:
+                await asyncio.to_thread(lambda: self.client.auth.sign_out())
+            except Exception as sign_out_error:
+                # Log but don't fail if sign_out fails - it's just a cleanup step
+                logger.debug(f"Sign out after registration (cleanup) failed: {sign_out_error}")
+
             # Immediately sign in to get token after registration
             login_response = await asyncio.to_thread(
                 lambda: self.client.auth.sign_in_with_password(
