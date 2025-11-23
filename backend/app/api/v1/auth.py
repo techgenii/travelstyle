@@ -23,6 +23,7 @@ Provides endpoints for user authentication, registration, and password managemen
 import logging
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
+
 from app.core.config import settings
 from app.models.auth import (
     ForgotPasswordRequest,

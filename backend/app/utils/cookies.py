@@ -21,15 +21,15 @@ Handles setting, reading, and clearing HttpOnly cookies.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Response
 
 logger = logging.getLogger(__name__)
 
 # Cookie names
-ACCESS_TOKEN_COOKIE = "access"
-REFRESH_TOKEN_COOKIE = "refresh"
+ACCESS_TOKEN_COOKIE = "access"  # nosec B105
+REFRESH_TOKEN_COOKIE = "refresh"  # nosec B105
 
 # Token TTLs (in seconds)
 ACCESS_TOKEN_TTL = 10 * 60  # 10 minutes
@@ -98,7 +98,7 @@ def clear_auth_cookies(response: Response) -> None:
         secure=True,
         samesite="Strict",
         path="/",
-        expires=datetime.now(timezone.utc) - timedelta(days=1),
+        expires=datetime.now(UTC) - timedelta(days=1),
     )
 
     # Clear refresh token cookie
@@ -110,7 +110,7 @@ def clear_auth_cookies(response: Response) -> None:
         secure=True,
         samesite="Strict",
         path="/",
-        expires=datetime.now(timezone.utc) - timedelta(days=1),
+        expires=datetime.now(UTC) - timedelta(days=1),
     )
 
     logger.debug("Auth cookies cleared successfully")
@@ -140,4 +140,3 @@ def get_refresh_token_from_cookie(request) -> str | None:
         Refresh token string or None if not found
     """
     return request.cookies.get(REFRESH_TOKEN_COOKIE)
-

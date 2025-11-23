@@ -22,9 +22,8 @@ This allows making requests as the authenticated user, respecting Row Level Secu
 
 import logging
 
-from supabase import Client, create_client
-
 from app.core.config import settings
+from supabase import Client, create_client
 
 logger = logging.getLogger(__name__)
 

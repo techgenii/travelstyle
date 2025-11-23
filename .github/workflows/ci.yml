@@ -77,7 +77,7 @@ jobs:
             exit 1
           fi
 
-          # Mask secrets
+          # Mask secrets (only actual secrets, not configuration values)
           echo "::add-mask::$OPENAI_API_KEY"
           echo "::add-mask::$OPENAI_ORG_ID"
           echo "::add-mask::$QLOO_API_KEY"
@@ -102,6 +102,7 @@ jobs:
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          TS_ENVIRONMENT: "development"
 
       # Run tests with improved configuration (warnings disabled)
       - name: Run tests with clean output
@@ -118,6 +119,7 @@ jobs:
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          TS_ENVIRONMENT: "development"
         run: |
           echo "🚀 Running tests with improved configuration (warnings disabled)"
           make prod-test

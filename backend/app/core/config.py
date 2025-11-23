@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     COOKIE_SECURE: bool = True  # Set to False for local development
     COOKIE_SAME_SITE: str = "Strict"  # or "Lax" if needed
 
+    # CORS Configuration
+    CORS_ORIGINS: str = "*"  # Comma-separated list of allowed origins, or "*" for all
+    # Example: "http://localhost:5173,https://yourdomain.com,https://bolt.new"
+
     model_config = {
         "env_file": ".env",
         "case_sensitive": True,

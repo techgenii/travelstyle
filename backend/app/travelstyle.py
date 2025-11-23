@@ -61,12 +61,49 @@ travelstyle_app = FastAPI(
 app = travelstyle_app
 
 # Middleware
+# Parse CORS origins from environment variable
+if settings.CORS_ORIGINS == "*":
+    cors_origins = ["*"]
+    cors_origin_regex = None
+    allow_creds = False
+elif settings.TS_ENVIRONMENT == "development":
+    # In development, allow specific origins + regex patterns for dynamic URLs
+    origins_list = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
+    explicit_origins = [o for o in origins_list if not o.startswith("pattern:")]
+
+    # Build regex from patterns (if any)
+    patterns = [o.replace("pattern:", "") for o in origins_list if o.startswith("pattern:")]
+
+    # Add default development patterns for Bolt.new and localhost
+    default_patterns = [
+        r".*\.webcontainer-api\.io$",  # Bolt.new dev URLs
+        r".*\.bolt\.new$",              # Bolt.new production
+        r"http://localhost:\d+$",       # Local dev
+    ]
+    patterns.extend(default_patterns)
+
+    cors_origin_regex = "|".join([f"({p})" for p in patterns]) if patterns else None
+    cors_origins = explicit_origins
+    allow_creds = True
+else:
+    # Production: only explicit origins
+    cors_origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
+    cors_origin_regex = None
+    allow_creds = True
+
+cors_kwargs = {
+    "allow_origins": cors_origins,
+    "allow_credentials": allow_creds,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+
+if cors_origin_regex:
+    cors_kwargs["allow_origin_regex"] = cors_origin_regex
+
 travelstyle_app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    **cors_kwargs
 )
 
 travelstyle_app.add_middleware(
@@ -133,13 +170,65 @@ def handler(event, context):
         print(f"Error details: {e}")
 
         # Return a proper error response instead of raising
+        # Get the origin from the request if available
+        origin = "*"
+        request_origin = None
+        if isinstance(event, dict):
+            headers = event.get("headers", {}) or {}
+            # Headers can be dict or list of tuples
+            if isinstance(headers, dict):
+                request_origin = headers.get("origin") or headers.get("Origin")
+            elif isinstance(headers, list):
+                for key, value in headers:
+                    if key.lower() == "origin":
+                        request_origin = value
+                        break
+
+        # Determine allowed origin based on CORS settings
+        if settings.CORS_ORIGINS == "*":
+            origin = "*"
+            allow_creds = False
+        elif settings.TS_ENVIRONMENT == "development":
+            # In development, check if origin matches patterns
+            import re
+            patterns = [
+                r".*\.webcontainer-api\.io$",
+                r".*\.bolt\.new$",
+                r"http://localhost:\d+$",
+            ]
+            if request_origin:
+                for pattern in patterns:
+                    if re.match(pattern, request_origin):
+                        origin = request_origin
+                        break
+            # Fallback to first explicit origin if no match
+            if origin == "*" and settings.CORS_ORIGINS:
+                origins_list = [o.strip() for o in settings.CORS_ORIGINS.split(",") if not o.startswith("pattern:")]
+                if origins_list:
+                    origin = origins_list[0]
+            allow_creds = True
+        else:
+            # Production: use first allowed origin or request origin if in list
+            if request_origin and settings.CORS_ORIGINS:
+                allowed_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",")]
+                if request_origin in allowed_origins:
+                    origin = request_origin
+                elif allowed_origins:
+                    origin = allowed_origins[0]
+            allow_creds = True
+
+        headers = {
+            "content-type": "application/json",
+            "access-control-allow-origin": origin,
+        }
+
+        # Only add credentials header if not using wildcard
+        if allow_creds:
+            headers["access-control-allow-credentials"] = "true"
+
         return {
             "statusCode": 500,
             "body": f'{{"detail":"Internal server error: {str(e)}","status_code":500}}',
-            "headers": {
-                "content-type": "application/json",
-                "access-control-allow-origin": "*",
-                "access-control-allow-credentials": "true",
-            },
+            "headers": headers,
             "isBase64Encoded": False,
         }
