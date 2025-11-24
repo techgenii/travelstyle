@@ -35,7 +35,6 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
       QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
-      OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
       VISUALCROSSING_API_KEY: ${{ secrets.VISUALCROSSING_API_KEY }}
       EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -139,14 +138,48 @@ jobs:
           name: lambda-package
           path: backend/lambda-deploy.zip
 
+      - name: Install jq (if needed)
+        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: Deploy Lambda Function
         run: |
           cd backend
 
           # Configure environment variables directly
-          ENVIRONMENT_VARS="Variables={OPENAI_API_KEY=$OPENAI_API_KEY,OPENAI_ORG_ID=$OPENAI_ORG_ID,QLOO_API_KEY=$QLOO_API_KEY,OPENWEATHER_API_KEY=$OPENWEATHER_API_KEY,VISUALCROSSING_API_KEY=$VISUALCROSSING_API_KEY,EXCHANGE_API_KEY=$EXCHANGE_API_KEY,SUPABASE_URL=$SUPABASE_URL,SUPABASE_KEY=$SUPABASE_KEY,CLOUDINARY_CLOUD_NAME=$CLOUDINARY_CLOUD_NAME,CLOUDINARY_API_KEY=$CLOUDINARY_API_KEY,CLOUDINARY_API_SECRET=$CLOUDINARY_API_SECRET,TS_ENVIRONMENT=$TS_ENVIRONMENT,CORS_ORIGINS=$CORS_ORIGINS}"
+          # Configure environment variables as JSON using jq (more robust)
+          echo "Configuring environment variables as JSON..."
+          ENVIRONMENT_JSON=$(jq -n \
+            --arg OPENAI_API_KEY "$OPENAI_API_KEY" \
+            --arg OPENAI_ORG_ID "$OPENAI_ORG_ID" \
+            --arg QLOO_API_KEY "$QLOO_API_KEY" \
+            --arg VISUALCROSSING_API_KEY "$VISUALCROSSING_API_KEY" \
+            --arg EXCHANGE_API_KEY "$EXCHANGE_API_KEY" \
+            --arg SUPABASE_URL "$SUPABASE_URL" \
+            --arg SUPABASE_KEY "$SUPABASE_KEY" \
+            --arg CLOUDINARY_CLOUD_NAME "$CLOUDINARY_CLOUD_NAME" \
+            --arg CLOUDINARY_API_KEY "$CLOUDINARY_API_KEY" \
+            --arg CLOUDINARY_API_SECRET "$CLOUDINARY_API_SECRET" \
+            --arg TS_ENVIRONMENT "$TS_ENVIRONMENT" \
+            --arg CORS_ORIGINS "$CORS_ORIGINS" \
+            '{
+              Variables: {
+                OPENAI_API_KEY: $OPENAI_API_KEY,
+                OPENAI_ORG_ID: $OPENAI_ORG_ID,
+                QLOO_API_KEY: $QLOO_API_KEY,
+                VISUALCROSSING_API_KEY: $VISUALCROSSING_API_KEY,
+                EXCHANGE_API_KEY: $EXCHANGE_API_KEY,
+                SUPABASE_URL: $SUPABASE_URL,
+                SUPABASE_KEY: $SUPABASE_KEY,
+                CLOUDINARY_CLOUD_NAME: $CLOUDINARY_CLOUD_NAME,
+                CLOUDINARY_API_KEY: $CLOUDINARY_API_KEY,
+                CLOUDINARY_API_SECRET: $CLOUDINARY_API_SECRET,
+                TS_ENVIRONMENT: $TS_ENVIRONMENT,
+                CORS_ORIGINS: $CORS_ORIGINS
+              }
+            }')
+          # ENVIRONMENT_VARS="Variables={OPENAI_API_KEY=$OPENAI_API_KEY,OPENAI_ORG_ID=$OPENAI_ORG_ID,QLOO_API_KEY=$QLOO_API_KEY,VISUALCROSSING_API_KEY=$VISUALCROSSING_API_KEY,EXCHANGE_API_KEY=$EXCHANGE_API_KEY,SUPABASE_URL=$SUPABASE_URL,SUPABASE_KEY=$SUPABASE_KEY,CLOUDINARY_CLOUD_NAME=$CLOUDINARY_CLOUD_NAME,CLOUDINARY_API_KEY=$CLOUDINARY_API_KEY,CLOUDINARY_API_SECRET=$CLOUDINARY_API_SECRET,TS_ENVIRONMENT=$TS_ENVIRONMENT,CORS_ORIGINS=$CORS_ORIGINS}"
 
-          echo "Environment variables configured (count: 13)"
+          echo "Environment variables configured (count: 12)"
           echo "Environment variables configured and ready for deployment"
 
           if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
@@ -166,7 +199,7 @@ jobs:
 
             aws lambda update-function-configuration \
               --function-name $FUNCTION_NAME \
-              --environment "$ENVIRONMENT_VARS" \
+              --environment "$ENVIRONMENT_JSON" \
               --timeout 30 \
               --memory-size 2048 \
               --ephemeral-storage '{"Size": 2048}'
@@ -182,7 +215,7 @@ jobs:
               --handler $HANDLER \
               --architectures $ARCHITECTURE \
               --zip-file fileb://$ZIP_FILE \
-              --environment "$ENVIRONMENT_VARS" \
+              --environment "$ENVIRONMENT_JSON" \
               --timeout 30 \
               --memory-size 2048 \
               --ephemeral-storage '{"Size": 2048}'

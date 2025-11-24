@@ -81,7 +81,6 @@ jobs:
           echo "::add-mask::$OPENAI_API_KEY"
           echo "::add-mask::$OPENAI_ORG_ID"
           echo "::add-mask::$QLOO_API_KEY"
-          echo "::add-mask::$OPENWEATHER_API_KEY"
           echo "::add-mask::$VISUALCROSSING_API_KEY"
           echo "::add-mask::$EXCHANGE_API_KEY"
           echo "::add-mask::$SUPABASE_URL"
@@ -89,12 +88,12 @@ jobs:
           echo "::add-mask::$CLOUDINARY_CLOUD_NAME"
           echo "::add-mask::$CLOUDINARY_API_KEY"
           echo "::add-mask::$CLOUDINARY_API_SECRET"
+          echo "::add-mask::$TS_ENVIRONMENT"
           echo "✅ Secrets validated and masked"
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
           QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
-          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
           VISUALCROSSING_API_KEY: ${{ secrets.VISUALCROSSING_API_KEY }}
           EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -102,7 +101,7 @@ jobs:
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
-          TS_ENVIRONMENT: "development"
+          TS_ENVIRONMENT: ${{ secrets.TS_ENVIRONMENT }}
 
       # Run tests with improved configuration (warnings disabled)
       - name: Run tests with clean output
@@ -111,7 +110,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
           QLOO_API_KEY: ${{ secrets.QLOO_API_KEY }}
-          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
           VISUALCROSSING_API_KEY: ${{ secrets.VISUALCROSSING_API_KEY }}
           EXCHANGE_API_KEY: ${{ secrets.EXCHANGE_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -119,7 +117,7 @@ jobs:
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
-          TS_ENVIRONMENT: "development"
+          TS_ENVIRONMENT: ${{ secrets.TS_ENVIRONMENT }}
         run: |
           echo "🚀 Running tests with improved configuration (warnings disabled)"
           make prod-test
