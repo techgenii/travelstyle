@@ -77,8 +77,9 @@ elif settings.TS_ENVIRONMENT == "development":
     # Add default development patterns for Bolt.new and localhost
     default_patterns = [
         r".*\.webcontainer-api\.io$",  # Bolt.new dev URLs
-        r".*\.bolt\.new$",              # Bolt.new production
-        r"http://localhost:\d+$",       # Local dev
+        r".*\.bolt\.new$",  # Bolt.new production
+        r".*\.bolt\.host$",  # Bolt.host URLs
+        r"http://localhost:\d+$",  # Local dev
     ]
     patterns.extend(default_patterns)
 
@@ -101,10 +102,7 @@ cors_kwargs = {
 if cors_origin_regex:
     cors_kwargs["allow_origin_regex"] = cors_origin_regex
 
-travelstyle_app.add_middleware(
-    CORSMiddleware,
-    **cors_kwargs
-)
+travelstyle_app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 travelstyle_app.add_middleware(
     TrustedHostMiddleware,
@@ -191,9 +189,11 @@ def handler(event, context):
         elif settings.TS_ENVIRONMENT == "development":
             # In development, check if origin matches patterns
             import re
+
             patterns = [
                 r".*\.webcontainer-api\.io$",
                 r".*\.bolt\.new$",
+                r".*\.bolt\.host$",  # Bolt.host URLs
                 r"http://localhost:\d+$",
             ]
             if request_origin:
@@ -203,7 +203,11 @@ def handler(event, context):
                         break
             # Fallback to first explicit origin if no match
             if origin == "*" and settings.CORS_ORIGINS:
-                origins_list = [o.strip() for o in settings.CORS_ORIGINS.split(",") if not o.startswith("pattern:")]
+                origins_list = [
+                    o.strip()
+                    for o in settings.CORS_ORIGINS.split(",")
+                    if not o.startswith("pattern:")
+                ]
                 if origins_list:
                     origin = origins_list[0]
             allow_creds = True
