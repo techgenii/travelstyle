@@ -43,7 +43,9 @@ jobs:
       CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
       CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
       TS_ENVIRONMENT: ${{ secrets.TS_ENVIRONMENT || 'development' }}
-      CORS_ORIGINS: ${{ secrets.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000' }}
+      # Default CORS origins for development (localhost + common dev ports + Bolt.new)
+      # Update CORS_ORIGINS secret with your production URL when ready
+      CORS_ORIGINS: ${{ secrets.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,http://localhost:5174,http://localhost:8080,https://bolt.new' }}
       COOKIE_SAME_SITE: ${{ secrets.COOKIE_SAME_SITE || 'None' }}
 
     steps:
@@ -246,6 +248,45 @@ jobs:
 
       - name: Configure API Gateway
         run: |
+          # Prepare CORS configuration first
+          echo "Preparing CORS configuration..."
+
+          # Parse CORS origins from environment variable
+          if [ "$CORS_ORIGINS" = "*" ]; then
+            CORS_ALLOW_ORIGINS="*"
+            CORS_ALLOW_CREDENTIALS="false"
+            # Build CORS config JSON for wildcard
+            CORS_CONFIG=$(jq -n \
+              --argjson allow_origins '["*"]' \
+              --argjson allow_credentials false \
+              '{
+                AllowOrigins: $allow_origins,
+                AllowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+                AllowHeaders: ["*"],
+                AllowCredentials: $allow_credentials,
+                MaxAge: 3600
+              }')
+          else
+            # Convert comma-separated origins to JSON array
+            CORS_ALLOW_ORIGINS=$(echo "$CORS_ORIGINS" | jq -R -s -c 'split(",") | map(gsub("^\\s+|\\s+$"; ""))')
+            CORS_ALLOW_CREDENTIALS="true"
+            # Build CORS config JSON for specific origins
+            CORS_CONFIG=$(jq -n \
+              --argjson allow_origins "$CORS_ALLOW_ORIGINS" \
+              --argjson allow_credentials true \
+              '{
+                AllowOrigins: $allow_origins,
+                AllowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+                AllowHeaders: ["*"],
+                AllowCredentials: $allow_credentials,
+                MaxAge: 3600
+              }')
+          fi
+
+          echo "CORS configuration prepared:"
+          echo "   AllowOrigins: $CORS_ALLOW_ORIGINS"
+          echo "   AllowCredentials: $CORS_ALLOW_CREDENTIALS"
+
           # Check if API already exists
           EXISTING_API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='$API_NAME'].ApiId" --output text 2>/dev/null || echo "")
 
@@ -253,10 +294,11 @@ jobs:
             echo "Using existing API Gateway: $EXISTING_API_ID"
             API_ID=$EXISTING_API_ID
           else
-            echo "Creating new API Gateway..."
+            echo "Creating new API Gateway with CORS configuration..."
             API_ID=$(aws apigatewayv2 create-api \
               --name "$API_NAME" \
               --protocol-type HTTP \
+              --cors-configuration "$CORS_CONFIG" \
               --query "ApiId" --output text)
             echo "Created API Gateway: $API_ID"
           fi
@@ -323,50 +365,31 @@ jobs:
             --stage-name '$default' \
             --auto-deploy 2>/dev/null || echo "Stage $default already exists"
 
-          # Configure CORS for API Gateway (CRITICAL for cookie support)
-          echo "Configuring CORS for API Gateway..."
-
-          # Parse CORS origins from environment variable
-          if [ "$CORS_ORIGINS" = "*" ]; then
-            CORS_ALLOW_ORIGINS="*"
-            CORS_ALLOW_CREDENTIALS="false"
-            # Build CORS config JSON for wildcard
-            CORS_CONFIG=$(jq -n \
-              --argjson allow_origins '["*"]' \
-              --argjson allow_credentials false \
-              '{
-                AllowOrigins: $allow_origins,
-                AllowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
-                AllowHeaders: ["*"],
-                AllowCredentials: $allow_credentials,
-                MaxAge: 3600
-              }')
+          # Update CORS for existing API (always update to ensure it's correct)
+          echo "Updating CORS configuration for API Gateway..."
+          if aws apigatewayv2 update-api \
+            --api-id $API_ID \
+            --cors-configuration "$CORS_CONFIG" 2>&1; then
+            echo "✅ CORS configuration updated successfully"
           else
-            # Convert comma-separated origins to JSON array
-            CORS_ALLOW_ORIGINS=$(echo "$CORS_ORIGINS" | jq -R -s -c 'split(",") | map(gsub("^\\s+|\\s+$"; ""))')
-            CORS_ALLOW_CREDENTIALS="true"
-            # Build CORS config JSON for specific origins
-            CORS_CONFIG=$(jq -n \
-              --argjson allow_origins "$CORS_ALLOW_ORIGINS" \
-              --argjson allow_credentials true \
-              '{
-                AllowOrigins: $allow_origins,
-                AllowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
-                AllowHeaders: ["*"],
-                AllowCredentials: $allow_credentials,
-                MaxAge: 3600
-              }')
+            echo "⚠️  Failed to update CORS configuration, checking current state..."
           fi
 
-          # Update API with CORS configuration
-          echo "Updating API Gateway with CORS configuration..."
-          aws apigatewayv2 update-api \
-            --api-id $API_ID \
-            --cors-configuration "$CORS_CONFIG" || echo "CORS configuration may already be set"
+          # Verify CORS configuration
+          echo "Verifying CORS configuration..."
+          CURRENT_CORS=$(aws apigatewayv2 get-api --api-id $API_ID --query 'CorsConfiguration' --output json 2>/dev/null || echo "null")
+          if [ "$CURRENT_CORS" != "null" ] && [ "$CURRENT_CORS" != "{}" ]; then
+            echo "✅ CORS is configured:"
+            echo "$CURRENT_CORS" | jq '.'
+          else
+            echo "❌ WARNING: CORS configuration not found! This will cause CORS errors."
+            echo "Attempting to set CORS configuration again..."
+            aws apigatewayv2 update-api \
+              --api-id $API_ID \
+              --cors-configuration "$CORS_CONFIG"
+          fi
 
-          echo "✅ CORS configured for API Gateway"
-          echo "   AllowOrigins: $CORS_ALLOW_ORIGINS"
-          echo "   AllowCredentials: $CORS_ALLOW_CREDENTIALS"
+          echo "✅ CORS configuration verified for API Gateway"
 
           # Set permissions (will fail silently if already exists)
           echo "Setting up Lambda permissions..."
