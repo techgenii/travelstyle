@@ -44,6 +44,7 @@ jobs:
       CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
       TS_ENVIRONMENT: ${{ secrets.TS_ENVIRONMENT || 'development' }}
       CORS_ORIGINS: ${{ secrets.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000' }}
+      COOKIE_SAME_SITE: ${{ secrets.COOKIE_SAME_SITE || 'None' }}
 
     steps:
       - name: Checkout code
@@ -161,6 +162,7 @@ jobs:
             --arg CLOUDINARY_API_SECRET "$CLOUDINARY_API_SECRET" \
             --arg TS_ENVIRONMENT "$TS_ENVIRONMENT" \
             --arg CORS_ORIGINS "$CORS_ORIGINS" \
+            --arg COOKIE_SAME_SITE "$COOKIE_SAME_SITE" \
             '{
               Variables: {
                 OPENAI_API_KEY: $OPENAI_API_KEY,
@@ -174,12 +176,13 @@ jobs:
                 CLOUDINARY_API_KEY: $CLOUDINARY_API_KEY,
                 CLOUDINARY_API_SECRET: $CLOUDINARY_API_SECRET,
                 TS_ENVIRONMENT: $TS_ENVIRONMENT,
-                CORS_ORIGINS: $CORS_ORIGINS
+                CORS_ORIGINS: $CORS_ORIGINS,
+                COOKIE_SAME_SITE: $COOKIE_SAME_SITE
               }
             }')
           # ENVIRONMENT_VARS="Variables={OPENAI_API_KEY=$OPENAI_API_KEY,OPENAI_ORG_ID=$OPENAI_ORG_ID,QLOO_API_KEY=$QLOO_API_KEY,VISUALCROSSING_API_KEY=$VISUALCROSSING_API_KEY,EXCHANGE_API_KEY=$EXCHANGE_API_KEY,SUPABASE_URL=$SUPABASE_URL,SUPABASE_KEY=$SUPABASE_KEY,CLOUDINARY_CLOUD_NAME=$CLOUDINARY_CLOUD_NAME,CLOUDINARY_API_KEY=$CLOUDINARY_API_KEY,CLOUDINARY_API_SECRET=$CLOUDINARY_API_SECRET,TS_ENVIRONMENT=$TS_ENVIRONMENT,CORS_ORIGINS=$CORS_ORIGINS}"
 
-          echo "Environment variables configured (count: 12)"
+          echo "Environment variables configured (count: 13)"
           echo "Environment variables configured and ready for deployment"
 
           if aws lambda get-function --function-name $FUNCTION_NAME &>/dev/null; then
@@ -319,6 +322,51 @@ jobs:
             --api-id $API_ID \
             --stage-name '$default' \
             --auto-deploy 2>/dev/null || echo "Stage $default already exists"
+
+          # Configure CORS for API Gateway (CRITICAL for cookie support)
+          echo "Configuring CORS for API Gateway..."
+
+          # Parse CORS origins from environment variable
+          if [ "$CORS_ORIGINS" = "*" ]; then
+            CORS_ALLOW_ORIGINS="*"
+            CORS_ALLOW_CREDENTIALS="false"
+            # Build CORS config JSON for wildcard
+            CORS_CONFIG=$(jq -n \
+              --argjson allow_origins '["*"]' \
+              --argjson allow_credentials false \
+              '{
+                AllowOrigins: $allow_origins,
+                AllowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+                AllowHeaders: ["*"],
+                AllowCredentials: $allow_credentials,
+                MaxAge: 3600
+              }')
+          else
+            # Convert comma-separated origins to JSON array
+            CORS_ALLOW_ORIGINS=$(echo "$CORS_ORIGINS" | jq -R -s -c 'split(",") | map(gsub("^\\s+|\\s+$"; ""))')
+            CORS_ALLOW_CREDENTIALS="true"
+            # Build CORS config JSON for specific origins
+            CORS_CONFIG=$(jq -n \
+              --argjson allow_origins "$CORS_ALLOW_ORIGINS" \
+              --argjson allow_credentials true \
+              '{
+                AllowOrigins: $allow_origins,
+                AllowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+                AllowHeaders: ["*"],
+                AllowCredentials: $allow_credentials,
+                MaxAge: 3600
+              }')
+          fi
+
+          # Update API with CORS configuration
+          echo "Updating API Gateway with CORS configuration..."
+          aws apigatewayv2 update-api \
+            --api-id $API_ID \
+            --cors-configuration "$CORS_CONFIG" || echo "CORS configuration may already be set"
+
+          echo "✅ CORS configured for API Gateway"
+          echo "   AllowOrigins: $CORS_ALLOW_ORIGINS"
+          echo "   AllowCredentials: $CORS_ALLOW_CREDENTIALS"
 
           # Set permissions (will fail silently if already exists)
           echo "Setting up Lambda permissions..."

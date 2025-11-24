@@ -62,13 +62,15 @@ async def login(login_data: LoginRequest, request: Request, response: Response):
     try:
         login_response, token_pair = await auth_service.login(login_data)
 
-        # Set secure cookies (use HTTPS detection for secure flag)
+        # Set secure cookies
+        # For SameSite=None, Secure MUST be True (browser requirement)
+        # In production/Lambda, always use Secure=True
         set_auth_cookies(
             response=response,
             access_token=token_pair.access_token,
             refresh_token=token_pair.refresh_token,
             access_ttl=token_pair.expires_in,
-            secure=request.url.scheme == "https",
+            secure=True,  # Always True for cross-site cookies (SameSite=None requires Secure)
             same_site=settings.COOKIE_SAME_SITE,
         )
 
@@ -77,7 +79,6 @@ async def login(login_data: LoginRequest, request: Request, response: Response):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
-            headers={"WWW-Authenticate": "Bearer"},
         ) from e
     except Exception as e:  # pylint: disable=broad-except
         raise HTTPException(
@@ -168,13 +169,14 @@ async def refresh_token(request: Request, response: Response):
 
         refresh_response, token_pair = await auth_service.refresh_token(refresh_token_value)
 
-        # Rotate cookies with new tokens (use HTTPS detection for secure flag)
+        # Rotate cookies with new tokens
+        # For SameSite=None, Secure MUST be True (browser requirement)
         set_auth_cookies(
             response=response,
             access_token=token_pair.access_token,
             refresh_token=token_pair.refresh_token,
             access_ttl=token_pair.expires_in,
-            secure=request.url.scheme == "https",
+            secure=True,  # Always True for cross-site cookies (SameSite=None requires Secure)
             same_site=settings.COOKIE_SAME_SITE,
         )
 
@@ -189,7 +191,6 @@ async def refresh_token(request: Request, response: Response):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
-            headers={"WWW-Authenticate": "Bearer"},  # pylint: disable=line-too-long
         ) from e
     except Exception as e:  # pylint: disable=broad-except
         clear_auth_cookies(response)
@@ -213,13 +214,14 @@ async def register(register_data: RegisterRequest, request: Request, response: R
             last_name=register_data.last_name,
         )
 
-        # Set secure cookies after registration (use HTTPS detection for secure flag)
+        # Set secure cookies after registration
+        # For SameSite=None, Secure MUST be True (browser requirement)
         set_auth_cookies(
             response=response,
             access_token=token_pair.access_token,
             refresh_token=token_pair.refresh_token,
             access_ttl=token_pair.expires_in,
-            secure=request.url.scheme == "https",
+            secure=True,  # Always True for cross-site cookies (SameSite=None requires Secure)
             same_site=settings.COOKIE_SAME_SITE,
         )
 

@@ -77,7 +77,9 @@ class Settings(BaseSettings):
 
     # Cookie settings
     COOKIE_SECURE: bool = True  # Set to False for local development
-    COOKIE_SAME_SITE: str = "Strict"  # or "Lax" if needed
+    COOKIE_SAME_SITE: str = (
+        "None"  # Required for cross-origin cookie sending (requires secure=True)
+    )
 
     # CORS Configuration
     CORS_ORIGINS: str = "*"  # Comma-separated list of allowed origins, or "*" for all

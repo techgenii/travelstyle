@@ -39,7 +39,6 @@ async def get_current_user(request: Request) -> dict:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
     )
 
     # Try to get access token from cookie

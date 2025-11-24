@@ -57,6 +57,10 @@ def set_auth_cookies(
         secure: Whether to set Secure flag (default: True, use False for local dev)
         same_site: SameSite attribute (default: "Strict")
     """
+    # When SameSite=None, Secure MUST be True (browser requirement)
+    if same_site.lower() == "none":
+        secure = True
+
     # Set access token cookie
     response.set_cookie(
         key=ACCESS_TOKEN_COOKIE,
@@ -66,6 +70,7 @@ def set_auth_cookies(
         secure=secure,
         samesite=same_site,
         path="/",
+        # Domain is omitted for host-only cookie (most reliable for cross-site)
     )
 
     # Set refresh token cookie
@@ -77,6 +82,7 @@ def set_auth_cookies(
         secure=secure,
         samesite=same_site,
         path="/",
+        # Domain is omitted for host-only cookie (most reliable for cross-site)
     )
 
     logger.debug("Auth cookies set successfully")
@@ -89,6 +95,8 @@ def clear_auth_cookies(response: Response) -> None:
     Args:
         response: FastAPI Response object
     """
+    from app.core.config import settings
+
     # Clear access token cookie
     response.set_cookie(
         key=ACCESS_TOKEN_COOKIE,
@@ -96,7 +104,7 @@ def clear_auth_cookies(response: Response) -> None:
         max_age=0,
         httponly=True,
         secure=True,
-        samesite="Strict",
+        samesite=settings.COOKIE_SAME_SITE,
         path="/",
         expires=datetime.now(UTC) - timedelta(days=1),
     )
@@ -108,7 +116,7 @@ def clear_auth_cookies(response: Response) -> None:
         max_age=0,
         httponly=True,
         secure=True,
-        samesite="Strict",
+        samesite=settings.COOKIE_SAME_SITE,
         path="/",
         expires=datetime.now(UTC) - timedelta(days=1),
     )
