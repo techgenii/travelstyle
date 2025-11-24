@@ -52,7 +52,7 @@ router = APIRouter()
 
 # pylint: disable=line-too-long
 @router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
-async def login(login_data: LoginRequest, response: Response):
+async def login(login_data: LoginRequest, request: Request, response: Response):
     """
     Authenticate user with email and password.
 
@@ -62,13 +62,13 @@ async def login(login_data: LoginRequest, response: Response):
     try:
         login_response, token_pair = await auth_service.login(login_data)
 
-        # Set secure cookies
+        # Set secure cookies (use HTTPS detection for secure flag)
         set_auth_cookies(
             response=response,
             access_token=token_pair.access_token,
             refresh_token=token_pair.refresh_token,
             access_ttl=token_pair.expires_in,
-            secure=settings.TS_ENVIRONMENT != "development",
+            secure=request.url.scheme == "https",
             same_site=settings.COOKIE_SAME_SITE,
         )
 
@@ -168,13 +168,13 @@ async def refresh_token(request: Request, response: Response):
 
         refresh_response, token_pair = await auth_service.refresh_token(refresh_token_value)
 
-        # Rotate cookies with new tokens
+        # Rotate cookies with new tokens (use HTTPS detection for secure flag)
         set_auth_cookies(
             response=response,
             access_token=token_pair.access_token,
             refresh_token=token_pair.refresh_token,
             access_ttl=token_pair.expires_in,
-            secure=settings.TS_ENVIRONMENT != "development",
+            secure=request.url.scheme == "https",
             same_site=settings.COOKIE_SAME_SITE,
         )
 
@@ -199,7 +199,7 @@ async def refresh_token(request: Request, response: Response):
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
-async def register(register_data: RegisterRequest, response: Response):
+async def register(register_data: RegisterRequest, request: Request, response: Response):
     """
     Register new user account.
 
@@ -213,13 +213,13 @@ async def register(register_data: RegisterRequest, response: Response):
             last_name=register_data.last_name,
         )
 
-        # Set secure cookies after registration
+        # Set secure cookies after registration (use HTTPS detection for secure flag)
         set_auth_cookies(
             response=response,
             access_token=token_pair.access_token,
             refresh_token=token_pair.refresh_token,
             access_ttl=token_pair.expires_in,
-            secure=settings.TS_ENVIRONMENT != "development",
+            secure=request.url.scheme == "https",
             same_site=settings.COOKIE_SAME_SITE,
         )
 
