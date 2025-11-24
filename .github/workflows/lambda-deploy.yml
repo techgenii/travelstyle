@@ -256,13 +256,14 @@ jobs:
             CORS_ALLOW_ORIGINS="*"
             CORS_ALLOW_CREDENTIALS="false"
             # Build CORS config JSON for wildcard
+            # Note: API Gateway HTTP API doesn't support "*" for AllowHeaders, must list explicitly
             CORS_CONFIG=$(jq -n \
               --argjson allow_origins '["*"]' \
               --argjson allow_credentials false \
               '{
                 AllowOrigins: $allow_origins,
                 AllowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
-                AllowHeaders: ["*"],
+                AllowHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
                 AllowCredentials: $allow_credentials,
                 MaxAge: 3600
               }')
@@ -271,13 +272,14 @@ jobs:
             CORS_ALLOW_ORIGINS=$(echo "$CORS_ORIGINS" | jq -R -s -c 'split(",") | map(gsub("^\\s+|\\s+$"; ""))')
             CORS_ALLOW_CREDENTIALS="true"
             # Build CORS config JSON for specific origins
+            # Note: API Gateway HTTP API doesn't support "*" for AllowHeaders, must list explicitly
             CORS_CONFIG=$(jq -n \
               --argjson allow_origins "$CORS_ALLOW_ORIGINS" \
               --argjson allow_credentials true \
               '{
                 AllowOrigins: $allow_origins,
                 AllowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
-                AllowHeaders: ["*"],
+                AllowHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
                 AllowCredentials: $allow_credentials,
                 MaxAge: 3600
               }')
